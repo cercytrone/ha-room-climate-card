@@ -1,0 +1,3 @@
+# Minimalkonfiguration: nur ein Temperatursensor.
+type: custom:room-climate-card
+temperature_entity: sensor.wohnzimmer_temperature

@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.log
+coverage/
+.tmp/
+.vite/
+*.tsbuildinfo
+
+# The production bundle in dist/ is intentionally committed: HACS serves it
+# directly from the repository / the GitHub release.
+.tmp/

@@ -1,0 +1,40 @@
+# Vollausbau: alle optionalen Bereiche aktiv, 12-h-Verlauf mit Legende.
+type: custom:room-climate-card
+name: Wohnzimmer
+icon: mdi:sofa
+height: auto
+border_radius: 18
+theme: auto
+
+temperature_entity: sensor.wohnzimmer_temperature
+humidity_entity: sensor.wohnzimmer_humidity
+temperature_decimals: 1
+humidity_decimals: 0
+
+show_window: true
+window_entity: binary_sensor.wohnzimmer_fenster
+window_open_states: [on, open, tilted]
+
+show_motion: true
+motion_entity: binary_sensor.wohnzimmer_bewegung
+motion_show_last_changed: true
+
+show_thermostat: true
+climate_entity: climate.wohnzimmer
+show_setpoint: true
+show_hvac_status: true
+show_hvac_mode: true
+heating_color: '#fb923c'
+heating_idle_color: '#94a3b8'
+heating_off_color: '#64748b'
+
+chart_hours: 12
+chart_height: 96
+chart_curve: smooth
+chart_show_legend: true
+chart_show_grid: true
+chart_show_points: false
+
+temperature_cool_below: 19
+temperature_warm_above: 25
+temperature_hot_above: 28

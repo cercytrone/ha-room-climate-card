@@ -1,0 +1,251 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import '../src/editor/room-climate-editor';
+import type { RoomClimateCardConfig } from '../src/config';
+import type { RoomClimateCardEditor } from '../src/editor/room-climate-editor';
+import { createHass, entity } from './helpers';
+
+/** Minimal stand-in for the Home Assistant `ha-selector` element. */
+class StubSelector extends HTMLElement {
+  hass?: unknown;
+  selector: Record<string, any> = { text: {} };
+  label = '';
+  value: unknown = undefined;
+  disabled = false;
+
+  get type(): string {
+    return Object.keys(this.selector)[0] ?? 'text';
+  }
+
+  emit(value: unknown): void {
+    this.dispatchEvent(
+      new CustomEvent('value-changed', { detail: { value }, bubbles: true, composed: true })
+    );
+  }
+}
+
+if (!customElements.get('ha-selector')) {
+  customElements.define('ha-selector', StubSelector);
+}
+
+const hass = createHass({
+  states: [
+    entity('sensor.temp', { state: '21', attributes: { device_class: 'temperature' } }),
+    entity('sensor.humidity', { state: '50', attributes: { device_class: 'humidity' } }),
+    entity('binary_sensor.window', { state: 'off', attributes: { device_class: 'window' } }),
+    entity('climate.thermostat', { state: 'heat' }),
+  ],
+});
+
+async function mountEditor(config: unknown): Promise<RoomClimateCardEditor> {
+  const editor = document.createElement('room-climate-card-editor') as RoomClimateCardEditor;
+  editor.hass = hass;
+  editor.setConfig(config);
+  document.body.append(editor);
+  await editor.updateComplete;
+  return editor;
+}
+
+function selectors(editor: RoomClimateCardEditor): StubSelector[] {
+  return Array.from(editor.shadowRoot!.querySelectorAll('ha-selector')) as StubSelector[];
+}
+
+function selectorByLabel(editor: RoomClimateCardEditor, label: string): StubSelector {
+  const found = selectors(editor).find((element) => element.label === label);
+  if (!found) throw new Error(`selector "${label}" not found`);
+  return found;
+}
+
+function openAll(editor: RoomClimateCardEditor): void {
+  for (const section of editor.shadowRoot!.querySelectorAll('details')) {
+    section.open = true;
+  }
+}
+
+const baseConfig: RoomClimateCardConfig = {
+  type: 'custom:room-climate-card',
+  name: 'Wohnzimmer',
+  temperature_entity: 'sensor.temp',
+  humidity_entity: 'sensor.humidity',
+  window_entity: 'binary_sensor.window',
+  climate_entity: 'climate.thermostat',
+  custom_key: 42,
+};
+
+describe('room climate card editor', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('renders every configuration section', async () => {
+    const editor = await mountEditor(baseConfig);
+    const titles = Array.from(editor.shadowRoot!.querySelectorAll('.section-title')).map(
+      (element) => element.textContent?.trim()
+    );
+    expect(titles).toEqual([
+      'Allgemein',
+      'Sensoren',
+      'Farben & Grenzwerte',
+      'Fenster',
+      'Bewegung',
+      'Thermostat',
+      'Verlauf',
+    ]);
+  });
+
+  it('uses native entity selectors filtered by domain', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Temperatursensor').selector).toEqual({
+      entity: { domain: 'sensor', multiple: false },
+    });
+    expect(selectorByLabel(editor, 'Fensterkontakt').selector).toEqual({
+      entity: { domain: ['binary_sensor', 'input_boolean', 'sensor'], multiple: false },
+    });
+    expect(selectorByLabel(editor, 'Thermostat-Entität').selector).toEqual({
+      entity: { domain: 'climate', multiple: false },
+    });
+  });
+
+  it('shows the stored configuration', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Raumname').value).toBe('Wohnzimmer');
+    expect(selectorByLabel(editor, 'Temperatursensor').value).toBe('sensor.temp');
+    expect(selectorByLabel(editor, 'Kartenhöhe').value).toBe(240);
+    expect((selectorByLabel(editor, 'Höhe automatisch (Inhalt)') as StubSelector).value).toBe(true);
+  });
+
+  it('emits config-changed with the merged configuration', async () => {
+    const editor = await mountEditor(baseConfig);
+    let detail: { config: RoomClimateCardConfig } | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      detail = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail;
+    });
+
+    selectorByLabel(editor, 'Raumname').emit('Küche');
+
+    expect(detail?.config.name).toBe('Küche');
+    expect(detail?.config.temperature_entity).toBe('sensor.temp');
+    expect(detail?.config.custom_key).toBe(42);
+    expect(detail?.config.type).toBe('custom:room-climate-card');
+    expect(editor.config.name).toBe('Küche');
+  });
+
+  it('keeps the selected values after being reconfigured', async () => {
+    const editor = await mountEditor(baseConfig);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+    selectorByLabel(editor, 'Raumname').emit('Küche');
+
+    editor.setConfig(emitted);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Raumname').value).toBe('Küche');
+  });
+
+  it('disables window fields when the window section is off', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Fensterkontakt').disabled).toBe(false);
+
+    selectorByLabel(editor, 'Fensterstatus anzeigen').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Fensterkontakt').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Zustände für „offen“').disabled).toBe(true);
+  });
+
+  it('disables thermostat colours when the thermostat is off', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    selectorByLabel(editor, 'Thermostat anzeigen').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Farbe Heizen').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Solltemperatur anzeigen').disabled).toBe(true);
+  });
+
+  it('disables chart options when no chart series is enabled', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    selectorByLabel(editor, 'Temperaturverlauf anzeigen').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    selectorByLabel(editor, 'Luftfeuchteverlauf anzeigen').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Zeitraum').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Chart-Höhe').disabled).toBe(true);
+  });
+
+  it('enables the fixed height field when automatic height is switched off', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Kartenhöhe').disabled).toBe(true);
+    selectorByLabel(editor, 'Höhe automatisch (Inhalt)').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(240);
+    expect(selectorByLabel(editor, 'Kartenhöhe').disabled).toBe(false);
+  });
+
+  it('converts colour selector values to hex strings', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+    selectorByLabel(editor, 'Farbe Heizen').emit([255, 128, 0]);
+    expect(emitted?.heating_color).toBe('#ff8000');
+  });
+
+  it('converts the chart period select to a number', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+    selectorByLabel(editor, 'Zeitraum').emit('24');
+    expect(emitted?.chart_hours).toBe(24);
+  });
+
+  it('provides a state selector for window open states', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Zustände für „offen“').selector).toEqual({
+      state: { entity_id: 'binary_sensor.window', multiple: true },
+    });
+  });
+
+  it('falls back to a text field for open states without an entity', async () => {
+    const editor = await mountEditor({ type: 'custom:room-climate-card', show_window: true });
+    openAll(editor);
+    const field = selectorByLabel(editor, 'Zustände für „offen“');
+    expect(field.selector).toEqual({ text: {} });
+    field.emit('on, tilted');
+    await editor.updateComplete;
+    expect(editor.config.window_open_states).toEqual(['on', 'tilted']);
+  });
+
+  it('uses english labels for english locales', async () => {
+    const editor = document.createElement('room-climate-card-editor') as RoomClimateCardEditor;
+    editor.hass = createHass({ language: 'en' });
+    editor.setConfig(baseConfig);
+    document.body.append(editor);
+    await editor.updateComplete;
+    const titles = Array.from(editor.shadowRoot!.querySelectorAll('.section-title')).map(
+      (element) => element.textContent?.trim()
+    );
+    expect(titles[0]).toBe('General');
+  });
+
+  it('survives an empty configuration', async () => {
+    const editor = await mountEditor(undefined);
+    expect(editor.shadowRoot!.querySelectorAll('.section').length).toBe(7);
+    expect(editor.config.type).toBe('custom:room-climate-card');
+  });
+});

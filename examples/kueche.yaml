@@ -1,0 +1,13 @@
+# Kompakte Karte: Fensterwarnung im Vordergrund, keine Bewegungsanzeige.
+type: custom:room-climate-card
+name: Küche
+icon: mdi:stove
+height: 200
+temperature_entity: sensor.kueche_temperature
+humidity_entity: sensor.kueche_humidity
+show_window: true
+window_entity: binary_sensor.kueche_fenster
+show_motion: false
+show_thermostat: false
+chart_hours: 6
+chart_height: 60
