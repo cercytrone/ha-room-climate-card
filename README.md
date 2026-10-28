@@ -50,7 +50,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Thermostat** | Optional. Solltemperatur, HVAC-Modus und Heizstatus (Heizt / Ruht / Aus / Unbekannt) mit eigenen Farben. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 3–48 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende, Gitter, Datenpunkte. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende, Gitter, Datenpunkte. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
 | **Robustheit** | `unavailable`/`unknown`/fehlende Entitäten, fehlende Attribute, kaputtes YAML – die Karte stürzt nicht ab. |
@@ -80,6 +80,13 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
    - URL: `/local/ha-room-climate-card.js`
    - Typ: **JavaScript-Modul**
 4. Seite neu laden.
+
+### Repository-Metadaten (nur für Maintainer)
+
+Für die Aufnahme als HACS-Default-Repository müssen im GitHub-Repository **Topics** gesetzt sein
+(Settings → Topics), z. B. `home-assistant`, `hacs`, `lovelace`, `custom-card`, `climate`,
+`dashboard`. Der Workflow *HACS validation* prüft das und schlägt fehl, solange keine Topics
+existieren. Für die Installation als benutzerdefiniertes Repository sind Topics nicht nötig.
 
 ### Ressource prüfen / Browser-Cache leeren
 
@@ -314,8 +321,9 @@ die Karte „Status unbekannt“ statt einen Zustand zu erfinden.
 | Änderungen im Editor erscheinen nicht | Browser-Cache: Hard-Reload; Versionsparameter an der Ressourcen-URL ergänzen. |
 | Karte nach Update unverändert | HACS-Update durchführen, danach HA-Frontend neu laden und Browser-Cache leeren. |
 
-Debug-Ausgaben: In der Browser-Konsole hilft `localStorage.setItem('debug', 'room-climate-card*')`
-nicht – die Karte loggt bewusst nur die Version.
+Debug-Ausgaben: Die Karte loggt bewusst nur ihre Version in der Browser-Konsole. Für die
+Fehlersuche ist die Konfiguration der Karte (Dashboard → Karte bearbeiten → YAML anzeigen) und
+der Zustand der Entität unter *Entwicklerwerkzeuge → Zustände* maßgeblich.
 
 ---
 
