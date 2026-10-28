@@ -10,7 +10,7 @@
 import {
   areaPath,
   bandColorFor,
-  buildRuns,
+  buildSegments,
   linearScale,
   padDomain,
   projectRun,
@@ -181,10 +181,19 @@ function renderCard(options: CardOptions): string {
     opacityBottom: 0.02,
   });
 
-  const runs = buildRuns(options.series, rangeMs).runs;
-  const humidityRuns = options.humiditySeries
-    ? buildRuns(options.humiditySeries, rangeMs).runs
+  // Mirror the card: holes are interpolated, the outer samples held to the edges.
+  const segments = buildSegments(options.series, {
+    rangeMs,
+    start,
+    end,
+    gapMode: 'connect',
+    maxGapMs: 120 * 60 * 1000,
+  });
+  const humiditySegments = options.humiditySeries
+    ? buildSegments(options.humiditySeries, { rangeMs, start, end, gapMode: 'connect' })
     : [];
+  const runs = segments.map((segment) => segment.samples);
+  const humidityRuns = humiditySegments.map((segment) => segment.samples);
 
   const smooth = options.smooth !== false;
   const paths = runs
@@ -229,12 +238,14 @@ function renderCard(options: CardOptions): string {
         .join('')
     : '';
 
+  const cornerInset = 20;
+  const labelScale = linearScale([start, end], [x + 2 + cornerInset, x + CARD_W - 2 - cornerInset]);
   const axis = timeTicks(start, end, 4)
     .map((tick, index) => {
       const date = new Date(tick);
       const label = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
       const anchor = index === 0 ? 'start' : index === 3 ? 'end' : 'middle';
-      return `<text x="${xScale(tick).toFixed(1)}" y="${chartY + chartH - 2}" ${font(
+      return `<text x="${labelScale(tick).toFixed(1)}" y="${chartY + chartH - 5}" ${font(
         9.5
       )} fill="${COLORS.muted}" text-anchor="${anchor}">${label}</text>`;
     })

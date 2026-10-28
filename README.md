@@ -96,7 +96,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.1.0`.
+  `ROOM-CLIMATE-CARD v1.1.1`.
 
 ---
 
@@ -215,6 +215,9 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 | `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48). |
 | `chart_height` | number | `84` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
 | `chart_curve` | `smooth` \| `linear` | `smooth` | Geglättete (überschwingungsfreie) oder direkt verbundene Linien. |
+| `chart_gap_mode` | `connect` \| `break` | `connect` | Datenlücken linear interpolieren (durchgehende Linie) oder sichtbar unterbrochen lassen. |
+| `chart_max_gap_minutes` | number | `120` | Größte Lücke (Minuten), die noch interpoliert wird; längere bleiben offen. |
+| `chart_gap_style` | `solid` \| `dashed` | `solid` | Interpolierte Abschnitte wie gemessene zeichnen oder gestrichelt hervorheben. |
 | `chart_show_legend` | boolean | `false` | Legende mit aktuellen Werten. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `true` | Feine Gitternetzlinien. |
@@ -234,7 +237,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur (über Istwert), Heizstatus-Icon, HVAC-Modus, drei Icon-Farben (rot/grün/grau) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenart, Gitter, Legende, Datenpunkte |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenart, Datenlücken (interpolieren/unterbrechen), maximale Lücke, Stil interpolierter Abschnitte, Gitter, Legende, Datenpunkte |
 
 Nicht benötigte Felder werden automatisch deaktiviert (z. B. Farben ohne Thermostat,
 Chart-Optionen ohne aktive Kurve). Jede Änderung löst sofort `config-changed` aus; die
@@ -254,8 +257,15 @@ YAML bleiben unangetastet.
   Karten-Resize oder Theme-Wechsel erzeugt keine neuen Requests. Aktualisierung alle 5 Minuten
   und sofort, wenn die Verbindung zurückkehrt.
 - **Aufbereitung:** Nicht numerische Zustände (`unavailable`, `unknown`, Text) werden als Lücke
-  behandelt. Zeitliche Lücken werden adaptiv an das Meldeintervall des Sensors erkannt, damit
-  langsam aktualisierende Sensoren keine gepunktete Linie erzeugen.
+  behandelt. Zeitliche Lücken werden adaptiv am Median-Meldeintervall des Sensors erkannt
+  (Untergrenze `max(Fenster/40, 5 min)`), damit langsam aktualisierende Sensoren keine
+  gepunktete Linie erzeugen.
+- **Datenlücken:** Home Assistant speichert nur Zustands*änderungen* – bleibt ein Wert konstant,
+  entsteht eine Lücke, obwohl der Sensor einwandfrei arbeitet. Solche Lücken werden bis
+  `chart_max_gap_minutes` linear zwischen den beiden echten Messwerten überbrückt; die Linie ist
+  durchgehend (`chart_gap_style: solid`, Standard) oder gestrichelt (`dashed`). Größere Lücken
+  bleiben offen – es werden keine Stunden erfunden. Der erste und letzte Messwert werden bis an
+  die Fensterkanten gehalten, weil ein HA-Zustand bis zur nächsten Änderung gilt.
 - **Glättung:** Monotone kubische Interpolation (Fritsch–Carlson) – die Kurve überschwingt
   nicht und bleibt innerhalb der Messwerte.
 - **Farben:** Die Temperaturkurve nutzt einen vertikalen Verlauf, der exakt an den
@@ -265,7 +275,9 @@ YAML bleiben unangetastet.
   lesbar bleiben.
 - **Responsiv:** Die Chart zeichnet neu auf Basis der gemessenen Pixelgröße
   (`ResizeObserver`), Achsenbeschriftungen und Legende entfallen bei zu wenig Platz, unter
-  40 × 34 px wird nichts gezeichnet statt zu verzerren.
+  40 × 34 px wird nichts gezeichnet statt zu verzerren. Die Zeitbeschriftung wird um den
+  Karten-Eckenradius eingerückt, damit erstes und letztes Label nicht im abgerundeten Eck
+  verschwinden.
 - **Fallbacks:** Ladezustand („Verlauf wird geladen …“), leerer Zeitraum („Keine
   Verlaufsdaten“) und Fehler („Verlauf konnte nicht geladen werden“).
 
@@ -335,7 +347,8 @@ heating_off_color: '#64748b'    # grau, wenn ausgeschaltet ist
 | „Custom element doesn't exist: room-climate-card“ | Ressource fehlt oder wurde als *JavaScript-Modul* nicht registriert. URL prüfen, Typ auf „JavaScript-Modul“ stellen, Seite neu laden. |
 | Karte zeigt „–“ | Entität ist `unavailable`/`unknown` oder liefert keinen numerischen Zustand. In *Entwicklerwerkzeuge → Zustände* prüfen. |
 | Kein Verlaufsdatum | Der Recorder ist deaktiviert, die Entität wird nicht aufgezeichnet, oder der Zeitraum liegt vor dem Retention-Zeitfenster (`recorder: purge_keep_days`). |
-| Chart zeigt Lücken | Genau so wurden keine Werte aufgezeichnet (Sensor offline). Das ist korrekt. |
+| Chart zeigt Lücken | Bewusst so konfiguriert (`chart_gap_mode: break`) oder die Lücke ist größer als `chart_max_gap_minutes`. |
+| Linie wirkt an einer Stelle „gerade“ | Dort wurde eine Datenlücke interpoliert (Standard: durchgezogen). Mit `chart_gap_style: dashed` wird der Abschnitt als interpoliert markiert. |
 | Thermostat-Icon bleibt grau/gestrichelt | Die Integration liefert kein `hvac_action`. Bewusst kein erfundenes „Heizt“ – der Tooltip nennt den Grund. |
 | Icon-Farbe passt nicht | `heating_color`, `heating_idle_color`, `heating_off_color` im Editor setzen. |
 | Änderungen im Editor erscheinen nicht | Browser-Cache: Hard-Reload; Versionsparameter an der Ressourcen-URL ergänzen. |
@@ -369,15 +382,15 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 159 Tests in 10 Dateien aus (Stand 1.1.0):
+`npm test` führt 182 Tests in 10 Dateien aus (Stand 1.1.1):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
 | `tests/config.test.ts` | Standardwerte, kaputte Eingaben, optionale Bereiche, Grenzwerte, Namensauflösung |
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
-| `tests/geometry.test.ts` | Skalen, Lücken-Erkennung, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
-| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, SVG-Größe, Resize ohne Verzerrung, Legende, Punkte, Gitter |
+| `tests/geometry.test.ts` | Skalen, Lücken-Erkennung, Interpolation von Lücken, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
+| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei Lücken, `break`-Modus, maximale Brücke, gestrichelte Brücken, Label-Abstand zu den Ecken, Legende, Punkte, Gitter |
 | `tests/card.test.ts` | Rendering, Formatierung, Farben, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
 | `tests/editor.test.ts` | Abschnitte, Selektoren, Werte, `config-changed`, deaktivierte Felder, Persistenz, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |

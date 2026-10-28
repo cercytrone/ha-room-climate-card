@@ -70,6 +70,14 @@ interface EditorText {
   curve: string;
   curveSmooth: string;
   curveLinear: string;
+  gapMode: string;
+  gapConnect: string;
+  gapBreak: string;
+  gapHelper: string;
+  maxGap: string;
+  gapStyle: string;
+  gapStyleSolid: string;
+  gapStyleDashed: string;
   grid: string;
   legend: string;
   points: string;
@@ -138,6 +146,15 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     curve: 'Kurvenverlauf',
     curveSmooth: 'Geglättet',
     curveLinear: 'Direkt verbunden',
+    gapMode: 'Datenlücken',
+    gapConnect: 'Durchgehend interpolieren',
+    gapBreak: 'Unterbrochen darstellen',
+    gapHelper:
+      'Home Assistant speichert nur Änderungen – Lücken entstehen auch bei konstanten Werten.',
+    maxGap: 'Maximal interpolierte Lücke',
+    gapStyle: 'Darstellung interpolierter Abschnitte',
+    gapStyleSolid: 'Durchgezogen (empfohlen)',
+    gapStyleDashed: 'Gestrichelt',
     grid: 'Gitternetz',
     legend: 'Legende',
     points: 'Datenpunkte',
@@ -204,6 +221,15 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     curve: 'Curve',
     curveSmooth: 'Smoothed',
     curveLinear: 'Straight',
+    gapMode: 'Data gaps',
+    gapConnect: 'Interpolate continuously',
+    gapBreak: 'Show as broken',
+    gapHelper:
+      'Home Assistant only stores changes – gaps also appear while values stay constant.',
+    maxGap: 'Largest interpolated gap',
+    gapStyle: 'Style of interpolated parts',
+    gapStyleSolid: 'Solid (recommended)',
+    gapStyleDashed: 'Dashed',
     grid: 'Grid lines',
     legend: 'Legend',
     points: 'Data points',
@@ -714,6 +740,45 @@ export class RoomClimateCardEditor extends LitElement {
         },
         value: this.stringValue('chart_curve', 'smooth'),
         disabled: !anyChart,
+      })}
+      ${this.renderField({
+        key: 'chart_gap_mode',
+        label: t.gapMode,
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'connect', label: t.gapConnect },
+              { value: 'break', label: t.gapBreak },
+            ],
+          },
+        },
+        value: this.stringValue('chart_gap_mode', 'connect'),
+        disabled: !anyChart,
+        helper: t.gapHelper,
+        onChange: (value) => this.patch({ chart_gap_mode: String(value) }),
+      })}
+      ${this.renderField({
+        key: 'chart_max_gap_minutes',
+        label: t.maxGap,
+        selector: { number: { min: 5, max: 720, step: 5, mode: 'box', unit_of_measurement: 'min' } },
+        value: this.numberValue('chart_max_gap_minutes', 120),
+        disabled: !anyChart || this.stringValue('chart_gap_mode', 'connect') === 'break',
+      })}
+      ${this.renderField({
+        key: 'chart_gap_style',
+        label: t.gapStyle,
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'solid', label: t.gapStyleSolid },
+              { value: 'dashed', label: t.gapStyleDashed },
+            ],
+          },
+        },
+        value: this.stringValue('chart_gap_style', 'solid'),
+        disabled: !anyChart || this.stringValue('chart_gap_mode', 'connect') === 'break',
       })}
       ${this.renderSwitch({
         key: 'chart_show_grid',

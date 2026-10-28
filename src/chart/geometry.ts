@@ -81,15 +81,45 @@ export function medianInterval(samples: ChartSample[]): number {
   return deltas.length % 2 ? deltas[middle] : (deltas[middle - 1] + deltas[middle]) / 2;
 }
 
+/** Linear-interpolated percentile of the intervals between samples. */
+export function intervalPercentile(samples: ChartSample[], fraction: number): number {
+  const deltas: number[] = [];
+  for (let i = 1; i < samples.length; i++) {
+    const delta = samples[i].t - samples[i - 1].t;
+    if (delta > 0) deltas.push(delta);
+  }
+  if (!deltas.length) return 0;
+  deltas.sort((a, b) => a - b);
+  const position = Math.min(1, Math.max(0, fraction)) * (deltas.length - 1);
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return deltas[lower];
+  return deltas[lower] + (deltas[upper] - deltas[lower]) * (position - lower);
+}
+
+export interface GapThresholdOptions {
+  /** Lower bound for a gap; smaller holes are just normal sampling jitter. */
+  minMs?: number;
+  /** Upper bound so a single long hole cannot swallow the whole chart. */
+  maxMs?: number;
+}
+
 /**
- * A gap breaks the line. The threshold adapts to the sensor's own reporting
- * interval so slow-polling sensors do not produce a dotted line.
+ * Customary spacing of a series. Home Assistant only stores state *changes*, so
+ * a sensor that reports every minute can still be silent for twenty minutes
+ * without being broken. The median is robust against a few long holes; the
+ * absolute floor keeps the threshold sane for fast reporting sensors.
  */
-export function gapThreshold(samples: ChartSample[], rangeMs: number): number {
-  const median = medianInterval(samples);
-  const adaptive = median > 0 ? median * 3 : 0;
-  const floor = Math.min(3 * 60 * 1000, Math.max(rangeMs / 20, 60 * 1000));
-  return Math.max(adaptive, floor);
+export function gapThreshold(
+  samples: ChartSample[],
+  rangeMs: number,
+  options: GapThresholdOptions = {}
+): number {
+  const spacing = medianInterval(samples);
+  const adaptive = spacing > 0 ? spacing * 2.5 : 0;
+  const minMs = options.minMs ?? Math.max(rangeMs / 40, 5 * 60 * 1000);
+  const maxMs = options.maxMs ?? Math.max(minMs, rangeMs / 3);
+  return Math.min(maxMs, Math.max(adaptive, minMs));
 }
 
 export interface Segments {
@@ -119,6 +149,165 @@ export function buildRuns(samples: ChartSample[], rangeMs: number): Segments {
   }
   if (current.length) runs.push(current);
   return { runs };
+}
+
+export type GapMode = 'connect' | 'break';
+
+export interface SegmentOptions {
+  /** Width of the visible time window in ms. */
+  rangeMs: number;
+  /** Window bounds; when given, the outer samples are held to the edges. */
+  start?: number;
+  end?: number;
+  /** `connect` interpolates small holes, `break` keeps them visible. */
+  gapMode?: GapMode;
+  /** Largest hole that will be interpolated (ms). */
+  maxGapMs?: number;
+}
+
+export interface SeriesSegment {
+  samples: ChartSample[];
+  /** `bridged[i]` marks the edge samples[i-1] → samples[i] as interpolated. */
+  bridged: boolean[];
+}
+
+const MAX_BRIDGE_POINTS = 8;
+
+function interpolate(
+  target: SeriesSegment,
+  from: ChartSample,
+  to: ChartSample,
+  threshold: number
+): void {
+  const span = to.t - from.t;
+  const fromValue = from.v as number;
+  const toValue = to.v as number;
+  const steps = Math.min(
+    MAX_BRIDGE_POINTS,
+    Math.max(1, Math.round(span / Math.max(threshold / 2, 60_000)))
+  );
+  // Intermediate anchors only – the caller appends the real end sample.
+  for (let step = 1; step < steps; step++) {
+    const ratio = step / steps;
+    target.samples.push({
+      t: Math.round(from.t + span * ratio),
+      v: fromValue + (toValue - fromValue) * ratio,
+    });
+    target.bridged.push(true);
+  }
+}
+
+/**
+ * Turns samples into renderable segments.
+ *
+ * - Holes shorter than `maxGapMs` are interpolated linearly, so the chart is
+ *   continuous while it still only uses values that were actually measured at
+ *   both ends of the hole.
+ * - Longer holes are kept broken (never invent hours of data).
+ * - The first and last sample are held to the window edges, because a Home
+ *   Assistant state is valid until it changes.
+ */
+export function buildSegments(
+  samples: ChartSample[],
+  options: SegmentOptions
+): SeriesSegment[] {
+  const { rangeMs, start, end } = options;
+  const gapMode: GapMode = options.gapMode ?? 'connect';
+  const threshold = gapThreshold(samples, rangeMs);
+  const maxGapMs = options.maxGapMs ?? rangeMs / 4;
+
+  const segments: SeriesSegment[] = [];
+  let current: SeriesSegment | null = null;
+  let previous: ChartSample | null = null;
+  let holeAt: number | null = null;
+  let leadingNull = false;
+  let trailingNull = false;
+
+  const flush = () => {
+    if (current && current.samples.length) segments.push(current);
+    current = null;
+    previous = null;
+  };
+
+  for (const sample of samples) {
+    if (sample.v === null || !Number.isFinite(sample.v)) {
+      if (!previous) leadingNull = true;
+      holeAt = holeAt ?? sample.t;
+      trailingNull = true;
+      continue;
+    }
+    trailingNull = false;
+
+    if (!previous || !current) {
+      current = { samples: [sample], bridged: [] };
+      previous = sample;
+      holeAt = null;
+      continue;
+    }
+
+    const delta = sample.t - previous.t;
+
+    if (delta <= threshold && holeAt === null) {
+      current.samples.push(sample);
+      current.bridged.push(false);
+      previous = sample;
+      continue;
+    }
+
+    const bridgeable = gapMode === 'connect' && delta <= maxGapMs;
+    if (bridgeable) {
+      interpolate(current, previous, sample, threshold);
+      current.samples.push(sample);
+      current.bridged.push(true);
+      previous = sample;
+      holeAt = null;
+      continue;
+    }
+
+    flush();
+    current = { samples: [sample], bridged: [] };
+    previous = sample;
+    holeAt = null;
+  }
+  flush();
+
+  if (!segments.length) return segments;
+
+  const first = segments[0];
+  if (!leadingNull && start !== undefined && first.samples[0].t > start) {
+    first.samples.unshift({ t: start, v: first.samples[0].v });
+    first.bridged.unshift(false);
+  }
+
+  if (trailingNull) {
+    // The sensor stopped reporting before the window ended: do not extend.
+    return segments;
+  }
+
+  const last = segments[segments.length - 1];
+  const lastSample = last.samples[last.samples.length - 1];
+  if (end !== undefined && lastSample.t < end) {
+    last.samples.push({ t: end, v: lastSample.v });
+    last.bridged.push(false);
+  }
+
+  return segments;
+}
+
+/** Splits a segment into sub-paths at interpolated edges (used for dashed gaps). */
+export function splitAtBridges(segment: SeriesSegment): ChartSample[][] {
+  if (!segment.bridged.some(Boolean)) return [segment.samples];
+  const parts: ChartSample[][] = [];
+  let current: ChartSample[] = [segment.samples[0]];
+  for (let i = 1; i < segment.samples.length; i++) {
+    current.push(segment.samples[i]);
+    if (segment.bridged[i]) {
+      parts.push(current);
+      current = [segment.samples[i]];
+    }
+  }
+  if (current.length > 1) parts.push(current);
+  return parts;
 }
 
 export function projectRun(

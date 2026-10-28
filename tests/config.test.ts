@@ -108,6 +108,34 @@ describe('normalizeConfig', () => {
     expect(config.window.openStates).toEqual(['on', 'tilted']);
   });
 
+  it('defaults the gap handling to a continuous, solid line', () => {
+    const config = normalizeConfig({ temperature_entity: 'sensor.t' });
+    expect(config.chart.gapMode).toBe('connect');
+    expect(config.chart.maxGapMinutes).toBe(120);
+    expect(config.chart.gapStyle).toBe('solid');
+  });
+
+  it('accepts gap options and clamps the maximum gap', () => {
+    const custom = normalizeConfig({
+      chart_gap_mode: 'break',
+      chart_gap_style: 'dashed',
+      chart_max_gap_minutes: 45,
+    });
+    expect(custom.chart.gapMode).toBe('break');
+    expect(custom.chart.gapStyle).toBe('dashed');
+    expect(custom.chart.maxGapMinutes).toBe(45);
+
+    expect(normalizeConfig({ chart_max_gap_minutes: 1 }).chart.maxGapMinutes).toBe(5);
+    expect(normalizeConfig({ chart_max_gap_minutes: 5000 }).chart.maxGapMinutes).toBe(720);
+    expect(normalizeConfig({ chart_max_gap_minutes: 'abc' }).chart.maxGapMinutes).toBe(120);
+  });
+
+  it('falls back to safe gap values', () => {
+    const config = normalizeConfig({ chart_gap_mode: 'zigzag', chart_gap_style: 'dotted' } as never);
+    expect(config.chart.gapMode).toBe('connect');
+    expect(config.chart.gapStyle).toBe('solid');
+  });
+
   it('falls back to safe theme / curve values', () => {
     const config = normalizeConfig({ theme: 'neon', chart_curve: 'zigzag' } as never);
     expect(config.theme).toBe('auto');

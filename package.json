@@ -1,6 +1,6 @@
 {
   "name": "ha-room-climate-card",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Moderne Raumklima-Karte fuer Home Assistant: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlaufs-Chart.",
   "type": "module",
   "license": "GPL-3.0-or-later",

@@ -31,6 +31,9 @@ heating_off_color: '#64748b'    # grau: ausgeschaltet
 chart_hours: 12
 chart_height: 96
 chart_curve: smooth
+chart_gap_mode: connect        # Lücken interpolieren (durchgehende Linie)
+chart_max_gap_minutes: 120     # längere Lücken bleiben offen
+chart_gap_style: solid         # interpolierte Abschnitte wie gemessene zeichnen
 chart_show_legend: true
 chart_show_grid: true
 chart_show_points: false
