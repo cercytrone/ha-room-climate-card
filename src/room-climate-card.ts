@@ -353,8 +353,8 @@ export class RoomClimateCard extends LitElement {
       role="group"
       aria-label="${this.cellAriaLabel(config, t)}"
     >
-      ${this.renderHeader(config, t)} ${this.renderMetrics(config, t)}
-      ${this.renderStatusRow(config, t)} ${this.renderChart(config, t)}
+      ${this.renderHeader(config, t)} ${this.renderSetpointRow(config, t)}
+      ${this.renderMetrics(config, t)} ${this.renderChart(config, t)}
       ${!this.hasAnyEntity(config) ? this.renderEmpty(t) : nothing}
     </div>`;
   }
@@ -518,73 +518,76 @@ export class RoomClimateCard extends LitElement {
     return `${formatNumber(reading.value, language, decimals)} ${reading.unit}`;
   }
 
-  private renderStatusRow(config: ResolvedConfig, t: Translator): TemplateResult | typeof nothing {
+  /**
+   * Target temperature above the actual temperature. The heating state is
+   * conveyed only by the colour of the icon in front of it (red = heating,
+   * green = idle, grey = off), never by an extra text label.
+   */
+  private renderSetpointRow(
+    config: ResolvedConfig,
+    t: Translator
+  ): TemplateResult | typeof nothing {
     if (!hasStatusRow(config)) return nothing;
     const thermostat = readThermostat(this.hass, config, t);
+    const showSetpoint = config.thermostat.showSetpoint && thermostat.setpoint !== null;
+    const showStatus = config.thermostat.showStatus;
+    const showMode = config.thermostat.showMode && Boolean(thermostat.modeLabel);
+    if (!showSetpoint && !showStatus && !showMode) return nothing;
+
     const color = thermostatStatusColor(thermostat, config);
-    const background = withAlpha(color, 0.12);
-    const border = withAlpha(color, 0.3);
-    const pillStyle = `--pill-color:${color};--pill-bg:${background};--pill-border:${border}`;
-    const pills: TemplateResult[] = [];
+    const statusLabel = this.thermostatAria(thermostat);
+    const language = this.language();
+    const setpointText =
+      thermostat.setpoint !== null
+        ? `${formatNumber(thermostat.setpoint, language, config.temperatureDecimals)} ${thermostat.unit}`
+        : '';
 
-    if (config.thermostat.showSetpoint && thermostat.setpoint !== null) {
-      pills.push(html`<span
-        class="pill setpoint"
-        title="${t.t('setpoint')} ${formatNumber(
-          thermostat.setpoint,
-          this.language(),
-          config.temperatureDecimals
-        )} ${thermostat.unit}"
-        style="${pillStyle}"
-      >
-        ${icons.thermometer()}<span class="pill-label"
-          >${t.t('setpoint')}
-          <strong
-            >${formatNumber(thermostat.setpoint, this.language(), config.temperatureDecimals)}
-            ${thermostat.unit}</strong
-          ></span
-        >
-      </span>`);
-    }
-
-    if (config.thermostat.showStatus) {
-      pills.push(html`<span
-        class="pill hvac ${thermostat.status}"
-        style="${pillStyle}"
-        title="${this.thermostatAria(thermostat, t)}"
-        aria-label="${this.thermostatAria(thermostat, t)}"
-      >
-        ${this.heatingIcon(thermostat)}<span class="pill-label">${thermostat.label}</span>
-      </span>`);
-    }
-
-    if (config.thermostat.showMode && thermostat.modeLabel) {
-      pills.push(html`<span class="pill mode"
-        ><span class="pill-label">${thermostat.modeLabel}</span></span
-      >`);
-    }
-
-    if (!pills.length) return nothing;
-    return html`<div class="status-row">${pills}</div>`;
+    return html`<div class="setpoint-row">
+      ${showStatus
+        ? html`<span
+            class="hvac-icon is-${thermostat.colorKey} status-${thermostat.status}"
+            style="--hvac-color:${color};--hvac-tint:${withAlpha(color, 0.14)};--hvac-ring:${withAlpha(
+              color,
+              0.32
+            )}"
+            role="img"
+            aria-label="${statusLabel}"
+            title="${statusLabel}"
+            >${this.heatingIcon(thermostat)}</span
+          >`
+        : nothing}
+      ${showSetpoint
+        ? html`<span class="setpoint" title="${t.t('setpoint')} ${setpointText}">
+            <span class="setpoint-label">${t.t('setpoint')}</span>
+            <span class="setpoint-value"
+              >${formatNumber(thermostat.setpoint as number, language, config.temperatureDecimals)}</span
+            ><span class="setpoint-unit">${thermostat.unit}</span>
+          </span>`
+        : nothing}
+      ${showMode ? html`<span class="mode-label">${thermostat.modeLabel}</span>` : nothing}
+    </div>`;
   }
 
+  /** Icon for the current HVAC action; the colour carries the state. */
   private heatingIcon(thermostat: ThermostatReading): TemplateResult {
-    switch (thermostat.status) {
-      case 'heating':
-        return icons.flame();
-      case 'off':
-        return icons.power();
-      case 'action':
-        return thermostat.action === 'cooling' ? icons.snowflake() : icons.fan();
-      default:
-        return icons.radiator();
+    if (thermostat.status === 'action') {
+      switch (thermostat.action) {
+        case 'cooling':
+          return icons.snowflake();
+        case 'fan':
+          return icons.fan();
+        case 'drying':
+          return icons.water();
+        default:
+          return icons.flame();
+      }
     }
+    return icons.flame();
   }
 
-  private thermostatAria(thermostat: ThermostatReading, t: Translator): string {
-    const parts = [t.t('roomClimate'), thermostat.label];
-    if (thermostat.modeLabel) parts.push(thermostat.modeLabel);
-    return parts.join(': ');
+  /** Accessible name of the HVAC icon: the state only, no duplicated text. */
+  private thermostatAria(thermostat: ThermostatReading): string {
+    return thermostat.label;
   }
 
   private renderChart(config: ResolvedConfig, t: Translator): TemplateResult | typeof nothing {
@@ -803,69 +806,113 @@ export class RoomClimateCard extends LitElement {
       color: var(--rcc-muted);
     }
     .humidity {
-      gap: 3px;
-      align-items: center;
+      gap: 4px;
+      align-items: baseline;
     }
     .drop-icon {
       display: inline-flex;
+      align-self: center;
       color: var(--rcc-muted);
-      opacity: 0.8;
+      opacity: 0.85;
     }
     .drop-icon .icon {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
     }
     .humidity-value {
-      font-size: 0.9rem;
-      font-weight: 500;
+      font-size: 1.3rem;
+      font-weight: 400;
+      line-height: 1;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
+      font-feature-settings: 'tnum' 1;
     }
     .humidity-unit {
-      font-size: 0.62rem;
+      font-size: 0.75rem;
+      font-weight: 400;
       color: var(--rcc-muted);
-      margin-left: -1px;
+      margin-left: -2px;
     }
 
-    .status-row {
+    .setpoint-row {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 5px;
-      margin-top: 7px;
+      gap: 6px;
+      margin-top: 5px;
+      min-height: 18px;
     }
-    .pill {
+    .hvac-icon {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 2px 7px 2px 6px;
-      border-radius: 999px;
-      font-size: 10.5px;
-      line-height: 1.35;
-      color: var(--pill-color, var(--rcc-muted));
-      background: var(--pill-bg, transparent);
-      border: 1px solid var(--pill-border, var(--rcc-border));
-      white-space: nowrap;
-      max-width: 100%;
+      justify-content: center;
+      flex: none;
+      width: 19px;
+      height: 19px;
+      border-radius: 6px;
+      color: var(--hvac-color, var(--rcc-muted));
+      background: var(--hvac-tint, transparent);
+      border: 1px solid var(--hvac-ring, transparent);
+      transition:
+        color 0.18s ease,
+        background-color 0.18s ease,
+        border-color 0.18s ease;
     }
-    .pill.mode {
-      --pill-color: var(--rcc-muted);
-      --pill-bg: transparent;
-      border-color: var(--rcc-border);
-      padding-right: 8px;
-    }
-    .pill .icon {
+    .hvac-icon .icon {
       width: 12px;
       height: 12px;
-      flex: none;
     }
-    .pill-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .hvac-icon.is-heating {
+      filter: drop-shadow(0 0 4px var(--hvac-ring, transparent));
     }
-    .pill strong {
-      font-weight: 600;
+    /* Unknown / unavailable: never look like a confident state. */
+    .hvac-icon.is-unknown,
+    .hvac-icon.status-unavailable,
+    .hvac-icon.status-missing {
+      background: transparent;
+      border-style: dashed;
+      border-color: var(--rcc-border);
+      opacity: 0.8;
+    }
+    .hvac-icon.is-unknown .icon,
+    .hvac-icon.status-unavailable .icon,
+    .hvac-icon.status-missing .icon {
+      opacity: 0.7;
+    }
+    .setpoint {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 3px;
+      min-width: 0;
       font-variant-numeric: tabular-nums;
+      color: var(--rcc-muted);
+    }
+    .setpoint-label {
+      font-size: 9.5px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+    .setpoint-value {
+      font-size: 0.95rem;
+      font-weight: 500;
+      line-height: 1;
+      color: var(--rcc-text);
+      letter-spacing: -0.01em;
+    }
+    .setpoint-unit {
+      font-size: 0.68rem;
+      font-weight: 400;
+    }
+    .mode-label {
+      font-size: 9.5px;
+      line-height: 1.2;
+      padding: 1px 6px;
+      border-radius: 999px;
+      color: var(--rcc-muted);
+      border: 1px solid var(--rcc-border);
+      white-space: nowrap;
     }
 
     .chart-slot {
@@ -926,14 +973,36 @@ export class RoomClimateCard extends LitElement {
     .density-xs .temperature .value {
       font-size: 1.4rem;
     }
-    .density-xs .status-row {
-      margin-top: 4px;
+    .density-xs .setpoint-row {
+      margin-top: 3px;
+      gap: 5px;
+    }
+    .density-xs .hvac-icon {
+      width: 17px;
+      height: 17px;
+    }
+    .density-xs .hvac-icon .icon {
+      width: 11px;
+      height: 11px;
+    }
+    .density-xs .setpoint-value {
+      font-size: 0.85rem;
+    }
+    .density-xs .humidity-value {
+      font-size: 1.05rem;
+    }
+    .density-xs .drop-icon .icon {
+      width: 12px;
+      height: 12px;
     }
     .density-xs .subtle {
       display: none;
     }
     .density-sm .temperature .value {
       font-size: 1.6rem;
+    }
+    .density-sm .humidity-value {
+      font-size: 1.18rem;
     }
     .density-xs .badge {
       width: 22px;

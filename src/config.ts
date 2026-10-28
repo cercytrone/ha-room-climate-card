@@ -158,8 +158,9 @@ export const DEFAULT_COLORS = {
   humidity: '#a78bfa',
   humidityLow: '#38bdf8',
   humidityHigh: '#e879f9',
-  heating: '#fb923c',
-  idle: '#94a3b8',
+  /** Red = heating, green = idle, grey = off (colour-coded HVAC icon). */
+  heating: '#ef4444',
+  idle: '#34d399',
   off: '#64748b',
 } as const;
 
