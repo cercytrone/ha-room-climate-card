@@ -46,10 +46,10 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | --- | --- |
 | **Raumname** | Frei konfigurierbar, optional aus einer Entität (`name_entity`) oder dem Friendly Name des Temperatursensors, optionales Icon. Lange Namen werden zweizeilig gekürzt. |
 | **Temperatur** | Zentraler Messwert, Einheit aus der Entität, konfigurierbare Dezimalstellen, Farbcodierung nach vier konfigurierbaren Temperaturbereichen. |
-| **Luftfeuchte** | Prozentwert mit eigener, klar unterscheidbarer Farbwelt und optionalen Grenzwerten (trocken/feucht). |
+| **Luftfeuchte** | Prozentwert mit eigener Farbwelt und optionalen Grenzwerten (trocken/feucht); bewusst größer gesetzt als früher, aber immer kleiner als die Temperatur. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
-| **Thermostat** | Optional. Solltemperatur, HVAC-Modus und Heizstatus (Heizt / Ruht / Aus / Unbekannt) mit eigenen Farben. |
+| **Thermostat** | Optional. Solltemperatur oberhalb der Isttemperatur; der Heizstatus wird nur durch die Farbe des Flammen-Icons davor gezeigt (rot = heizt, grün = ruht, grau = aus), optional zusätzlich der HVAC-Modus. |
 | **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende, Gitter, Datenpunkte. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -96,7 +96,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.0.0`.
+  `ROOM-CLIMATE-CARD v1.1.0`.
 
 ---
 
@@ -196,12 +196,15 @@ Empfehlung**.
 | --- | --- | --- | --- |
 | `show_thermostat` | boolean | automatisch | Thermostatzeile anzeigen. |
 | `climate_entity` | entity | – | Climate-Entität. |
-| `show_setpoint` | boolean | `true` | Solltemperatur als Pill. |
-| `show_hvac_status` | boolean | `true` | Heizstatus als Pill. |
-| `show_hvac_mode` | boolean | `false` | HVAC-Modus als Pill. |
-| `heating_color` | color | `#fb923c` | Farbe für „Heizt“. |
-| `heating_idle_color` | color | `#94a3b8` | Farbe für „Ruht“. |
-| `heating_off_color` | color | `#64748b` | Farbe für „Aus“. |
+| `show_setpoint` | boolean | `true` | Solltemperatur oberhalb der Isttemperatur anzeigen. |
+| `show_hvac_status` | boolean | `true` | Status-Icon (Flamme) vor der Solltemperatur anzeigen. |
+| `show_hvac_mode` | boolean | `false` | HVAC-Modus zusätzlich als Text anzeigen. |
+| `heating_color` | color | `#ef4444` (rot) | Icon-Farbe, wenn die Heizung läuft. |
+| `heating_idle_color` | color | `#34d399` (grün) | Icon-Farbe, wenn die Heizung aktiv, aber ohne Heizanforderung ist. |
+| `heating_off_color` | color | `#64748b` (grau) | Icon-Farbe bei ausgeschalteter Heizung. |
+
+Das Status-Icon ersetzt eine zusätzliche Textzeile: Die Farbe trägt die Information, der
+Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 
 ### Verlauf
 
@@ -230,7 +233,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Farben & Grenzwerte** | Temperaturgrenzen (kühl/warm/heiß), vier Temperaturfarben, Feuchtefarbe, Feuchte-Grenzwerte und -Farben |
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
-| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur, Heizstatus, HVAC-Modus, drei Farben |
+| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur (über Istwert), Heizstatus-Icon, HVAC-Modus, drei Icon-Farben (rot/grün/grau) |
 | **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenart, Gitter, Legende, Datenpunkte |
 
 Nicht benötigte Felder werden automatisch deaktiviert (z. B. Farben ohne Thermostat,
@@ -285,16 +288,31 @@ YAML bleiben unangetastet.
 
 ## Heizstatus: was die Karte wirklich anzeigt
 
-| Anzeige | Bedingung |
-| --- | --- |
-| **Heizt** (Amber/Orange) | `hvac_action == heating` |
-| **Ruht** (neutral) | `hvac_action == idle` |
-| **Aus** (gedämpft) | HVAC-Modus `off` oder `hvac_action == off` |
-| **Kühlt / Lüftet / Trocknet / Vorheizen** | entspechender `hvac_action`, neutrale Farbe |
-| **Status unbekannt** | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` |
+Der Status steckt ausschließlich im Flammen-Icon links vor der Solltemperatur:
+
+| Icon | Bedeutung | Bedingung |
+| --- | --- | --- |
+| Flamme **rot** | Heizt | `hvac_action == heating` |
+| Flamme **grün** | Ruht (aktiv, keine Heizanforderung) | `hvac_action == idle` |
+| Flamme **grau, gefüllt** | Aus | HVAC-Modus `off` oder `hvac_action == off` |
+| Schneeflocke / Ventilator / Tropfen | Kühlt / Lüftet / Trocknet | entsprechender `hvac_action`, neutrale Farbe |
+| Flamme **grau, gestrichelter Rahmen** | Status unbekannt | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` |
 
 Ein eingeschaltetes Thermostat gilt bewusst **nicht** als „Heizt“. Fehlt `hvac_action`, zeigt
-die Karte „Status unbekannt“ statt einen Zustand zu erfinden.
+die Karte das Icon im Unknown-Stil (gestrichelter Rahmen, gedämpft) statt einen Zustand zu
+erfinden; als Titel und Screenreader-Text steht „Status unbekannt“ dahinter.
+
+Beispiel:
+
+```yaml
+type: custom:room-climate-card
+climate_entity: climate.wohnzimmer
+show_setpoint: true
+show_hvac_status: true
+heating_color: '#ef4444'        # rot, wenn geheizt wird
+heating_idle_color: '#34d399'   # grün, wenn das Thermostat nur bereitsteht
+heating_off_color: '#64748b'    # grau, wenn ausgeschaltet ist
+```
 
 ---
 
@@ -318,7 +336,8 @@ die Karte „Status unbekannt“ statt einen Zustand zu erfinden.
 | Karte zeigt „–“ | Entität ist `unavailable`/`unknown` oder liefert keinen numerischen Zustand. In *Entwicklerwerkzeuge → Zustände* prüfen. |
 | Kein Verlaufsdatum | Der Recorder ist deaktiviert, die Entität wird nicht aufgezeichnet, oder der Zeitraum liegt vor dem Retention-Zeitfenster (`recorder: purge_keep_days`). |
 | Chart zeigt Lücken | Genau so wurden keine Werte aufgezeichnet (Sensor offline). Das ist korrekt. |
-| „Status unbekannt“ beim Thermostat | Die Integration liefert kein `hvac_action`. Bewusst kein erfundenes „Heizt“. |
+| Thermostat-Icon bleibt grau/gestrichelt | Die Integration liefert kein `hvac_action`. Bewusst kein erfundenes „Heizt“ – der Tooltip nennt den Grund. |
+| Icon-Farbe passt nicht | `heating_color`, `heating_idle_color`, `heating_off_color` im Editor setzen. |
 | Änderungen im Editor erscheinen nicht | Browser-Cache: Hard-Reload; Versionsparameter an der Ressourcen-URL ergänzen. |
 | Karte nach Update unverändert | HACS-Update durchführen, danach HA-Frontend neu laden und Browser-Cache leeren. |
 
@@ -350,7 +369,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 156 Tests in 10 Dateien aus (Stand 1.0.0):
+`npm test` führt 159 Tests in 10 Dateien aus (Stand 1.1.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
@@ -359,7 +378,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Lücken-Erkennung, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
 | `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, SVG-Größe, Resize ohne Verzerrung, Legende, Punkte, Gitter |
-| `tests/card.test.ts` | Rendering, Formatierung, Farben, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
+| `tests/card.test.ts` | Rendering, Formatierung, Farben, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
 | `tests/editor.test.ts` | Abschnitte, Selektoren, Werte, `config-changed`, deaktivierte Felder, Persistenz, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |

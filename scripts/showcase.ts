@@ -39,9 +39,10 @@ const COLORS = {
   warm: '#fbbf24',
   hot: '#f43f5e',
   humidity: '#a78bfa',
-  heating: '#fb923c',
-  idle: '#94a3b8',
+  heating: '#ef4444',
+  idle: '#34d399',
   off: '#64748b',
+  unknown: '#94a3b8',
   windowOpen: '#fbbf24',
   motion: '#34d399',
 };
@@ -77,7 +78,11 @@ interface CardOptions {
   window?: 'closed' | 'open' | 'unknown';
   motion?: 'active' | 'idle' | 'none';
   quiet?: string;
-  pills?: Array<{ label: string; color: string; icon: 'flame' | 'radiator' | 'power' | 'thermometer' }>;
+  /** Target temperature row above the current value. */
+  setpoint?: string;
+  /** Colour of the HVAC flame icon: heating / idle / off / unknown. */
+  hvacColor?: string;
+  hvacMode?: string;
   series: ChartSample[];
   humiditySeries?: ChartSample[];
   smooth?: boolean;
@@ -235,31 +240,41 @@ function renderCard(options: CardOptions): string {
     })
     .join('');
 
-  const pills = (options.pills ?? [])
-    .map((pill, index) => {
-      const width = 18 + pill.label.length * 5.6;
-      const offset = (options.pills ?? [])
-        .slice(0, index)
-        .reduce((sum, item) => sum + 18 + item.label.length * 5.6 + 6, 0);
-      return `<g transform="translate(${offset},0)">
-        <rect width="${width.toFixed(1)}" height="19" rx="9.5" fill="${pill.color}1f" stroke="${pill.color}4d" stroke-width="1" />
-        <g transform="translate(6,4.5)" fill="none" stroke="${pill.color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <g transform="scale(0.42)">${iconPath(pill.icon)}</g>
-        </g>
-        <text x="18" y="13.5" ${font(9.5, 600)} fill="${pill.color}">${escapeXml(pill.label)}</text>
-      </g>`;
-    })
-    .join('');
+  const setpointRow =
+    options.setpoint !== undefined
+      ? `<g transform="translate(${x + 14},${y + 60})">
+          ${
+            options.hvacColor
+              ? `<rect x="0" y="0" width="19" height="19" rx="6" fill="${options.hvacColor}24" stroke="${options.hvacColor}52" stroke-width="1" />
+                 <g transform="translate(3.5,3.5)" fill="none" stroke="${options.hvacColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                   <g transform="scale(0.5)">${iconPath('flame')}</g>
+                 </g>`
+              : ''
+          }
+          <text x="${options.hvacColor ? 25 : 0}" y="9.5" ${font(8.5, 600)} fill="${COLORS.muted}" letter-spacing="0.4">SOLL</text>
+          <text x="${(options.hvacColor ? 25 : 0) + 28}" y="10" ${font(13.5, 600)} fill="${COLORS.text}">${escapeXml(
+            options.setpoint
+          )}</text>
+          <text x="${(options.hvacColor ? 25 : 0) + 33 + options.setpoint.length * 7.4}" y="10" ${font(10)} fill="${COLORS.muted}">°C</text>
+          ${
+            options.hvacMode
+              ? `<text x="${(options.hvacColor ? 25 : 0) + 56 + options.setpoint.length * 7.4}" y="9.5" ${font(9)} fill="${COLORS.muted}">${escapeXml(
+                  options.hvacMode
+                )}</text>`
+              : ''
+          }
+        </g>`
+      : '';
 
   const humidity = options.humidity
     ? `<g>
-        <g transform="translate(${x + CARD_W - 66},${y + 46})" fill="none" stroke="${COLORS.muted}" stroke-width="1.3">
-          <path d="M6 1.6c1.4 1.6 2.8 3.2 2.8 5a2.8 2.8 0 0 1-5.6 0c0-1.8 1.4-3.4 2.8-5Z" />
+        <g transform="translate(${x + CARD_W - 92},${y + 84})" fill="none" stroke="${COLORS.muted}" stroke-width="1.2">
+          <path d="M6.5 1.6c1.5 1.7 3 3.4 3 5.3a3 3 0 0 1-6 0c0-1.9 1.5-3.6 3-5.3Z" />
         </g>
-        <text x="${x + CARD_W - 52}" y="${y + 56}" ${font(15, 600)} fill="${options.humidityColor ?? COLORS.humidity}">${escapeXml(
-          options.humidity
-        )}</text>
-        <text x="${x + CARD_W - 30}" y="${y + 56}" ${font(10)} fill="${COLORS.muted}">%</text>
+        <text x="${x + CARD_W - 78}" y="${y + 101}" ${font(21, 400)} fill="${
+          options.humidityColor ?? COLORS.humidity
+        }">${escapeXml(options.humidity)}</text>
+        <text x="${x + CARD_W - 42}" y="${y + 101}" ${font(12)} fill="${COLORS.muted}">%</text>
       </g>`
     : '';
 
@@ -286,7 +301,7 @@ function renderCard(options: CardOptions): string {
       : '';
 
   const quietLabel = options.quiet
-    ? `<text x="${x + 14}" y="${y + 47}" ${font(9.5)} fill="${COLORS.muted}">${escapeXml(options.quiet)}</text>`
+    ? `<text x="${x + 14}" y="${y + 44}" ${font(9.5)} fill="${COLORS.muted}">${escapeXml(options.quiet)}</text>`
     : '';
 
   return `<g>
@@ -326,14 +341,14 @@ function renderCard(options: CardOptions): string {
     </g>
     <text x="${x + 14}" y="${y + 29}" ${font(13.5, 700)} fill="${COLORS.text}">${escapeXml(options.name)}</text>
     ${quietLabel}
-    <text x="${x + 14}" y="${y + 82}" ${font(30, 300)} fill="${options.temperatureColor}">${escapeXml(
+    <text x="${x + 14}" y="${y + 101}" ${font(30, 300)} fill="${options.temperatureColor}">${escapeXml(
       options.temperature
     )}</text>
-    <text x="${x + 16 + options.temperature.length * 16}" y="${y + 82}" ${font(13)} fill="${COLORS.muted}">${escapeXml(
+    <text x="${x + 16 + options.temperature.length * 16}" y="${y + 101}" ${font(13)} fill="${COLORS.muted}">${escapeXml(
       options.unit
     )}</text>
     ${humidity}
-    ${options.pills?.length ? `<g transform="translate(${x + 14},${y + 96})">${pills}</g>` : ''}
+    ${setpointRow}
     ${motionBadge}
     ${windowBadge}
   </g>`;
@@ -372,16 +387,14 @@ const cards: CardOptions[] = [
     x: PAD,
     y: 104,
     name: 'Wohnzimmer',
-    temperature: '22,0',
+    temperature: '21,8',
     temperatureColor: COLORS.comfort,
     unit: '°C',
     humidity: '50',
     window: 'closed',
     motion: 'active',
-    pills: [
-      { label: 'Soll 22,0 °C', color: COLORS.comfort, icon: 'thermometer' },
-      { label: 'Heizt', color: COLORS.heating, icon: 'flame' },
-    ],
+    setpoint: '22,0',
+    hvacColor: COLORS.heating,
     series: samples(22, 0.6, 5),
     humiditySeries: samples(50, 5, 7),
     points: true,
@@ -400,10 +413,9 @@ const cards: CardOptions[] = [
     window: 'open',
     motion: 'idle',
     quiet: 'Ruhe seit 12 Min.',
-    pills: [
-      { label: 'Soll 21,5 °C', color: COLORS.warm, icon: 'thermometer' },
-      { label: 'Ruht', color: COLORS.idle, icon: 'radiator' },
-    ],
+    setpoint: '21,5',
+    hvacColor: COLORS.idle,
+    hvacMode: 'Heizen',
     series: samples(22.6, 0.5, 4),
     humiditySeries: samples(64, 3, 6),
   },
@@ -420,10 +432,8 @@ const cards: CardOptions[] = [
     window: 'open',
     motion: 'idle',
     quiet: 'Ruhe seit 46 Min.',
-    pills: [
-      { label: 'Soll 21,0 °C', color: COLORS.off, icon: 'thermometer' },
-      { label: 'Aus', color: COLORS.off, icon: 'power' },
-    ],
+    setpoint: '21,0',
+    hvacColor: COLORS.off,
     series: samples(25.4, 0.9, 3.5, { from: 2.2, to: 1.4 }),
     humiditySeries: samples(68, 7, 2.5),
     grid: true,
@@ -438,7 +448,8 @@ const cards: CardOptions[] = [
     unit: '°C',
     humidity: '44',
     window: 'closed',
-    pills: [{ label: 'Status unbekannt', color: COLORS.idle, icon: 'radiator' }],
+    setpoint: '20,5',
+    hvacColor: COLORS.unknown,
     series: samples(18.7, 0.6, 6),
     humiditySeries: samples(44, 2, 5),
     smooth: false,

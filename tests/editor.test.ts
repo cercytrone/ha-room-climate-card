@@ -163,8 +163,8 @@ describe('room climate card editor', () => {
     selectorByLabel(editor, 'Thermostat anzeigen').emit(false);
     await editor.updateComplete;
     openAll(editor);
-    expect(selectorByLabel(editor, 'Farbe Heizen').disabled).toBe(true);
-    expect(selectorByLabel(editor, 'Solltemperatur anzeigen').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Icon-Farbe Heizen (z. B. Rot)').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Solltemperatur anzeigen (über Istwert)').disabled).toBe(true);
   });
 
   it('disables chart options when no chart series is enabled', async () => {
@@ -198,7 +198,7 @@ describe('room climate card editor', () => {
     editor.addEventListener('config-changed', (event) => {
       emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
     });
-    selectorByLabel(editor, 'Farbe Heizen').emit([255, 128, 0]);
+    selectorByLabel(editor, 'Icon-Farbe Heizen (z. B. Rot)').emit([255, 128, 0]);
     expect(emitted?.heating_color).toBe('#ff8000');
   });
 

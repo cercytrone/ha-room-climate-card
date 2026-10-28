@@ -130,7 +130,10 @@ describe('room climate card', () => {
     expect(text(card, '.humidity-value')).toBe('–');
     expect(q(card, '.temperature')?.getAttribute('aria-label')).toContain('Nicht verfügbar');
     expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
-    expect(text(card, '.pill.hvac')).toBe('Nicht verfügbar');
+    const icon = q(card, '.hvac-icon');
+    expect(icon?.getAttribute('aria-label')).toBe('Nicht verfügbar');
+    expect(icon?.classList.contains('is-unknown')).toBe(true);
+    expect(q(card, '.setpoint')).toBeNull();
   });
 
   it('shows the window badge only when enabled and reflects the state', async () => {
@@ -184,24 +187,50 @@ describe('room climate card', () => {
     expect(q(card, '.badge.motion')).toBeNull();
   });
 
-  it('renders the heating status truthfully', async () => {
+  it('shows the setpoint above the current temperature', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
-    expect(text(card, '.pill.hvac')).toBe('Heizt');
-    expect(text(card, '.pill.setpoint')).toContain('Soll');
-    expect(text(card, '.pill.setpoint')).toContain('22,0 °C');
+    const row = q(card, '.setpoint-row');
+    const metrics = q(card, '.metrics');
+    expect(row).not.toBeNull();
+    expect(metrics).not.toBeNull();
+    // The setpoint row must come before the metrics in document order.
+    expect(row!.compareDocumentPosition(metrics!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(text(card, '.setpoint')).toContain('Soll');
+    expect(text(card, '.setpoint-value')).toBe('22,0');
+    expect(text(card, '.setpoint-unit')).toBe('°C');
+    expect(text(card, '.temperature .value')).toBe('21,8');
+  });
+
+  it('conveys the heating state only through the icon colour', async () => {
+    const heating = mount(fullConfig, createHass({ states: baseStates() }));
+    await heating.updateComplete;
+    const heatingIcon = q(heating, '.hvac-icon') as HTMLElement;
+    expect(heatingIcon.classList.contains('is-heating')).toBe(true);
+    expect(heatingIcon.style.getPropertyValue('--hvac-color')).toBe('#ef4444');
+    expect(heatingIcon.getAttribute('aria-label')).toBe('Heizt');
+    expect(heatingIcon.querySelector('svg')).not.toBeNull();
+    // No textual status label next to the setpoint any more.
+    expect(text(heating, '.setpoint-row')).not.toContain('Heizt');
+    expect(q(heating, '.pill')).toBeNull();
 
     const idle = mount(
       { ...fullConfig, name: 'Küche' },
       createHass({
         states: [
           ...baseStates().filter((state) => state.entity_id !== 'climate.thermostat'),
-          entity('climate.thermostat', { state: 'heat', attributes: { temperature: 21, hvac_action: 'idle' } }),
+          entity('climate.thermostat', {
+            state: 'heat',
+            attributes: { temperature: 21, hvac_action: 'idle' },
+          }),
         ],
       })
     );
     await idle.updateComplete;
-    expect(text(idle, '.pill.hvac')).toBe('Ruht');
+    const idleIcon = q(idle, '.hvac-icon') as HTMLElement;
+    expect(idleIcon.classList.contains('is-idle')).toBe(true);
+    expect(idleIcon.style.getPropertyValue('--hvac-color')).toBe('#34d399');
+    expect(idleIcon.getAttribute('aria-label')).toBe('Ruht');
 
     const off = mount(
       { ...fullConfig, name: 'Bad' },
@@ -213,7 +242,27 @@ describe('room climate card', () => {
       })
     );
     await off.updateComplete;
-    expect(text(off, '.pill.hvac')).toBe('Aus');
+    const offIcon = q(off, '.hvac-icon') as HTMLElement;
+    expect(offIcon.classList.contains('is-off')).toBe(true);
+    expect(offIcon.style.getPropertyValue('--hvac-color')).toBe('#64748b');
+    expect(offIcon.getAttribute('aria-label')).toBe('Aus');
+    expect(text(off, '.setpoint-value')).toBe('18,0');
+  });
+
+  it('uses custom icon colours from the configuration', async () => {
+    const card = mount(
+      {
+        ...fullConfig,
+        heating_color: '#ff0000',
+        heating_idle_color: '#00ff00',
+        heating_off_color: '#0000ff',
+      },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    expect(
+      (q(card, '.hvac-icon') as HTMLElement).style.getPropertyValue('--hvac-color')
+    ).toBe('#ff0000');
   });
 
   it('does not claim heating when hvac_action is missing', async () => {
@@ -227,23 +276,58 @@ describe('room climate card', () => {
       })
     );
     await card.updateComplete;
-    expect(text(card, '.pill.hvac')).toBe('Status unbekannt');
+    const icon = q(card, '.hvac-icon') as HTMLElement;
+    expect(icon.classList.contains('is-unknown')).toBe(true);
+    expect(icon.getAttribute('aria-label')).toBe('Status unbekannt');
+    expect(icon.style.getPropertyValue('--hvac-color')).toContain('--rcc-neutral');
+    expect(text(card, '.setpoint-row')).not.toContain('Heizt');
   });
 
   it('respects thermostat sub-options', async () => {
-    const card = mount(
+    const both = mount(
       { ...fullConfig, show_setpoint: false, show_hvac_status: false, show_hvac_mode: false },
       createHass({ states: baseStates() })
     );
-    await card.updateComplete;
-    expect(q(card, '.status-row')).toBeNull();
+    await both.updateComplete;
+    expect(q(both, '.setpoint-row')).toBeNull();
+
+    const iconOnly = mount(
+      { ...fullConfig, show_setpoint: false },
+      createHass({ states: baseStates() })
+    );
+    await iconOnly.updateComplete;
+    expect(q(iconOnly, '.hvac-icon')).not.toBeNull();
+    expect(q(iconOnly, '.setpoint')).toBeNull();
+
+    const setpointOnly = mount(
+      { ...fullConfig, show_hvac_status: false },
+      createHass({ states: baseStates() })
+    );
+    await setpointOnly.updateComplete;
+    expect(q(setpointOnly, '.hvac-icon')).toBeNull();
+    expect(text(setpointOnly, '.setpoint-value')).toBe('22,0');
   });
 
   it('omits the thermostat row when disabled', async () => {
     const card = mount({ ...fullConfig, show_thermostat: false }, createHass({ states: baseStates() }));
     await card.updateComplete;
-    expect(q(card, '.status-row')).toBeNull();
-    expect(q(card, '.pill')).toBeNull();
+    expect(q(card, '.setpoint-row')).toBeNull();
+    expect(q(card, '.hvac-icon')).toBeNull();
+  });
+
+  it('renders the humidity larger than before but smaller than the temperature', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const styleSheets = (
+      card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
+    ).elementStyles;
+    const styleText = Array.from(styleSheets ?? [])
+      .map((sheet) => sheet.cssText ?? '')
+      .join('\n');
+    expect(styleText).toContain('.humidity-value');
+    expect(styleText).toMatch(/\.humidity-value\s*\{[^}]*font-size:\s*1\.3rem/);
+    expect(styleText).toMatch(/\.temperature \.value\s*\{[^}]*font-size:\s*1\.85rem/);
+    expect(text(card, '.humidity-value')).toBe('50,4');
   });
 
   it('applies a fixed height and density classes', async () => {
