@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Room Climate Card – Demo (Testdaten)</title>
+    <style>
+      :root {
+        --demo-bg: #0b111e;
+        --demo-text: #e6edf9;
+        --demo-muted: #94a3b8;
+        --demo-border: #233248;
+        --demo-panel: #111a2b;
+        --demo-input-bg: #1b2436;
+        --demo-accent: #38bdf8;
+        --demo-warn: #fbbf24;
+        /* Home Assistant variables consumed by the card */
+        --primary-text-color: var(--demo-text);
+        --secondary-text-color: var(--demo-muted);
+        --card-background-color: #162032;
+        --ha-card-background: #162032;
+        --ha-card-border-color: #233248;
+        --ha-card-border-radius: 18px;
+        --divider-color: #233248;
+        --primary-color: var(--demo-accent);
+        color-scheme: dark;
+      }
+      html[data-theme='light'] {
+        --demo-bg: #eef2f7;
+        --demo-text: #0f172a;
+        --demo-muted: #64748b;
+        --demo-border: #dbe3ee;
+        --demo-panel: #ffffff;
+        --demo-input-bg: #f1f5f9;
+        --primary-text-color: #0f172a;
+        --secondary-text-color: #64748b;
+        --card-background-color: #ffffff;
+        --ha-card-background: #ffffff;
+        --ha-card-border-color: #e2e8f0;
+        --divider-color: #e2e8f0;
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 20px 16px 48px;
+        background: var(--demo-bg);
+        color: var(--demo-text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        transition: background-color 0.2s ease;
+      }
+      .shell {
+        max-width: 1080px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .demo-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid color-mix(in srgb, var(--demo-warn) 45%, transparent);
+        background: color-mix(in srgb, var(--demo-warn) 12%, transparent);
+        border-radius: 12px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--demo-text);
+      }
+      .demo-banner strong {
+        color: var(--demo-warn);
+        letter-spacing: 0.06em;
+      }
+      header h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+      header p {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--demo-muted);
+        line-height: 1.5;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid var(--demo-border);
+        border-radius: 12px;
+        background: var(--demo-panel);
+        font-size: 12px;
+        color: var(--demo-muted);
+      }
+      .toolbar label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .toolbar select,
+      .toolbar button {
+        font: inherit;
+        color: var(--demo-text);
+        background: var(--demo-input-bg);
+        border: 1px solid var(--demo-border);
+        border-radius: 8px;
+        padding: 5px 8px;
+        cursor: pointer;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+      }
+      h2 {
+        margin: 6px 0 0;
+        font-size: 14px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .editor-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 760px) {
+        .editor-panel {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .editor-box {
+        border: 1px solid var(--demo-border);
+        border-radius: 14px;
+        background: var(--demo-panel);
+        padding: 10px 12px 4px;
+      }
+      .preview-box {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .preview-box .hint {
+        font-size: 11.5px;
+        color: var(--demo-muted);
+      }
+      .code {
+        margin: 0;
+        padding: 10px 12px;
+        background: var(--demo-input-bg);
+        border: 1px solid var(--demo-border);
+        border-radius: 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--demo-muted);
+        max-height: 220px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      room-climate-card {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="demo-banner">
+        <strong>DEMO</strong>
+        <span>
+          Diese Seite läuft ohne Home Assistant. Alle Entitätswerte und Verlaufskurven sind
+          <strong>simulierte Testdaten</strong> aus <code>dev/mock-hass.ts</code> – keine echten
+          Messwerte. Die Karte selbst ist identisch mit dem ausgelieferten Bundle.
+        </span>
+      </div>
+
+      <header>
+        <h1>Room Climate Card · Entwicklungsumgebung</h1>
+        <p>
+          Vorschau verschiedener Konfigurationen inklusive responsiver Kartenhöhe und visuellem
+          Editor. In Home Assistant wird dieselbe Karte über HACS installiert.
+        </p>
+      </header>
+
+      <div class="toolbar">
+        <label>
+          Theme
+          <select id="theme">
+            <option value="dark">Dunkel</option>
+            <option value="light">Hell</option>
+          </select>
+        </label>
+        <label>
+          Kartenhöhe
+          <select id="height">
+            <option value="auto">Automatisch</option>
+            <option value="160">160 px</option>
+            <option value="200">200 px</option>
+            <option value="240">240 px</option>
+            <option value="320">320 px</option>
+          </select>
+        </label>
+        <label>
+          Verlaufszeitraum
+          <select id="hours">
+            <option value="3">3 Stunden</option>
+            <option value="6" selected>6 Stunden</option>
+            <option value="12">12 Stunden</option>
+            <option value="24">24 Stunden</option>
+          </select>
+        </label>
+        <button id="reload">Neu laden</button>
+      </div>
+
+      <section class="grid" id="cards"></section>
+
+      <h2>Visueller Editor</h2>
+      <div class="editor-panel">
+        <div class="editor-box">
+          <room-climate-card-editor id="editor"></room-climate-card-editor>
+        </div>
+        <div class="preview-box">
+          <room-climate-card id="preview"></room-climate-card>
+          <div class="hint">
+            Änderungen im Editor aktualisieren die Vorschau sofort (config-changed).
+          </div>
+          <pre class="code" id="yaml"></pre>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

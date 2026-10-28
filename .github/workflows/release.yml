@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Resolve version
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check version matches package.json
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match tag (${{ steps.version.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/ha-room-climate-card.js
+            dist/ha-room-climate-card.js.map
+          body: |
+            Einzelne JavaScript-Datei für HACS. HACS lädt `ha-room-climate-card.js`,
+            wenn das Release als *Dashboard*-Repository installiert ist.
+
+            Installation über HACS: Repository `cercytrone/ha-room-climate-card`
+            als benutzerdefiniertes Repository (Kategorie *Dashboard*) hinzufügen.

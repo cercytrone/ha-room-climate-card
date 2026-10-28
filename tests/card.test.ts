@@ -1,0 +1,416 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import '../src/main';
+import type { RoomClimateCard } from '../src/room-climate-card';
+import type { RoomClimateCardConfig } from '../src/config';
+import type { HomeAssistant } from '../src/types';
+import { createHass, entity, flush, resizeTo } from './helpers';
+
+const now = Date.now();
+
+function baseStates() {
+  return [
+    entity('sensor.temp', {
+      state: '21.78',
+      attributes: { unit_of_measurement: '°C', friendly_name: 'Wohnzimmer' },
+    }),
+    entity('sensor.humidity', {
+      state: '50.4',
+      attributes: { unit_of_measurement: '%', friendly_name: 'Wohnzimmer Feuchte' },
+    }),
+    entity('binary_sensor.window', { state: 'off', attributes: { device_class: 'window' } }),
+    entity('binary_sensor.motion', {
+      state: 'off',
+      lastChanged: new Date(now - 12 * 60 * 1000).toISOString(),
+    }),
+    entity('climate.thermostat', {
+      state: 'heat',
+      attributes: { temperature: 22, hvac_action: 'heating', friendly_name: 'Wohnzimmer Thermostat' },
+    }),
+  ];
+}
+
+function historyFor(entityIds: string[]) {
+  const history: Record<string, Array<{ s: string; lu: number }>> = {};
+  for (const id of entityIds) {
+    history[id] = Array.from({ length: 20 }, (_, index) => ({
+      s: (21 + Math.sin(index / 3)).toFixed(2),
+      lu: Math.floor((now - (20 - index) * 10 * 60 * 1000) / 1000),
+    }));
+  }
+  return history;
+}
+
+function mount(
+  config: RoomClimateCardConfig,
+  hass: HomeAssistant,
+  size?: { width: number; height: number }
+): RoomClimateCard {
+  const card = document.createElement('room-climate-card') as RoomClimateCard;
+  card.setConfig(config);
+  card.hass = hass;
+  document.body.append(card);
+  if (size) resizeTo(card, size.width, size.height);
+  return card;
+}
+
+function q(card: RoomClimateCard, selector: string): Element | null {
+  return card.shadowRoot!.querySelector(selector);
+}
+
+function qa(card: RoomClimateCard, selector: string): Element[] {
+  return Array.from(card.shadowRoot!.querySelectorAll(selector));
+}
+
+function text(card: RoomClimateCard, selector: string): string {
+  return q(card, selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
+const fullConfig: RoomClimateCardConfig = {
+  type: 'custom:room-climate-card',
+  name: 'Wohnzimmer',
+  temperature_entity: 'sensor.temp',
+  humidity_entity: 'sensor.humidity',
+  window_entity: 'binary_sensor.window',
+  motion_entity: 'binary_sensor.motion',
+  climate_entity: 'climate.thermostat',
+  humidity_decimals: 1,
+};
+
+describe('room climate card', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.useRealTimers();
+  });
+
+  it('renders name, temperature and humidity with locale formatting', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+
+    expect(text(card, '.name')).toBe('Wohnzimmer');
+    expect(text(card, '.temperature .value')).toBe('21,8');
+    expect(text(card, '.temperature .unit')).toBe('°C');
+    expect(text(card, '.humidity-value')).toBe('50,4');
+    expect(text(card, '.humidity-unit')).toBe('%');
+  });
+
+  it('formats numbers for english locales', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates(), language: 'en' }));
+    await card.updateComplete;
+    expect(text(card, '.temperature .value')).toBe('21.8');
+  });
+
+  it('colours the temperature by band', async () => {
+    const card = mount(
+      { ...fullConfig, temperature_cool_below: 30, temperature_warm_above: 31, temperature_hot_above: 32 },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    const value = q(card, '.temperature .value') as HTMLElement;
+    expect(value.style.color).toBe('rgb(56, 189, 248)');
+  });
+
+  it('handles unavailable sensors without crashing', async () => {
+    const hass = createHass({
+      states: [
+        entity('sensor.temp', { state: 'unavailable' }),
+        entity('sensor.humidity', { state: 'unknown' }),
+        entity('binary_sensor.window', { state: 'unavailable' }),
+        entity('binary_sensor.motion', { state: 'unavailable' }),
+        entity('climate.thermostat', { state: 'unavailable' }),
+      ],
+    });
+    const card = mount(fullConfig, hass);
+    await card.updateComplete;
+
+    expect(text(card, '.temperature .value')).toBe('–');
+    expect(text(card, '.humidity-value')).toBe('–');
+    expect(q(card, '.temperature')?.getAttribute('aria-label')).toContain('Nicht verfügbar');
+    expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
+    expect(text(card, '.pill.hvac')).toBe('Nicht verfügbar');
+  });
+
+  it('shows the window badge only when enabled and reflects the state', async () => {
+    const hass = createHass({ states: baseStates() });
+    const card = mount(fullConfig, hass);
+    await card.updateComplete;
+    const badge = q(card, '.badge.window');
+    expect(badge).not.toBeNull();
+    expect(badge?.classList.contains('is-open')).toBe(false);
+    expect(badge?.getAttribute('aria-label')).toBe('Fenster geschlossen');
+
+    card.hass = createHass({
+      states: baseStates().map((state) =>
+        state.entity_id === 'binary_sensor.window' ? entity('binary_sensor.window', { state: 'on' }) : state
+      ),
+    });
+    await card.updateComplete;
+    expect(q(card, '.badge.window')?.classList.contains('is-open')).toBe(true);
+    expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Fenster offen');
+  });
+
+  it('removes the window badge completely when disabled', async () => {
+    const card = mount({ ...fullConfig, show_window: false }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.badge.window')).toBeNull();
+    expect(q(card, '.badges')?.children.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('shows motion state and the quiet duration', async () => {
+    const hass = createHass({ states: baseStates() });
+    const card = mount(fullConfig, hass);
+    await card.updateComplete;
+    expect(q(card, '.badge.motion')?.classList.contains('is-active')).toBe(false);
+    expect(text(card, '.subtle')).toContain('Ruhe seit');
+    expect(text(card, '.subtle')).toContain('12 Min.');
+
+    card.hass = createHass({
+      states: baseStates().map((state) =>
+        state.entity_id === 'binary_sensor.motion' ? entity('binary_sensor.motion', { state: 'on' }) : state
+      ),
+    });
+    await card.updateComplete;
+    expect(q(card, '.badge.motion')?.classList.contains('is-active')).toBe(true);
+    expect(q(card, '.badge.motion')?.getAttribute('aria-label')).toBe('Bewegung erkannt');
+    expect(text(card, '.subtle')).toBe('');
+  });
+
+  it('hides the motion badge when disabled', async () => {
+    const card = mount({ ...fullConfig, show_motion: false }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.badge.motion')).toBeNull();
+  });
+
+  it('renders the heating status truthfully', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(text(card, '.pill.hvac')).toBe('Heizt');
+    expect(text(card, '.pill.setpoint')).toContain('Soll');
+    expect(text(card, '.pill.setpoint')).toContain('22,0 °C');
+
+    const idle = mount(
+      { ...fullConfig, name: 'Küche' },
+      createHass({
+        states: [
+          ...baseStates().filter((state) => state.entity_id !== 'climate.thermostat'),
+          entity('climate.thermostat', { state: 'heat', attributes: { temperature: 21, hvac_action: 'idle' } }),
+        ],
+      })
+    );
+    await idle.updateComplete;
+    expect(text(idle, '.pill.hvac')).toBe('Ruht');
+
+    const off = mount(
+      { ...fullConfig, name: 'Bad' },
+      createHass({
+        states: [
+          ...baseStates().filter((state) => state.entity_id !== 'climate.thermostat'),
+          entity('climate.thermostat', { state: 'off', attributes: { temperature: 18 } }),
+        ],
+      })
+    );
+    await off.updateComplete;
+    expect(text(off, '.pill.hvac')).toBe('Aus');
+  });
+
+  it('does not claim heating when hvac_action is missing', async () => {
+    const card = mount(
+      fullConfig,
+      createHass({
+        states: [
+          ...baseStates().filter((state) => state.entity_id !== 'climate.thermostat'),
+          entity('climate.thermostat', { state: 'heat', attributes: { temperature: 21 } }),
+        ],
+      })
+    );
+    await card.updateComplete;
+    expect(text(card, '.pill.hvac')).toBe('Status unbekannt');
+  });
+
+  it('respects thermostat sub-options', async () => {
+    const card = mount(
+      { ...fullConfig, show_setpoint: false, show_hvac_status: false, show_hvac_mode: false },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    expect(q(card, '.status-row')).toBeNull();
+  });
+
+  it('omits the thermostat row when disabled', async () => {
+    const card = mount({ ...fullConfig, show_thermostat: false }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.status-row')).toBeNull();
+    expect(q(card, '.pill')).toBeNull();
+  });
+
+  it('applies a fixed height and density classes', async () => {
+    const card = mount({ ...fullConfig, height: 200 }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const container = q(card, '.card') as HTMLElement;
+    expect(container.classList.contains('fixed-height')).toBe(true);
+    expect(container.style.getPropertyValue('--rcc-height')).toBe('200px');
+    expect(container.classList.contains('density-sm')).toBe(true);
+
+    resizeTo(card, 320, 150);
+    await card.updateComplete;
+    expect((q(card, '.card') as HTMLElement).classList.contains('density-xs')).toBe(true);
+  });
+
+  it('uses automatic height by default', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const container = q(card, '.card') as HTMLElement;
+    expect(container.classList.contains('auto-height')).toBe(true);
+    expect(container.style.getPropertyValue('--rcc-height')).toBe('');
+    expect(container.style.getPropertyValue('--rcc-chart-height')).toBe('84px');
+  });
+
+  it('supports theme overrides', async () => {
+    const card = mount({ ...fullConfig, theme: 'light' }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.card')?.classList.contains('theme-light')).toBe(true);
+  });
+
+  it('loads real history through the websocket API', async () => {
+    const hass = createHass({
+      states: baseStates(),
+      history: historyFor(['sensor.temp', 'sensor.humidity']),
+    });
+    const card = mount(fullConfig, hass);
+    await flush();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await card.updateComplete;
+
+    const chart = q(card, 'room-climate-chart') as HTMLElement & {
+      temperature?: Array<{ t: number; v: number | null }>;
+      humidity?: Array<{ t: number; v: number | null }>;
+    };
+    expect(chart).not.toBeNull();
+    expect(chart.temperature?.length).toBe(20);
+    expect(chart.humidity?.length).toBe(20);
+  });
+
+  it('shows a fallback when history is unavailable', async () => {
+    const hass = createHass({ states: baseStates(), history: {} });
+    const card = mount(fullConfig, hass);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await card.updateComplete;
+    const chart = q(card, 'room-climate-chart') as HTMLElement & {
+      setSize: (width: number, height: number) => void;
+      updateComplete: Promise<unknown>;
+      shadowRoot: ShadowRoot;
+    };
+    chart.setSize(320, 90);
+    await chart.updateComplete;
+    expect(chart.shadowRoot.querySelector('.state-title')?.textContent?.trim()).toBe(
+      'Keine Verlaufsdaten'
+    );
+  });
+
+  it('hides the chart when both chart series are disabled', async () => {
+    const card = mount(
+      { ...fullConfig, show_temperature_chart: false, show_humidity_chart: false },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    expect(q(card, 'room-climate-chart')).toBeNull();
+    expect(q(card, '.chart-slot')).toBeNull();
+  });
+
+  it('renders a hint when no entities are configured', async () => {
+    const card = mount({ type: 'custom:room-climate-card', name: 'Leer' }, createHass());
+    await card.updateComplete;
+    expect(text(card, '.empty-title')).toBe('Keine Sensoren konfiguriert');
+    expect(q(card, '.temperature')).toBeNull();
+  });
+
+  it('never crashes on invalid configuration or missing hass', async () => {
+    const card = document.createElement('room-climate-card') as RoomClimateCard;
+    card.setConfig(undefined as never);
+    document.body.append(card);
+    await card.updateComplete;
+    expect(card.shadowRoot!.querySelector('.card')).not.toBeNull();
+
+    card.setConfig({ type: 'custom:room-climate-card', temperature_entity: 'nonsense', height: 'abc' });
+    await card.updateComplete;
+    expect(card.shadowRoot!.querySelector('.card')).not.toBeNull();
+
+    card.hass = createHass({ states: [entity('sensor.temp', { state: 'broken' })] });
+    card.setConfig({ type: 'custom:room-climate-card', temperature_entity: 'sensor.temp' });
+    await card.updateComplete;
+    expect(text(card, '.temperature .value')).toBe('–');
+  });
+
+  it('only re-renders when a referenced entity changes', async () => {
+    const hass = createHass({ states: baseStates() });
+    const card = mount(fullConfig, hass);
+    await card.updateComplete;
+
+    const renderSpy = vi.spyOn(card as unknown as { render: () => unknown }, 'render');
+    // Same entity objects, one extra unrelated entity.
+    card.hass = {
+      ...hass,
+      states: { ...hass.states, 'light.unrelated': entity('light.unrelated', { state: 'on' }) },
+    };
+    await card.updateComplete;
+    expect(renderSpy).not.toHaveBeenCalled();
+
+    card.hass = {
+      ...hass,
+      states: { ...hass.states, 'sensor.temp': entity('sensor.temp', { state: '19.5' }) },
+    };
+    await card.updateComplete;
+    expect(renderSpy).toHaveBeenCalled();
+  });
+
+  it('cleans up observers when removed from the document', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    card.remove();
+    const observers = (
+      globalThis as unknown as { TestResizeObserver: { instances: Array<{ targets: Set<Element> }> } }
+    ).TestResizeObserver.instances;
+    expect(observers.some((observer) => observer.targets.has(card))).toBe(false);
+  });
+
+  it('exposes card size and grid options for the dashboard', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(card.getCardSize()).toBeGreaterThanOrEqual(2);
+    const grid = card.getGridOptions();
+    expect(grid.columns).toBe(6);
+    expect(grid.rows).toBeGreaterThanOrEqual(2);
+  });
+
+  it('provides a usable stub config from the available entities', () => {
+    const config = (
+      document.createElement('room-climate-card').constructor as typeof RoomClimateCard
+    ).getStubConfig(
+      createHass({
+        states: [
+          entity('sensor.t', { state: '21', attributes: { device_class: 'temperature' } }),
+          entity('sensor.h', { state: '40', attributes: { device_class: 'humidity' } }),
+          entity('binary_sensor.w', { state: 'off', attributes: { device_class: 'window' } }),
+        ],
+      })
+    );
+    expect(config.temperature_entity).toBe('sensor.t');
+    expect(config.humidity_entity).toBe('sensor.h');
+    expect(config.window_entity).toBe('binary_sensor.w');
+    expect(config.type).toBe('custom:room-climate-card');
+  });
+
+  it('renders long room names without breaking the layout', async () => {
+    const card = mount(
+      { ...fullConfig, name: 'Wohnzimmer mit sehr langem Namen und Erker' },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    const name = q(card, '.name') as HTMLElement;
+    expect(name.getAttribute('title')).toBe('Wohnzimmer mit sehr langem Namen und Erker');
+    expect(qa(card, '.badge').length).toBe(2);
+  });
+});

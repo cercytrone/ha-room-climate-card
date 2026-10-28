@@ -1,0 +1,17 @@
+# Nur Luftfeuchte + eigener Feuchte-Verlauf, helles Erscheinungsbild.
+type: custom:room-climate-card
+name: Bad
+icon: mdi:shower
+theme: light
+height: 240
+humidity_entity: sensor.bad_humidity
+humidity_decimals: 1
+humidity_low_threshold: 40
+humidity_high_threshold: 70
+humidity_color: '#a78bfa'
+humidity_high_color: '#e879f9'
+show_temperature_chart: false
+show_humidity_chart: true
+chart_hours: 3
+chart_curve: linear
+chart_show_points: true
