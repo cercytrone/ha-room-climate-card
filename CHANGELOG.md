@@ -4,6 +4,22 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- HACS-Einbindung ist bewusst **nur als benutzerdefiniertes Repository** (Kategorie *Dashboard*)
+  dokumentiert. Die README beschreibt keine Aufnahme in die HACS-Standardliste mehr und der
+  Abschnitt zu Repository-Topics entfällt.
+- Installationsanleitung präzisiert: die Frontend-Ressource muss nach dem HACS-Download geprüft
+  und bei Bedarf manuell ergänzt werden.
+
+### Entfernt
+
+- GitHub-Workflow `HACS validation` (`.github/workflows/hacs.yml`). Er prüfte ausschließlich die
+  Anforderungen für HACS-Default-Repositories und schlug daher ohne Repository-Topics fehl. Die
+  Workflows *Build & Test* und *Release* bleiben unverändert.
+
 ## [1.0.0] – 2026-10-28
 
 Erste stabile Version.
