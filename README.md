@@ -21,7 +21,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 
 - [Funktionen](#funktionen)
 - [Installation](#installation)
-  - [Über HACS (empfohlen)](#über-hacs-empfohlen)
+  - [Über HACS als benutzerdefiniertes Repository](#über-hacs-als-benutzerdefiniertes-repository)
   - [Manuell](#manuell)
   - [Ressource prüfen / Browser-Cache leeren](#ressource-prüfen--browser-cache-leeren)
 - [Schnellstart](#schnellstart)
@@ -59,17 +59,25 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 
 ## Installation
 
-### Über HACS (empfohlen)
+> Dieses Projekt wird **ausschließlich als benutzerdefiniertes Repository** über HACS
+> eingebunden. Es ist nicht für die Aufnahme in die HACS-Standardliste (`hacs/default`)
+> vorgesehen; eine Validierung gegen die Default-Repository-Anforderungen findet nicht statt.
+
+### Über HACS als benutzerdefiniertes Repository
 
 1. HACS öffnen → **Dashboard** (in älteren Versionen „Frontend“).
 2. Oben rechts **⋮ → Benutzerdefinierte Repositories**.
-3. Repository `cercytrone/ha-room-climate-card` hinzufügen, Kategorie **Dashboard**.
-4. Nach **Room Climate Card** suchen → **Herunterladen**.
-5. HACS legt die Ressource automatisch an. Falls nicht: **Einstellungen → Dashboards → ⋮ →
-   Ressourcen → Ressource hinzufügen**
+3. Repository `cercytrone/ha-room-climate-card` eintragen, Kategorie **Dashboard**, bestätigen.
+4. Das Repository erscheint anschließend in der HACS-Suche: nach **Room Climate Card** suchen →
+   **Herunterladen**.
+5. **Ressource prüfen** (je nach HACS-Version wird sie nicht immer automatisch angelegt):
+   **Einstellungen → Dashboards → ⋮ → Ressourcen**. Fehlt der Eintrag, *Ressource hinzufügen*:
    - URL: `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js`
    - Typ: **JavaScript-Modul**
 6. Browser-Cache leeren bzw. die Seite neu laden (siehe unten).
+
+HACS lädt dabei die gebaute Datei `ha-room-climate-card.js` aus dem Repository (bzw. aus dem
+letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard → Aktualisierungen**.
 
 ### Manuell
 
@@ -80,13 +88,6 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
    - URL: `/local/ha-room-climate-card.js`
    - Typ: **JavaScript-Modul**
 4. Seite neu laden.
-
-### Repository-Metadaten (nur für Maintainer)
-
-Für die Aufnahme als HACS-Default-Repository müssen im GitHub-Repository **Topics** gesetzt sein
-(Settings → Topics), z. B. `home-assistant`, `hacs`, `lovelace`, `custom-card`, `climate`,
-`dashboard`. Der Workflow *HACS validation* prüft das und schlägt fehl, solange keine Topics
-existieren. Für die Installation als benutzerdefiniertes Repository sind Topics nicht nötig.
 
 ### Ressource prüfen / Browser-Cache leeren
 
@@ -399,8 +400,8 @@ dist/                      Gebautes Bundle (HACS-Download)
   Chart leer (mit Hinweistext).
 - Bei sehr hohen Punktzahlen (24 h mit sekündlicher Aktualisierung) wird für die Darstellung
   dezimiert – die Kurve entspricht dann einer Stichprobe, nicht jedem Einzelwert.
-- HACS-Default-Repository: Die Aufnahme in `hacs/default` ist nicht beantragt; die Installation
-  erfolgt als *benutzerdefiniertes Repository*.
+- HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
+  `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
 - Die README-Vorschau ist gerendert (Demo-Daten), kein Screenshot einer echten Installation.
 
 ---
