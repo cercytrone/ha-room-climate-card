@@ -47,8 +47,10 @@ jobs:
 
       - name: Check committed bundle is up to date
         run: |
-          if ! git diff --quiet -- dist/ha-room-climate-card.js; then
-            echo "::warning::dist/ha-room-climate-card.js is out of date – run 'npm run build' and commit the result."
+          if ! git diff --quiet -- dist/; then
+            echo "::error::dist/ is out of date – run 'npm run build' and commit the result."
+            git --no-pager diff --stat -- dist/
+            exit 1
           fi
 
       - name: Upload bundle
