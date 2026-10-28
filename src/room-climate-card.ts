@@ -634,6 +634,10 @@ export class RoomClimateCard extends LitElement {
         .showPoints=${config.chart.showPoints}
         .showGrid=${config.chart.showGrid}
         .curve=${config.chart.curve}
+        .gapMode=${config.chart.gapMode}
+        .maxGapMinutes=${config.chart.maxGapMinutes}
+        .gapStyle=${config.chart.gapStyle}
+        .cornerRadius=${config.borderRadius}
         .language=${language}
         .loading=${this._historyLoading}
         .error=${this._historyError}
@@ -665,7 +669,7 @@ export class RoomClimateCard extends LitElement {
       box-sizing: border-box;
       height: var(--rcc-height, auto);
       min-height: 0;
-      padding: 11px 14px 0;
+      padding: 11px 14px 2px;
       overflow: hidden;
       background: var(--rcc-bg);
       border: 1px solid var(--rcc-border);

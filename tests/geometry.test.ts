@@ -3,6 +3,9 @@ import {
   areaPath,
   bandColorFor,
   buildRuns,
+  buildSegments,
+  intervalPercentile,
+  splitAtBridges,
   decimate,
   extent,
   gapThreshold,
@@ -127,6 +130,149 @@ describe('gaps and runs', () => {
   it('never returns empty runs for only gaps', () => {
     const runs = buildRuns([{ t: 0, v: null }], 3600_000).runs;
     expect(runs).toEqual([]);
+  });
+});
+
+describe('segments with interpolation', () => {
+  const hour = 3600_000;
+  const start = 0;
+  const end = 6 * hour;
+
+  function at(hoursFromStart: number, v: number | null): ChartSample {
+    return { t: hoursFromStart * hour, v };
+  }
+
+  it('connects a hole with interpolated points', () => {
+    // 6 minute cadence, then a 90 minute hole.
+    const samples = [at(1, 20), at(1.1, 20.2), at(2.6, 21), at(2.7, 21.1)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(1);
+    const { samples: values, bridged } = segments[0];
+    expect(values.length).toBeGreaterThan(samples.length);
+    expect(bridged.some(Boolean)).toBe(true);
+    // Interpolated values stay between the two measured values.
+    for (const sample of values) {
+      expect(sample.v as number).toBeGreaterThanOrEqual(20);
+      expect(sample.v as number).toBeLessThanOrEqual(21.1);
+    }
+    // Timestamps stay sorted.
+    for (let i = 1; i < values.length; i++) {
+      expect(values[i].t).toBeGreaterThan(values[i - 1].t);
+    }
+  });
+
+  it('bridges null markers in connect mode', () => {
+    const samples = [at(1, 20), at(1.1, 20.1), at(1.2, null), at(2.4, 21)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(1);
+    expect(segments[0].bridged.some(Boolean)).toBe(true);
+  });
+
+  it('keeps null markers broken in break mode', () => {
+    const samples = [at(1, 20), at(1.1, 20.1), at(1.2, null), at(2.4, 21)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'break',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(2);
+  });
+
+  it('never bridges beyond maxGapMs', () => {
+    const samples = [at(1, 20), at(1.1, 20.1), at(1.2, 20.2), at(4.5, 22)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(2);
+  });
+
+  it('holds the outer samples to the window edges', () => {
+    const samples = [at(2, 20), at(3, 21)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+    });
+    expect(segments).toHaveLength(1);
+    const points = segments[0].samples;
+    expect(points[0]).toEqual({ t: start, v: 20 });
+    expect(points[points.length - 1]).toEqual({ t: end, v: 21 });
+    // Edge extension is not an interpolation (state holds until it changes).
+    expect(segments[0].bridged).toHaveLength(points.length - 1);
+    expect(segments[0].bridged[0]).toBe(false);
+    expect(segments[0].bridged[segments[0].bridged.length - 1]).toBe(false);
+  });
+
+  it('does not extend when the sensor went unavailable at the edges', () => {
+    const samples = [at(0, null), at(1, 20), at(3, 21)];
+    const withLeading = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+    });
+    expect(withLeading[0].samples[0].t).toBe(hour);
+
+    const trailing = buildSegments([at(1, 20), at(3, 21), at(5.5, null)], {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+    });
+    const last = trailing[trailing.length - 1].samples;
+    expect(last[last.length - 1].t).toBeLessThan(end);
+  });
+
+  it('returns no segments for empty or all-null input', () => {
+    expect(buildSegments([], { rangeMs: end, start, end })).toEqual([]);
+    expect(buildSegments([at(1, null), at(2, null)], { rangeMs: end, start, end })).toEqual([]);
+  });
+
+  it('splits a segment at bridged edges only', () => {
+    const samples = [at(1, 20), at(1.1, 20.2), at(2.6, 21), at(2.7, 21.1)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    const parts = splitAtBridges(segments[0]);
+    expect(parts.length).toBeGreaterThan(1);
+    // Every part carries at least two points so a path can be drawn.
+    for (const part of parts) expect(part.length).toBeGreaterThanOrEqual(2);
+
+    const continuous = buildSegments([at(1, 20), at(1.05, 20.1)], {
+      rangeMs: end - start,
+      gapMode: 'connect',
+    });
+    expect(splitAtBridges(continuous[0])).toHaveLength(1);
+  });
+
+  it('computes interval percentiles', () => {
+    const samples = series([1, 2, 3, 4, 5], 60_000);
+    expect(intervalPercentile(samples, 0)).toBe(60_000);
+    expect(intervalPercentile(samples, 0.75)).toBe(60_000);
+    expect(intervalPercentile([], 0.5)).toBe(0);
   });
 });
 

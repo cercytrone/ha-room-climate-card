@@ -4,19 +4,51 @@ import type { TemperatureBandColors } from '../config';
 import {
   areaPath,
   bandColorFor,
-  buildRuns,
-  decimate,
+  buildSegments,
   extent,
   linearScale,
   padDomain,
   projectRun,
   seriesPath,
+  splitAtBridges,
   temperatureGradientStops,
   tickCountForWidth,
   timeTicks,
   verticalFadeStops,
   type ChartSample,
+  type GapMode,
+  type SeriesSegment,
 } from './geometry';
+
+/**
+ * Decimates a segment for rendering but keeps the `bridged` flags aligned with
+ * the remaining samples so interpolated stretches can still be styled apart.
+ */
+function decimateSegment(segment: SeriesSegment, maxPoints: number): SeriesSegment {
+  const { samples, bridged } = segment;
+  if (samples.length <= maxPoints || maxPoints < 3) return segment;
+  const stride = Math.ceil(samples.length / maxPoints);
+  const keptSamples: ChartSample[] = [];
+  const keptBridged: boolean[] = [];
+  let lastIndex = 0;
+  for (let i = 0; i < samples.length; i += stride) {
+    if (!keptSamples.length) {
+      keptSamples.push(samples[i]);
+      lastIndex = i;
+      continue;
+    }
+    keptSamples.push(samples[i]);
+    // Edge is bridged if any skipped edge in between was interpolated.
+    keptBridged.push(bridged.slice(lastIndex + 1, i + 1).some(Boolean));
+    lastIndex = i;
+  }
+  const finalIndex = samples.length - 1;
+  if (lastIndex !== finalIndex) {
+    keptSamples.push(samples[finalIndex]);
+    keptBridged.push(bridged.slice(lastIndex + 1, finalIndex + 1).some(Boolean));
+  }
+  return { samples: keptSamples, bridged: keptBridged };
+}
 
 const FALLBACK_WIDTH = 320;
 const FALLBACK_HEIGHT = 84;
@@ -48,6 +80,10 @@ export class RoomClimateChart extends LitElement {
     showPoints: { attribute: false },
     showGrid: { attribute: false },
     curve: { attribute: false },
+    gapMode: { attribute: false },
+    maxGapMinutes: { attribute: false },
+    gapStyle: { attribute: false },
+    cornerRadius: { attribute: false },
     language: { attribute: false },
     loading: { attribute: false },
     error: { attribute: false },
@@ -197,6 +233,14 @@ export class RoomClimateChart extends LitElement {
   showPoints = false;
   showGrid = true;
   curve: 'smooth' | 'linear' = 'smooth';
+  /** `connect` interpolates holes, `break` leaves them visible. */
+  gapMode: GapMode = 'connect';
+  /** Largest hole in minutes that will be interpolated. */
+  maxGapMinutes = 120;
+  /** `solid` draws bridged stretches like measured ones. */
+  gapStyle: 'solid' | 'dashed' = 'solid';
+  /** Card corner radius; keeps the axis labels clear of the rounded edges. */
+  cornerRadius = 18;
   language = 'de';
   loading = false;
   error?: string;
@@ -328,7 +372,7 @@ export class RoomClimateChart extends LitElement {
     const legendSpace = this.showLegend && height >= 96 ? 14 : 0;
     const chartHeight = Math.max(20, height - legendSpace);
     const showAxis = chartHeight >= 62;
-    const axisSpace = showAxis ? 13 : 2;
+    const axisSpace = showAxis ? 16 : 2;
     const top = 5;
     const bottom = chartHeight - axisSpace;
     const plotHeight = Math.max(6, bottom - top);
@@ -336,6 +380,10 @@ export class RoomClimateChart extends LitElement {
     const right = width - 1;
     const rangeMs = Math.max(1, this.end - this.start);
     const x = linearScale([this.start, this.end], [left, right]);
+    // The curves may run into the rounded corners, the labels may not.
+    const cornerInset = showAxis ? Math.min(Math.max(this.cornerRadius, 0), 24) + 2 : 0;
+    const labelX = linearScale([this.start, this.end], [left + cornerInset, right - cornerInset]);
+    const labelBaseline = chartHeight - 5;
 
     const temperatureValues = (this.temperature ?? [])
       .map((sample) => sample.v)
@@ -357,12 +405,27 @@ export class RoomClimateChart extends LitElement {
     const tempSeries = this.temperature ?? [];
     const humiditySeries = this.humidity ?? [];
 
-    // Split first (honours null markers / gaps), then limit point count per run.
-    const rawTempRuns = tempDomain ? buildRuns(tempSeries, rangeMs).runs : [];
-    const rawHumidityRuns = humidityDomain ? buildRuns(humiditySeries, rangeMs).runs : [];
-    const perRunLimit = Math.max(60, Math.floor(MAX_CHART_POINTS / Math.max(1, rawTempRuns.length + rawHumidityRuns.length)));
-    const tempRuns = rawTempRuns.map((run) => decimate(run, perRunLimit));
-    const humidityRuns = rawHumidityRuns.map((run) => decimate(run, perRunLimit));
+    // Build segments first (holes get interpolated or stay broken), then limit
+    // the point count per segment while keeping the bridge flags.
+    const segmentOptions = {
+      rangeMs,
+      start: this.start,
+      end: this.end,
+      gapMode: this.gapMode,
+      maxGapMs: Math.max(5, this.maxGapMinutes) * 60 * 1000,
+    };
+    const rawTempSegments: SeriesSegment[] = tempDomain
+      ? buildSegments(tempSeries, segmentOptions)
+      : [];
+    const rawHumiditySegments: SeriesSegment[] = humidityDomain
+      ? buildSegments(humiditySeries, segmentOptions)
+      : [];
+    const segmentCount = Math.max(1, rawTempSegments.length + rawHumiditySegments.length);
+    const perSegmentLimit = Math.max(60, Math.floor(MAX_CHART_POINTS / segmentCount));
+    const tempSegments = rawTempSegments.map((segment) => decimateSegment(segment, perSegmentLimit));
+    const humiditySegments = rawHumiditySegments.map((segment) =>
+      decimateSegment(segment, perSegmentLimit)
+    );
 
     const tempGradient = tempDomain
       ? temperatureGradientStops({
@@ -400,27 +463,53 @@ export class RoomClimateChart extends LitElement {
     const axisLabels = ticks.map((tick, index) => {
       const label = this.formatTime(tick);
       const anchor = index === 0 ? 'start' : index === ticks.length - 1 ? 'end' : 'middle';
-      return svg`<text class="axis-label" x=${x(tick)} y=${chartHeight - 2} text-anchor=${anchor}>
+      return svg`<text class="axis-label" x=${labelX(tick)} y=${labelBaseline} text-anchor=${anchor}>
         ${label}
       </text>`;
     });
 
-    const tempPaths = tempRuns.map((run) => {
-      const points = projectRun(run, x, tempY!);
-      return svg`<path class="series-line" d=${seriesPath(points, this.curve === 'smooth')} style="stroke:${`url(#${this.uid}-temp-stroke)`}" />`;
-    });
-    const tempAreas = tempRuns.map((run) => {
-      const points = projectRun(run, x, tempY!);
-      return svg`<path d=${areaPath(points, bottom, this.curve === 'smooth')} style="fill:url(#${this.uid}-temp-fill)" />`;
-    });
-    const humidityPaths = humidityRuns.map((run) => {
-      const points = projectRun(run, x, humidityY!);
-      return svg`<path class="series-line" d=${seriesPath(points, this.curve === 'smooth')} style="stroke:${this.humidityColor}" />`;
-    });
-    const humidityAreas = humidityRuns.map((run) => {
-      const points = projectRun(run, x, humidityY!);
-      return svg`<path d=${areaPath(points, bottom, this.curve === 'smooth')} style="fill:url(#${this.uid}-humidity-fill)" />`;
-    });
+    const smooth = this.curve === 'smooth';
+    const dashedBridges = this.gapStyle === 'dashed';
+
+    /** One line path per segment – or several when bridged parts are dashed. */
+    const linePaths = (
+      segment: SeriesSegment,
+      y: (value: number) => number,
+      stroke: string,
+      strokeWidth = 1.9
+    ): TemplateResult[] => {
+      const parts = dashedBridges ? splitAtBridges(segment) : [segment.samples];
+      return parts
+        .filter((part) => part.length > 1)
+        .map((part) => {
+          const points = projectRun(part, x, y);
+          return svg`<path
+            class="series-line"
+            d=${seriesPath(points, smooth)}
+            style="stroke:${stroke};stroke-width:${strokeWidth}"
+          />`;
+        });
+    };
+
+    const tempPaths = tempSegments.flatMap((segment) =>
+      linePaths(segment, tempY!, `url(#${this.uid}-temp-stroke)`)
+    );
+    // A single area per segment keeps the gradient continuous across bridges.
+    const tempAreas = tempSegments
+      .filter((segment) => segment.samples.length > 1)
+      .map((segment) => {
+        const points = projectRun(segment.samples, x, tempY!);
+        return svg`<path d=${areaPath(points, bottom, smooth)} style="fill:url(#${this.uid}-temp-fill)" />`;
+      });
+    const humidityPaths = humiditySegments.flatMap((segment) =>
+      linePaths(segment, humidityY!, this.humidityColor, 1.6)
+    );
+    const humidityAreas = humiditySegments
+      .filter((segment) => segment.samples.length > 1)
+      .map((segment) => {
+        const points = projectRun(segment.samples, x, humidityY!);
+        return svg`<path d=${areaPath(points, bottom, smooth)} style="fill:url(#${this.uid}-humidity-fill)" />`;
+      });
 
     const pointMarkers: TemplateResult[] = [];
     if (this.showPoints) {
@@ -442,12 +531,16 @@ export class RoomClimateChart extends LitElement {
         });
       };
       if (tempY) {
-        tempRuns.forEach((run) =>
-          addPoints(run, tempY, (value) => bandColorFor(value, this.bands, this.bandColors))
+        tempSegments.forEach((segment) =>
+          addPoints(segment.samples, tempY, (value) =>
+            bandColorFor(value, this.bands, this.bandColors)
+          )
         );
       }
       if (humidityY) {
-        humidityRuns.forEach((run) => addPoints(run, humidityY, () => this.humidityColor));
+        humiditySegments.forEach((segment) =>
+          addPoints(segment.samples, humidityY, () => this.humidityColor)
+        );
       }
     }
 

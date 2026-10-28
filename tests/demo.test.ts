@@ -40,6 +40,26 @@ describe('demo environment', () => {
     }
   );
 
+  it('renders a continuous line although the demo data contains a deliberate gap', async () => {
+    const scenario = demoScenarios.find((entry) => entry.title.includes('Bad'))!;
+    const card = document.createElement('room-climate-card') as RoomClimateCard;
+    card.hass = hass;
+    card.setConfig(scenario.config);
+    document.body.append(card);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await card.updateComplete;
+
+    const chart = card.shadowRoot!.querySelector('room-climate-chart') as HTMLElement & {
+      setSize: (w: number, h: number) => void;
+      updateComplete: Promise<unknown>;
+      shadowRoot: ShadowRoot;
+    };
+    chart.setSize(360, 90);
+    await chart.updateComplete;
+    // One continuous path per series, no visible break despite the data hole.
+    expect(chart.shadowRoot.querySelectorAll('.series-line')).toHaveLength(2);
+  });
+
   it('serves synthetic history for the demo sensors', async () => {
     const result = await hass.connection!.sendMessagePromise({
       type: 'history/history_during_period',

@@ -180,6 +180,21 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Chart-Höhe').disabled).toBe(true);
   });
 
+  it('offers the data gap options and disables them in break mode', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Datenlücken').value).toBe('connect');
+    expect(selectorByLabel(editor, 'Maximal interpolierte Lücke').value).toBe(120);
+    expect(selectorByLabel(editor, 'Darstellung interpolierter Abschnitte').value).toBe('solid');
+
+    selectorByLabel(editor, 'Datenlücken').emit('break');
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.chart_gap_mode).toBe('break');
+    expect(selectorByLabel(editor, 'Maximal interpolierte Lücke').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Darstellung interpolierter Abschnitte').disabled).toBe(true);
+  });
+
   it('enables the fixed height field when automatic height is switched off', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

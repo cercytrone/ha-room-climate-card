@@ -4,6 +4,29 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.1] – 2026-10-28
+
+### Behoben
+
+- **Zeitleiste an den Kartenrändern:** Das erste und das letzte Zeitlabel lagen im Bereich der
+  abgerundeten Ecken und wurden abgeschnitten. Die Beschriftung wird jetzt um den Eckenradius
+  eingerückt, die Grundlinie sitzt 5 px über der Unterkante (Platz für Unterlängen), und die
+  Karte hat 2 px Bodenfreiheit. Die Kurven selbst laufen weiterhin randlos.
+- **Unterbrochene Kurven und Gradienten:** Home Assistant speichert nur Zustandsänderungen,
+  deshalb entstehen auch bei konstanten Werten Lücken. Diese werden jetzt standardmäßig linear
+  interpoliert (durchgezogene Linie) und die Fläche wird pro Segment am Stück gefüllt – keine
+  vertikalen Schnitte im Farbverlauf mehr.
+  - Lücken bis `chart_max_gap_minutes` (Standard 120) werden überbrückt, längere bleiben offen.
+  - Erster und letzter Messwert werden bis an die Fensterkanten gehalten (ein HA-Zustand gilt
+    bis zur nächsten Änderung) – keine 10–20 px fehlende Kurve mehr am Rand.
+  - Die Lückenerkennung richtet sich nach dem Median-Meldeintervall mit sinnvoller Untergrenze
+    statt nach einer festen 3-Minuten-Grenze.
+
+### Hinzugefügt
+
+- Optionen `chart_gap_mode` (`connect`/`break`), `chart_max_gap_minutes` und `chart_gap_style`
+  (`solid`/`dashed`) inklusive Editor-Feldern.
+
 ## [1.1.0] – 2026-10-28
 
 ### Geändert

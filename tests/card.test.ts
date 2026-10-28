@@ -394,6 +394,38 @@ describe('room climate card', () => {
     );
   });
 
+  it('forwards the gap configuration to the chart', async () => {
+    const card = mount(
+      {
+        ...fullConfig,
+        chart_gap_mode: 'break',
+        chart_gap_style: 'dashed',
+        chart_max_gap_minutes: 45,
+        border_radius: 6,
+      },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    const chart = q(card, 'room-climate-chart') as HTMLElement & {
+      gapMode: string;
+      gapStyle: string;
+      maxGapMinutes: number;
+      cornerRadius: number;
+    };
+    expect(chart.gapMode).toBe('break');
+    expect(chart.gapStyle).toBe('dashed');
+    expect(chart.maxGapMinutes).toBe(45);
+    expect(chart.cornerRadius).toBe(6);
+  });
+
+  it('defaults to a continuous solid chart', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const chart = q(card, 'room-climate-chart') as HTMLElement & { gapMode: string; gapStyle: string };
+    expect(chart.gapMode).toBe('connect');
+    expect(chart.gapStyle).toBe('solid');
+  });
+
   it('hides the chart when both chart series are disabled', async () => {
     const card = mount(
       { ...fullConfig, show_temperature_chart: false, show_humidity_chart: false },
