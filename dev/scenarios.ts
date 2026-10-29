@@ -37,7 +37,7 @@ export const demoScenarios: DemoScenario[] = [
     },
   },
   {
-    title: 'Bad · Ruht + Datenlücke im Verlauf',
+    title: 'Bad · Ruht + lange konstante Phase (keine HA-Samples)',
     config: {
       type: 'custom:room-climate-card',
       name: 'Bad (1. OG)',

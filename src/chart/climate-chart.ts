@@ -5,6 +5,7 @@ import {
   areaPath,
   bandColorFor,
   buildSegments,
+  prepareSamples,
   extent,
   linearScale,
   padDomain,
@@ -402,8 +403,10 @@ export class RoomClimateChart extends LitElement {
     const tempY = tempDomain ? linearScale(tempDomain, [bottom, top]) : null;
     const humidityY = humidityDomain ? linearScale(humidityDomain, [bottom, top]) : null;
 
-    const tempSeries = this.temperature ?? [];
-    const humiditySeries = this.humidity ?? [];
+    // Defensive clean-up: live history may be unsorted, contain duplicates or
+    // reach outside the window – all of which would draw artefacts.
+    const tempSeries = prepareSamples(this.temperature, this.start, this.end);
+    const humiditySeries = prepareSamples(this.humidity, this.start, this.end);
 
     // Build segments first (holes get interpolated or stay broken), then limit
     // the point count per segment while keeping the bridge flags.
@@ -494,22 +497,24 @@ export class RoomClimateChart extends LitElement {
     const tempPaths = tempSegments.flatMap((segment) =>
       linePaths(segment, tempY!, `url(#${this.uid}-temp-stroke)`)
     );
-    // A single area per segment keeps the gradient continuous across bridges.
-    const tempAreas = tempSegments
-      .filter((segment) => segment.samples.length > 1)
-      .map((segment) => {
-        const points = projectRun(segment.samples, x, tempY!);
-        return svg`<path d=${areaPath(points, bottom, smooth)} style="fill:url(#${this.uid}-temp-fill)" />`;
-      });
+    // All areas of one series live in a single <path> with sub-paths, so the
+    // gradient can never show seams where a real hole splits the data.
+    const mergedArea = (segmentsToDraw: SeriesSegment[], y: (value: number) => number): string =>
+      segmentsToDraw
+        .filter((segment) => segment.samples.length > 1)
+        .map((segment) => areaPath(projectRun(segment.samples, x, y), bottom, smooth))
+        .join(' ');
+    const tempAreaPath = mergedArea(tempSegments, tempY!);
+    const tempAreas = tempAreaPath
+      ? [svg`<path d=${tempAreaPath} style="fill:url(#${this.uid}-temp-fill)" />`]
+      : [];
     const humidityPaths = humiditySegments.flatMap((segment) =>
       linePaths(segment, humidityY!, this.humidityColor, 1.6)
     );
-    const humidityAreas = humiditySegments
-      .filter((segment) => segment.samples.length > 1)
-      .map((segment) => {
-        const points = projectRun(segment.samples, x, humidityY!);
-        return svg`<path d=${areaPath(points, bottom, smooth)} style="fill:url(#${this.uid}-humidity-fill)" />`;
-      });
+    const humidityAreaPath = mergedArea(humiditySegments, humidityY!);
+    const humidityAreas = humidityAreaPath
+      ? [svg`<path d=${humidityAreaPath} style="fill:url(#${this.uid}-humidity-fill)" />`]
+      : [];
 
     const pointMarkers: TemplateResult[] = [];
     if (this.showPoints) {

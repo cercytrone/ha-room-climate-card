@@ -4,6 +4,35 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.2] – 2026-10-29
+
+### Behoben
+
+- **Kurvenaussetzer im Verlauf (Ursache gefunden):** 1.1.1 hat „seit N Minuten kein Sample“ als
+  fehlende Messung gewertet. Home Assistant schreibt aber nur Zustands*änderungen* – bleibt die
+  Temperatur nachts stundenlang konstant, gibt es korrekt keine Zeilen. Diese Stellen wurden
+  deshalb fälschlich interpoliert oder abgerissen. Neue Regel: **ein fehlendes Sample bedeutet
+  „Wert unverändert“ und bricht die Linie nie** (wie im HA-Frontend). Nur ein expliziter
+  `unavailable`/`unknown`-Abschnitt ist eine echte Lücke und wird ab
+  `chart_max_gap_minutes` sichtbar unterbrochen.
+- **Flächen-/Spitzen-Artefakte am Rand („Aussetzer unten“):** Live-History liefert durch
+  `include_start_time_state`, späte REST-Antworten oder veralteten Cache auch Samples außerhalb
+  des Zeitfensters. Diese wurden bisher mitprojiziert (`y < 0`, `x < 0`) und erschienen als
+  Zacken und als große Fläche unter der Kurve. Neue Funktion `prepareSamples()` sortiert,
+  entfernt Dubletten-Zeitstempel, verwirft nicht-numerische Werte und schneidet exakt auf das
+  Fenster zu, bevor Geometrie entsteht.
+- **Nähte im Farbverlauf:** Alle Teilflächen einer Reihe werden jetzt als **ein** `<path>` mit
+  mehreren Subpfaden gerendert. Auch bei einer echten Unterbrechung kann der Gradient dadurch
+  keine sichtbare Kante mehr zeigen.
+
+### Geändert
+
+- Editor-Texte präzisiert: „Kurze Ausfälle überbrücken“ / „Ausfälle sichtbar unterbrechen“,
+  „Maximal überbrückte Ausfallzeit“; der Hilfetext erklärt, dass konstante Phasen immer
+  durchgehend gezeichnet werden.
+- README: Abschnitt „Datenaufbereitung“ neu strukturiert (konstante Phasen, echte Ausfälle,
+  Kanten, Fläche) und Fehlerbehebungstabelle ergänzt.
+
 ## [1.1.1] – 2026-10-28
 
 ### Behoben
