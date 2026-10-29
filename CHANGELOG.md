@@ -4,6 +4,25 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.3.0] – 2026-10-29
+
+### Geändert
+
+- **Weiche Übergänge zwischen den Temperaturstufen:** Der Farbverlauf wechselte an jeder
+  Bandgrenze (kühl/komfort/warm/heiß) innerhalb von 3 px die Farbe. Auf der Fläche war das als
+  harte horizontale Naht zu sehen. Die Blende ist jetzt breit und skaliert mit der
+  Diagrammhöhe (Standard ein Drittel der Höhe, begrenzt auf 14–46 px). Liegen zwei Schwellen
+  dicht beieinander, nutzt jeder Übergang höchstens 45 % des Abstands – so bleiben beide
+  Stufen erkennbar, statt sich gegenseitig aufzufressen.
+- **Zwischenfarben in OKLab:** Die Rampe wird nicht mehr vom Renderer in sRGB interpoliert,
+  sondern in OKLab vorgemischt (8 Zwischenstufen je Übergang). Das sRGB-Mittel von Amber und
+  Grün liegt dunkler als beide Endfarben – der alte Verlauf bekam dadurch einen graugrünen
+  Knick. Für Farben, die kein Hexwert sind (z. B. `rgb(…)` oder Farbnamen), fällt die Karte
+  sauber auf zwei Stützstellen zurück.
+- **Feuchtefläche läuft weicher aus:** Statt zwei Stützstellen mit linearer Deckkraft läuft
+  der Verlauf über sieben Stützstellen mit Smoothstep-Kurve aus – dichter an der Kurve,
+  früher transparent zum Grund hin, ohne sichtbare Kante.
+
 ## [1.2.3] – 2026-10-29
 
 ### Behoben

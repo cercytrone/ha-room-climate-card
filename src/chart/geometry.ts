@@ -440,6 +440,98 @@ export function areaPath(points: Point[], baseline: number, smooth: boolean): st
   return `${line} L ${round(last.x)} ${round(baseline)} L ${round(first.x)} ${round(baseline)} Z`;
 }
 
+/* ------------------------------------------------------------------ *
+ * Colour mixing
+ *
+ * Band edges used to switch colour inside a few pixels, which reads as a
+ * hard seam. Blending over a wide zone needs the intermediate colours to be
+ * pleasant: plain sRGB interpolation turns amber -> emerald into a muddy
+ * olive, so the ramp is built in OKLab, which keeps hue and saturation.
+ * ------------------------------------------------------------------ */
+
+type Rgb = [number, number, number];
+
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+function parseHexColor(value: string): Rgb | null {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim());
+  if (!match) return null;
+  let hex = match[1];
+  if (hex.length === 3) {
+    hex = hex
+      .split('')
+      .map((char) => char + char)
+      .join('');
+  }
+  return [
+    parseInt(hex.slice(0, 2), 16) / 255,
+    parseInt(hex.slice(2, 4), 16) / 255,
+    parseInt(hex.slice(4, 6), 16) / 255,
+  ];
+}
+
+function toHexColor(rgb: Rgb): string {
+  return `#${rgb
+    .map((channel) => Math.round(clamp01(channel) * 255).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+const srgbToLinear = (channel: number): number =>
+  channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+
+const linearToSrgb = (channel: number): number =>
+  channel <= 0.0031308 ? channel * 12.92 : 1.055 * channel ** (1 / 2.4) - 0.055;
+
+function toOklab(rgb: Rgb): Rgb {
+  const [r, g, b] = rgb.map(srgbToLinear) as Rgb;
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+function fromOklab(lab: Rgb): Rgb {
+  const [L, a, b] = lab;
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    linearToSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    linearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    linearToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ];
+}
+
+/**
+ * Mixes two CSS colours in OKLab. Returns `null` when either colour is not a
+ * plain hex value (named colours, `rgb()`, `currentColor`, …) so callers can
+ * fall back to the renderer's own interpolation instead of guessing.
+ */
+export function mixColor(from: string, to: string, t: number): string | null {
+  const start = parseHexColor(from);
+  const end = parseHexColor(to);
+  if (!start || !end) return null;
+  const ratio = clamp01(t);
+  const a = toOklab(start);
+  const b = toOklab(end);
+  const mixed: Rgb = [
+    a[0] + (b[0] - a[0]) * ratio,
+    a[1] + (b[1] - a[1]) * ratio,
+    a[2] + (b[2] - a[2]) * ratio,
+  ];
+  return toHexColor(fromOklab(mixed));
+}
+
+/** Smoothstep – removes the visible kink at both ends of a linear ramp. */
+const smoothstep = (t: number): number => {
+  const value = clamp01(t);
+  return value * value * (3 - 2 * value);
+};
+
 export interface GradientStop {
   /** 0..1 relative to the gradient axis. */
   offset: number;
@@ -458,8 +550,10 @@ export interface BandStopOptions {
   opacityTop?: number;
   /** Opacity at the bottom of the gradient (area fill). */
   opacityBottom?: number;
-  /** Soft transition width in pixels. */
+  /** Soft transition width in pixels (default: 34 % of the plot height). */
   blendPx?: number;
+  /** Intermediate stops per blend; more stops = smoother ramp (default 8). */
+  blendSteps?: number;
 }
 
 /**
@@ -483,38 +577,63 @@ export function temperatureGradientStops(options: BandStopOptions): GradientStop
   const { top, bottom, domain, thresholds, colors } = options;
   const opacityTop = options.opacityTop ?? 1;
   const opacityBottom = options.opacityBottom ?? opacityTop;
-  const blend = options.blendPx ?? 3;
   const height = Math.max(1, bottom - top);
   const scale = linearScale(domain, [bottom, top]);
-  const fraction = (y: number) => Math.min(1, Math.max(0, (y - top) / height));
-  const opacityAt = (y: number) => {
-    const ratio = Math.min(1, Math.max(0, (y - top) / height));
-    return opacityTop + (opacityBottom - opacityTop) * ratio;
-  };
+  const fraction = (y: number) => clamp01((y - top) / height);
+  const opacityAt = (y: number) => opacityTop + (opacityBottom - opacityTop) * fraction(y);
   const colorAt = (value: number) => bandColorFor(value, thresholds, colors);
+
+  // Bands that are visible in the plot, ordered from the top edge downwards
+  // (higher temperature = higher on the axis = smaller y).
+  const edges = [thresholds.hot, thresholds.warm, thresholds.cool]
+    .map((value) => ({ value, y: scale(value) }))
+    .filter((edge) => Number.isFinite(edge.y) && edge.y > top && edge.y < bottom)
+    .sort((a, b) => a.y - b.y);
+
+  // The fade scales with the plot so a tall chart gets a generous transition
+  // instead of a seam, while small charts keep recognisable bands.
+  const requested = options.blendPx ?? Math.min(46, Math.max(14, height * 0.34));
+  const steps = Math.max(2, options.blendSteps ?? 8);
 
   const stops: GradientStop[] = [
     { offset: 0, color: colorAt(domain[1]), opacity: opacityAt(top) },
   ];
 
   let currentColor = colorAt(domain[1]);
-  for (const boundary of [thresholds.hot, thresholds.warm, thresholds.cool]) {
-    const y = scale(boundary);
-    if (!Number.isFinite(y) || y <= top || y >= bottom) continue;
-    const below = colorAt(boundary - 1e-6);
-    if (below === currentColor) continue;
-    stops.push({
-      offset: fraction(Math.max(top, y - blend / 2)),
-      color: currentColor,
-      opacity: opacityAt(y - blend / 2),
-    });
-    stops.push({
-      offset: fraction(Math.min(bottom, y + blend / 2)),
-      color: below,
-      opacity: opacityAt(y + blend / 2),
-    });
-    currentColor = below;
-  }
+  edges.forEach((edge, index) => {
+    const nextColor = colorAt(edge.value - 1e-6);
+    if (nextColor === currentColor) return;
+
+    // Neighbouring thresholds may sit close together (e.g. 25 °C and 28 °C):
+    // each half-fade may use at most 45 % of the gap so two fades never overlap.
+    const previousY = index === 0 ? top : edges[index - 1].y;
+    const nextY = index === edges.length - 1 ? bottom : edges[index + 1].y;
+    const half = Math.min(
+      requested / 2,
+      Math.max(0, edge.y - previousY) * 0.45,
+      Math.max(0, nextY - edge.y) * 0.45
+    );
+
+    const from = Math.max(top, edge.y - half);
+    const to = Math.min(bottom, edge.y + half);
+    stops.push({ offset: fraction(from), color: currentColor, opacity: opacityAt(from) });
+
+    // Intermediate stops in OKLab: the renderer would otherwise interpolate in
+    // sRGB and produce a muddy grey-green in the middle of the ramp.
+    const mixable = mixColor(currentColor, nextColor, 0.5) !== null;
+    if (mixable && to - from > 1) {
+      for (let step = 1; step < steps; step++) {
+        const ratio = step / steps;
+        const y = from + (to - from) * ratio;
+        const color = mixColor(currentColor, nextColor, smoothstep(ratio));
+        if (!color) break;
+        stops.push({ offset: fraction(y), color, opacity: opacityAt(y) });
+      }
+    }
+
+    stops.push({ offset: fraction(to), color: nextColor, opacity: opacityAt(to) });
+    currentColor = nextColor;
+  });
 
   stops.push({ offset: 1, color: colorAt(domain[0]), opacity: opacityAt(bottom) });
   // Ensure strictly ascending offsets for SVG compatibility.
@@ -526,15 +645,34 @@ export function temperatureGradientStops(options: BandStopOptions): GradientStop
   return stops;
 }
 
+/**
+ * Vertical fade of a single colour. With more than two steps the opacity runs
+ * through a smoothstep curve, so the area does not end in a visible edge where
+ * the linear ramp changes slope.
+ */
 export function verticalFadeStops(
   color: string,
   opacityTop: number,
-  opacityBottom: number
+  opacityBottom: number,
+  steps = 2
 ): GradientStop[] {
-  return [
-    { offset: 0, color, opacity: opacityTop },
-    { offset: 1, color, opacity: opacityBottom },
-  ];
+  if (steps <= 2) {
+    return [
+      { offset: 0, color, opacity: opacityTop },
+      { offset: 1, color, opacity: opacityBottom },
+    ];
+  }
+  const count = Math.max(2, Math.round(steps));
+  const stops: GradientStop[] = [];
+  for (let index = 0; index < count; index++) {
+    const ratio = index / (count - 1);
+    stops.push({
+      offset: ratio,
+      color,
+      opacity: opacityTop + (opacityBottom - opacityTop) * smoothstep(ratio),
+    });
+  }
+  return stops;
 }
 
 export function timeTicks(start: number, end: number, count: number): number[] {
