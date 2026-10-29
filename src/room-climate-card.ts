@@ -650,6 +650,7 @@ export class RoomClimateCard extends LitElement {
         .gapMode=${config.chart.gapMode}
         .maxGapMinutes=${config.chart.maxGapMinutes}
         .gapStyle=${config.chart.gapStyle}
+        .humidityLineStyle=${config.chart.humidityLineStyle}
         .cornerRadius=${config.borderRadius}
         .language=${language}
         .loading=${this._historyLoading}

@@ -85,6 +85,10 @@ interface EditorText {
   gapStyle: string;
   gapStyleSolid: string;
   gapStyleDashed: string;
+  humidityLine: string;
+  humidityLineSolid: string;
+  humidityLineDotted: string;
+  humidityLineHelper: string;
   grid: string;
   legend: string;
   points: string;
@@ -171,6 +175,11 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     gapStyle: 'Darstellung überbrückter Abschnitte',
     gapStyleSolid: 'Durchgezogen (empfohlen)',
     gapStyleDashed: 'Gestrichelt',
+    humidityLine: 'Linienart Luftfeuchte',
+    humidityLineSolid: 'Durchgezogen',
+    humidityLineDotted: 'Gepunktet',
+    humidityLineHelper:
+      'Nur die Feuchtekurve. Die Temperaturkurve bleibt unverändert; Fläche, Endpunkt und Farben gelten weiter.',
     grid: 'Gitternetz',
     legend: 'Legende',
     points: 'Datenpunkte',
@@ -255,6 +264,11 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     gapStyle: 'Style of bridged parts',
     gapStyleSolid: 'Solid (recommended)',
     gapStyleDashed: 'Dashed',
+    humidityLine: 'Humidity line style',
+    humidityLineSolid: 'Solid',
+    humidityLineDotted: 'Dotted',
+    humidityLineHelper:
+      'Humidity curve only. The temperature curve is unchanged; area, end marker and colours still apply.',
     grid: 'Grid lines',
     legend: 'Legend',
     points: 'Data points',
@@ -993,6 +1007,23 @@ export class RoomClimateCardEditor extends LitElement {
         },
         value: this.stringValue('chart_curve', 'smooth'),
         disabled: !anyChart,
+      })}
+      ${this.renderField({
+        key: 'chart_humidity_line_style',
+        label: t.humidityLine,
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'solid', label: t.humidityLineSolid },
+              { value: 'dotted', label: t.humidityLineDotted },
+            ],
+          },
+        },
+        value: this.stringValue('chart_humidity_line_style', 'solid'),
+        disabled: !showHumidity,
+        helper: t.humidityLineHelper,
+        onChange: (value) => this.patch({ chart_humidity_line_style: String(value) }),
       })}
       ${this.renderField({
         key: 'chart_gap_mode',

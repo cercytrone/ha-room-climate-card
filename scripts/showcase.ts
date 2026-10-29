@@ -87,6 +87,8 @@ interface CardOptions {
   unit: string;
   humidity?: string;
   humidityColor?: string;
+  /** Draw the humidity curve as a row of dots (like the card option). */
+  humidityDotted?: boolean;
   window?: 'closed' | 'open' | 'unknown';
   motion?: 'active' | 'idle' | 'none';
   quiet?: string;
@@ -224,8 +226,10 @@ function renderCard(options: CardOptions): string {
       : humidityRuns
           .map((run) => {
             const pts: Point[] = projectRun(run, xScale, humidityScale);
+            const strokeWidth = options.humidityDotted ? 2.4 : 1.8;
+            const dash = options.humidityDotted ? ' stroke-dasharray="0.1 5.5"' : '';
             return `<path d="${areaPath(pts, chartBottom, smooth)}" fill="url(#${options.cardId}-humid-fill)" />
-              <path d="${seriesPath(pts, smooth)}" fill="none" stroke="${COLORS.humidity}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />`;
+              <path d="${seriesPath(pts, smooth)}" fill="none" stroke="${COLORS.humidity}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"${dash} />`;
           })
           .join('');
 
@@ -532,6 +536,7 @@ const cards: CardOptions[] = [
     unit: '°C',
     humidity: '64',
     humidityColor: COLORS.humidity,
+    humidityDotted: true,
     window: 'open',
     motion: 'idle',
     quiet: 'Ruhe seit 12 Min.',

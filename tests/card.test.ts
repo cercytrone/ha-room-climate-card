@@ -488,9 +488,24 @@ describe('room climate card', () => {
   it('defaults to a continuous solid chart', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
-    const chart = q(card, 'room-climate-chart') as HTMLElement & { gapMode: string; gapStyle: string };
+    const chart = q(card, 'room-climate-chart') as HTMLElement & {
+      gapMode: string;
+      gapStyle: string;
+      humidityLineStyle: string;
+    };
     expect(chart.gapMode).toBe('connect');
     expect(chart.gapStyle).toBe('solid');
+    expect(chart.humidityLineStyle).toBe('solid');
+  });
+
+  it('forwards the dotted humidity line style to the chart', async () => {
+    const card = mount(
+      { ...fullConfig, chart_humidity_line_style: 'dotted' },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    const chart = q(card, 'room-climate-chart') as HTMLElement & { humidityLineStyle: string };
+    expect(chart.humidityLineStyle).toBe('dotted');
   });
 
   it('hides the chart when both chart series are disabled', async () => {

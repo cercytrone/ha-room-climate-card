@@ -6,6 +6,8 @@ export type CurveMode = 'smooth' | 'linear';
 export type GapMode = 'connect' | 'break';
 /** `solid` draws bridged stretches like measured ones. */
 export type GapStyle = 'solid' | 'dashed';
+/** Line style of the humidity curve: a continuous stroke or a dotted one. */
+export type HumidityLineStyle = 'solid' | 'dotted';
 
 /**
  * Card configuration as written in YAML / produced by the visual editor.
@@ -80,6 +82,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_gap_mode?: GapMode;
   chart_max_gap_minutes?: number;
   chart_gap_style?: GapStyle;
+  /** `dotted` renders the humidity curve as dots; the temperature stays as is. */
+  chart_humidity_line_style?: HumidityLineStyle;
   chart_show_legend?: boolean;
   chart_show_points?: boolean;
   chart_show_grid?: boolean;
@@ -117,6 +121,7 @@ export interface ResolvedChartConfig {
   gapMode: GapMode;
   maxGapMinutes: number;
   gapStyle: GapStyle;
+  humidityLineStyle: HumidityLineStyle;
   showLegend: boolean;
   showPoints: boolean;
   showGrid: boolean;
@@ -315,6 +320,8 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
   const curve: CurveMode = config.chart_curve === 'linear' ? 'linear' : 'smooth';
   const gapMode: GapMode = config.chart_gap_mode === 'break' ? 'break' : 'connect';
   const gapStyle: GapStyle = config.chart_gap_style === 'dashed' ? 'dashed' : 'solid';
+  const humidityLineStyle: HumidityLineStyle =
+    config.chart_humidity_line_style === 'dotted' ? 'dotted' : 'solid';
 
   return {
     raw: config,
@@ -384,6 +391,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       gapMode,
       maxGapMinutes: Math.round(asNumber(config.chart_max_gap_minutes, 5, 720, 120)),
       gapStyle,
+      humidityLineStyle,
       showLegend: asBoolean(config.chart_show_legend) ?? false,
       showPoints: asBoolean(config.chart_show_points) ?? false,
       showGrid: asBoolean(config.chart_show_grid) ?? true,

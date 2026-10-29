@@ -110,6 +110,41 @@ describe('climate chart', () => {
     expect(root.querySelectorAll('.grid-line').length).toBe(3);
   });
 
+  it('draws the humidity curve as a dotted line when requested', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 21, 20.5]),
+      humidity: samples([45, 47, 52, 55, 50]),
+      humidityLineStyle: 'dotted',
+    });
+    setSize(chart, 360, 110);
+    await chart.updateComplete;
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    expect(lines).toHaveLength(2);
+
+    // Default humidity colour of the chart is #34d399; the temperature uses a
+    // gradient reference, so both lines are easy to tell apart.
+    const humidityLine = lines.find((line) => line.style.stroke === '#34d399');
+    const temperatureLine = lines.find((line) => line.style.stroke.includes('temp-stroke'));
+    expect(humidityLine).toBeDefined();
+    expect(humidityLine?.style.strokeDasharray).toBe('0.1 5.5');
+    // The temperature curve is untouched.
+    expect(temperatureLine?.style.strokeDasharray).toBe('');
+    // The area underneath stays filled, only the stroke is dotted.
+    expect(chart.shadowRoot!.querySelectorAll('path[style*="humidity-fill"]')).toHaveLength(1);
+  });
+
+  it('keeps both curves solid by default', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+    });
+    setSize(chart, 320, 100);
+    await chart.updateComplete;
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    expect(lines).toHaveLength(2);
+    for (const line of lines) expect(line.style.strokeDasharray).toBe('');
+  });
+
   it('interpolates small data gaps into one continuous line by default', async () => {
     const chart = createChart({
       temperature: samples([20, 21, null, null, 22, 23]),

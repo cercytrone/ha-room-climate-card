@@ -330,6 +330,25 @@ describe('room climate card editor', () => {
     expect(editor.config.height).toBe(380);
   });
 
+  it('offers a line style for the humidity curve', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Linienart Luftfeuchte').value).toBe('solid');
+
+    selectorByLabel(editor, 'Linienart Luftfeuchte').emit('dotted');
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.chart_humidity_line_style).toBe('dotted');
+    // The temperature curve must not be affected by this option.
+    expect(selectorByLabel(editor, 'Kurvenverlauf').value).toBe('smooth');
+  });
+
+  it('disables the humidity line style when the humidity chart is off', async () => {
+    const editor = await mountEditor({ ...baseConfig, show_humidity_chart: false });
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Linienart Luftfeuchte').disabled).toBe(true);
+  });
+
   it('converts colour selector values to hex strings', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);
