@@ -34,6 +34,7 @@ export const demoScenarios: DemoScenario[] = [
       motion_entity: 'binary_sensor.demo_kitchen_motion',
       climate_entity: 'climate.demo_kitchen_thermostat',
       show_hvac_mode: true,
+      chart_humidity_line_style: 'dotted',
     },
   },
   {

@@ -84,6 +84,7 @@ export class RoomClimateChart extends LitElement {
     gapMode: { attribute: false },
     maxGapMinutes: { attribute: false },
     gapStyle: { attribute: false },
+    humidityLineStyle: { attribute: false },
     cornerRadius: { attribute: false },
     language: { attribute: false },
     loading: { attribute: false },
@@ -245,6 +246,8 @@ export class RoomClimateChart extends LitElement {
   maxGapMinutes = 120;
   /** `solid` draws bridged stretches like measured ones. */
   gapStyle: 'solid' | 'dashed' = 'solid';
+  /** `dotted` renders the humidity curve as a row of dots. */
+  humidityLineStyle: 'solid' | 'dotted' = 'solid';
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 18;
   language = 'de';
@@ -479,12 +482,20 @@ export class RoomClimateChart extends LitElement {
     const smooth = this.curve === 'smooth';
     const dashedBridges = this.gapStyle === 'dashed';
 
+    /*
+     * Dots are short dashes with round caps: 0.1 px dash + 5.5 px gap renders a
+     * clean row of round dots in every renderer (a zero-length dash is not
+     * handled consistently). Everything else stays a continuous stroke.
+     */
+    const dottedDash = '0.1 5.5';
+
     /** One line path per segment – or several when bridged parts are dashed. */
     const linePaths = (
       segment: SeriesSegment,
       y: (value: number) => number,
       stroke: string,
-      strokeWidth = 2.1
+      strokeWidth = 2.1,
+      dashed = false
     ): TemplateResult[] => {
       const parts = dashedBridges ? splitAtBridges(segment) : [segment.samples];
       return parts
@@ -494,7 +505,7 @@ export class RoomClimateChart extends LitElement {
           return svg`<path
             class="series-line"
             d=${seriesPath(points, smooth)}
-            style="stroke:${stroke};stroke-width:${strokeWidth}"
+            style="stroke:${stroke};stroke-width:${strokeWidth}${dashed ? `;stroke-dasharray:${dottedDash}` : ''}"
           />`;
         });
     };
@@ -513,8 +524,16 @@ export class RoomClimateChart extends LitElement {
     const tempAreas = tempAreaPath
       ? [svg`<path d=${tempAreaPath} style="fill:url(#${this.uid}-temp-fill)" />`]
       : [];
+    const humidityDotted = this.humidityLineStyle === 'dotted';
     const humidityPaths = humiditySegments.flatMap((segment) =>
-      linePaths(segment, humidityY!, this.humidityColor, 1.8)
+      linePaths(
+        segment,
+        humidityY!,
+        this.humidityColor,
+        // Dots read better slightly thicker than an uninterrupted line.
+        humidityDotted ? 2.4 : 1.8,
+        humidityDotted
+      )
     );
     const humidityAreaPath = mergedArea(humiditySegments, humidityY!);
     const humidityAreas = humidityAreaPath

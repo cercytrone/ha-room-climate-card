@@ -4,6 +4,23 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.4] – 2026-10-29
+
+### Hinzugefügt
+
+- **Gepunktete Feuchtekurve:** Neue Option `chart_humidity_line_style` (`solid` |
+  `dotted`, Standard `solid`) mit eigenem Feld **Linienart Luftfeuchte** im Editor-Abschnitt
+  *Verlauf*. Nur die Feuchtekurve wird zur Punktreihe; Temperaturkurve, Flächen, Endpunkt und
+  Farben bleiben unverändert. Das Feld ist deaktiviert, solange kein Feuchteverlauf aktiv ist.
+
+### Technisch
+
+- Punkte entstehen über `stroke-dasharray: 0.1 5.5` mit runden Kappen – dadurch echte runde
+  Punkte statt Striche, konsistent in allen Rendering-Engines (eine Dash-Länge von 0 wird nicht
+  überall gleich behandelt). Die Punktlinie ist mit 2,4 px etwas kräftiger als die
+  durchgezogene 1,8-px-Linie.
+- Showcase-Vorschau zeigt die Variante in der Küche.
+
 ## [1.1.3] – 2026-10-29
 
 ### Behoben

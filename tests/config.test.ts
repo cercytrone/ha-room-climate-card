@@ -87,6 +87,19 @@ describe('normalizeConfig', () => {
     expect(asFontFamily(undefined)).toBeUndefined();
   });
 
+  it('defaults the humidity line to solid and accepts dotted', () => {
+    expect(normalizeConfig({}).chart.humidityLineStyle).toBe('solid');
+    expect(normalizeConfig({ chart_humidity_line_style: 'dotted' }).chart.humidityLineStyle).toBe(
+      'dotted'
+    );
+    // Unknown values fall back instead of breaking the chart.
+    for (const value of ['dashed', 'dots', 42, null, {}]) {
+      expect(
+        normalizeConfig({ chart_humidity_line_style: value }).chart.humidityLineStyle
+      ).toBe('solid');
+    }
+  });
+
   it('never throws for nonsense input', () => {
     for (const input of [undefined, null, 42, 'text', [], { temperature_entity: 17 }]) {
       expect(() => normalizeConfig(input)).not.toThrow();
