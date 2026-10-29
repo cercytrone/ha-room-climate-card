@@ -51,7 +51,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Thermostat** | Optional. Solltemperatur und Heizstatus-Icon sitzen als **Badges** in derselben Optik wie Fenster- und Bewegungs-Badge. Der Status steckt nur in der Farbe des Icons (rot = heizt, grün = ruht, grau = aus), optional zusätzlich der HVAC-Modus als Chip. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende, Gitter, Datenpunkte. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende (nur Reihennamen), Gitter, Datenpunkte. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Modernes, flächiges Design mit Farbverlauf, Farbschleiern, Badge-Kacheln mit farbigem Ring und Halo am aktuellen Messpunkt – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.2.1`.
+  `ROOM-CLIMATE-CARD v1.2.2`.
 
 ---
 
@@ -239,7 +239,7 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 | `chart_gap_mode` | `connect` \| `break` | `connect` | Echte Ausfälle (`unavailable`/`unknown`) überbrücken oder sichtbar unterbrechen. Konstante Phasen ohne HA-Samples werden **immer** durchgehend gezeichnet. |
 | `chart_max_gap_minutes` | number | `120` | Längste Ausfallzeit (Minuten), die noch überbrückt wird; längere bleiben offen. |
 | `chart_gap_style` | `solid` \| `dashed` | `solid` | Überbrückte Abschnitte wie gemessene zeichnen oder gestrichelt markieren. |
-| `chart_show_legend` | boolean | `false` | Legende mit aktuellen Werten. |
+| `chart_show_legend` | boolean | `false` | Legende mit den Reihennamen (Temperatur, Luftfeuchte). Die aktuellen Werte stehen bereits groß über dem Verlauf. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `true` | Feine Gitternetzlinien. |
 
@@ -445,7 +445,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 216 Tests in 11 Dateien aus (Stand 1.2.1):
+`npm test` führt 218 Tests in 11 Dateien aus (Stand 1.2.2):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

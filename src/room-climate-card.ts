@@ -572,9 +572,15 @@ export class RoomClimateCard extends LitElement {
       ${showSetpoint
         ? html`<span class="badge setpoint" title="${t.t('setpoint')} ${setpointText}">
             <span class="setpoint-label">${t.t('setpoint')}</span>
-            <span class="setpoint-value"
-              >${formatNumber(thermostat.setpoint as number, language, config.temperatureDecimals)}</span
-            ><span class="setpoint-unit">${thermostat.unit}</span>
+            <span class="setpoint-reading"
+              ><span class="setpoint-value"
+                >${formatNumber(
+                  thermostat.setpoint as number,
+                  language,
+                  config.temperatureDecimals
+                )}</span
+              ><span class="setpoint-unit">${thermostat.unit}</span></span
+            >
           </span>`
         : nothing}
       ${showMode ? html`<span class="mode-label">${thermostat.modeLabel}</span>` : nothing}
@@ -615,8 +621,6 @@ export class RoomClimateCard extends LitElement {
         : undefined;
 
     const language = this.language();
-    const temperature = readSensor(this.hass, config.temperatureEntity, 'temperature');
-    const humidity = readSensor(this.hass, config.humidityEntity, 'humidity');
 
     const labels = {
       empty: t.t('noHistory'),
@@ -632,12 +636,6 @@ export class RoomClimateCard extends LitElement {
       <room-climate-chart
         .temperature=${temperatureSamples}
         .humidity=${humiditySamples}
-        .temperatureValue=${temperature.value !== null
-          ? `${formatNumber(temperature.value, language, config.temperatureDecimals)} ${temperature.unit}`
-          : undefined}
-        .humidityValue=${humidity.value !== null
-          ? `${formatNumber(humidity.value, language, config.humidityDecimals)} ${humidity.unit}`
-          : undefined}
         .bandColors=${config.bandColors}
         .bands=${config.bands}
         .humidityColor=${config.humidity.color}
@@ -927,10 +925,15 @@ export class RoomClimateCard extends LitElement {
     .hvac-icon.status-missing .icon {
       opacity: 0.7;
     }
-    /* Setpoint badge: same surface, wider, so label and value sit as one chip. */
+    /*
+     * Everything inside the setpoint badge is centred on the badge's vertical
+     * axis: label, value and unit share one optical line. Baseline alignment on
+     * the badge itself would push the flex line to the top edge of the fixed
+     * 30 px box, which made the value sit right under the upper border.
+     */
     .setpoint {
       padding: 0 11px;
-      align-items: baseline;
+      align-items: center;
       min-width: 0;
       font-variant-numeric: tabular-nums;
       color: var(--rcc-muted);
@@ -938,10 +941,16 @@ export class RoomClimateCard extends LitElement {
     .setpoint-label {
       font-size: 9.5px;
       font-weight: 600;
+      line-height: 1;
       letter-spacing: 0.07em;
       text-transform: uppercase;
       opacity: 0.85;
-      align-self: center;
+    }
+    /* Value and unit keep a shared baseline with each other. */
+    .setpoint-reading {
+      display: inline-flex;
+      align-items: baseline;
+      min-width: 0;
     }
     .setpoint-value {
       font-size: 1.0625rem;
@@ -951,9 +960,10 @@ export class RoomClimateCard extends LitElement {
       letter-spacing: -0.01em;
     }
     .setpoint-unit {
-      margin-left: -2px;
+      margin-left: 1px;
       font-size: 0.68rem;
       font-weight: 400;
+      line-height: 1;
     }
     .mode-label {
       display: inline-flex;
@@ -1063,6 +1073,9 @@ export class RoomClimateCard extends LitElement {
     }
     .density-xs .setpoint {
       padding: 0 9px;
+    }
+    .density-xs .setpoint-label {
+      font-size: 9px;
     }
     .density-xs .setpoint-value {
       font-size: 0.9rem;
