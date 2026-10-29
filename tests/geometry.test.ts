@@ -12,6 +12,7 @@ import {
   gapThreshold,
   linearScale,
   medianInterval,
+  mixColor,
   padDomain,
   seriesPath,
   smoothPath,
@@ -405,7 +406,83 @@ describe('gradients', () => {
       expect(stops[i].offset).toBeGreaterThan(stops[i - 1].offset);
     }
     const colorsSeen = new Set(stops.map((stop) => stop.color));
-    expect(colorsSeen).toEqual(new Set([colors.cool, colors.comfort, colors.warm, colors.hot]));
+    // Every band colour appears …
+    for (const color of Object.values(colors)) expect(colorsSeen.has(color)).toBe(true);
+    // … plus the blended colours in between.
+    expect(colorsSeen.size).toBeGreaterThan(Object.keys(colors).length);
+  });
+
+  it('fades between two bands instead of switching colour in one pixel', () => {
+    const stops = temperatureGradientStops({
+      top: 0,
+      bottom: 200,
+      domain: [15, 32],
+      thresholds,
+      colors,
+    });
+    const comfort = stops.filter((stop) => stop.color === colors.comfort);
+    const warm = stops.filter((stop) => stop.color === colors.warm);
+    expect(comfort.length).toBeGreaterThan(0);
+    expect(warm.length).toBeGreaterThan(0);
+    // The gap between the last amber and the first green stop is the fade. It
+    // used to be 3 px; it must now be a clearly visible ramp.
+    const fadePx = (comfort[0].offset - warm[warm.length - 1].offset) * 200;
+    expect(fadePx).toBeGreaterThan(12);
+    expect(stops.filter((stop) => stop.color !== colors.comfort && stop.color !== colors.warm).length).toBeGreaterThan(2);
+  });
+
+  it('keeps two blends apart when thresholds sit close together', () => {
+    const stops = temperatureGradientStops({
+      top: 0,
+      bottom: 100,
+      domain: [24, 31],
+      thresholds: { cool: 19, warm: 25, hot: 26 },
+      colors,
+    });
+    for (let i = 1; i < stops.length; i++) {
+      expect(stops[i].offset).toBeGreaterThan(stops[i - 1].offset);
+    }
+    // 25 °C and 26 °C are only ~14 px apart, so neither blend may swallow the
+    // other band entirely: a flat stretch of each colour has to survive.
+    expect(stops.some((stop) => stop.color === colors.comfort)).toBe(true);
+    expect(stops.some((stop) => stop.color === colors.warm)).toBe(true);
+  });
+
+  it('mixes band colours in OKLab so the ramp does not dip dark', () => {
+    const luminance = (hex: string): number => {
+      const channels = [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16) / 255);
+      const [r, g, b] = channels.map((channel) =>
+        channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+      );
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const naiveMid = '#98c95f'; // (amber + emerald) / 2, channel by channel
+    const mixed = mixColor('#fbbf24', naiveMid, 0) as string;
+    expect(mixed).toBe('#fbbf24');
+    const start = luminance('#fbbf24');
+    const end = luminance('#34d399');
+    const middle = luminance(mixColor('#fbbf24', '#34d399', 0.5) as string);
+    expect(middle).toBeGreaterThan(Math.min(start, end));
+    expect(middle).toBeLessThan(Math.max(start, end));
+    // Plain sRGB averaging dips below both ends here – the muddy olive step
+    // that made the old narrow fade look like a seam.
+    expect(luminance(naiveMid)).toBeLessThan(Math.min(start, end));
+  });
+
+  it('leaves colours it cannot mix to the renderer', () => {
+    expect(mixColor('rgb(1, 2, 3)', '#34d399', 0.5)).toBeNull();
+    expect(mixColor('red', 'blue', 0.5)).toBeNull();
+    const stops = temperatureGradientStops({
+      top: 0,
+      bottom: 100,
+      domain: [15, 32],
+      thresholds,
+      colors: { cool: 'blue', comfort: 'green', warm: 'orange', hot: 'red' },
+    });
+    for (let i = 1; i < stops.length; i++) {
+      expect(stops[i].offset).toBeGreaterThan(stops[i - 1].offset);
+    }
+    expect(stops[0].color).toBe('red');
   });
 
   it('fades the area fill from top to bottom', () => {
@@ -439,6 +516,19 @@ describe('gradients', () => {
       { offset: 0, color: '#0f0', opacity: 0.4 },
       { offset: 1, color: '#0f0', opacity: 0 },
     ]);
+  });
+
+  it('eases a multi step fade so it has no hard edge', () => {
+    const stops = verticalFadeStops('#a78bfa', 0.3, 0, 7);
+    expect(stops).toHaveLength(7);
+    expect(stops[0]).toEqual({ offset: 0, color: '#a78bfa', opacity: 0.3 });
+    expect(stops[6]).toEqual({ offset: 1, color: '#a78bfa', opacity: 0 });
+    const opacities = stops.map((stop) => stop.opacity);
+    for (let i = 1; i < opacities.length; i++) {
+      expect(opacities[i]).toBeLessThan(opacities[i - 1]);
+    }
+    // Smoothstep: the fade starts flatter than a linear ramp (0.15 vs 0.25).
+    expect(opacities[2]).toBeGreaterThan(0.3 * (1 - 0.33));
   });
 
   it('picks band colours for single values', () => {

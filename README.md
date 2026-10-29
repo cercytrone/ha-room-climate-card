@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.2.3`.
+  `ROOM-CLIMATE-CARD v1.3.0`.
 
 ---
 
@@ -327,6 +327,14 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 - **Farben:** Die Temperaturkurve nutzt einen vertikalen Verlauf, der exakt an den
   konfigurierten Temperaturbändern ausgerichtet ist; die Fläche darunter blendet von 30 % auf
   2 % Deckkraft aus. Die Feuchtekurve hat ihre eigene Farbe.
+- **Weiche Bandübergänge:** Zwischen zwei Temperaturbändern wird nicht mehr auf drei Pixeln
+  umgeschaltet, sondern über eine breite Rampe geblendet (Standard: ein Drittel der
+  Diagrammhöhe, begrenzt auf 14–46 px). Liegen zwei Schwellen nah beieinander, nutzt jede
+  Rampe höchstens 45 % des Abstands, damit sich zwei Übergänge nie überlagern und jede Stufe
+  sichtbar bleibt. Die Zwischenfarben entstehen in **OKLab** statt in sRGB – dadurch bleibt
+  der Verlauf leuchtend und kippt nicht in ein graues Oliv (sRGB-Mittelwert von Amber und
+  Grün liegt dunkler als beide Enden). Feuchte-Fläche: die Deckkraft läuft über eine
+  Smoothstep-Kurve aus, damit unten keine sichtbare Kante entsteht.
 - **Skalierung:** Beide Reihen werden unabhängig skaliert, damit unterschiedliche Wertebereiche
   lesbar bleiben.
 - **Responsiv:** Die Chart zeichnet neu auf Basis der gemessenen Pixelgröße
@@ -445,7 +453,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 218 Tests in 11 Dateien aus (Stand 1.2.3):
+`npm test` führt 224 Tests in 11 Dateien aus (Stand 1.3.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

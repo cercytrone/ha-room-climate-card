@@ -110,6 +110,37 @@ describe('climate chart', () => {
     expect(root.querySelectorAll('.grid-line').length).toBe(3);
   });
 
+  it('blends the temperature bands over a wide ramp instead of a hard edge', async () => {
+    // A series that clearly crosses several bands.
+    const chart = createChart({
+      temperature: samples([16, 18, 21, 24, 27, 29, 27, 24, 21, 18, 16]),
+      bands: { cool: 19, warm: 25, hot: 28 },
+    });
+    setSize(chart, 420, 200);
+    await chart.updateComplete;
+
+    const stroke = chart.shadowRoot!.querySelector('[id$="-temp-stroke"]')!;
+    const stops = Array.from(stroke.querySelectorAll('stop'));
+    // Wide fades need intermediate colours: a two-stop-per-band gradient would
+    // only produce a handful of stops.
+    expect(stops.length).toBeGreaterThan(12);
+
+    const colours = new Set(stops.map((stop) => stop.getAttribute('stop-color')));
+    expect(colours.has('#38bdf8')).toBe(true);
+    expect(colours.has('#fbbf24')).toBe(true);
+    // Blended colours in between are neither of the band colours.
+    const mixed = Array.from(colours).filter(
+      (colour) => colour !== '#38bdf8' && colour !== '#fbbf24' && colour !== '#34d399' && colour !== '#f43f5e'
+    );
+    expect(mixed.length).toBeGreaterThan(2);
+
+    // Offsets stay strictly ascending, otherwise SVG ignores the later stops.
+    const offsets = stops.map((stop) => Number(stop.getAttribute('offset')));
+    for (let i = 1; i < offsets.length; i++) {
+      expect(offsets[i]).toBeGreaterThan(offsets[i - 1]);
+    }
+  });
+
   it('draws the humidity curve as a dotted line when requested', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22, 21, 20.5]),

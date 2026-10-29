@@ -450,7 +450,9 @@ export class RoomClimateChart extends LitElement {
           opacityBottom: 0.01,
         })
       : [];
-    const humidityGradient = verticalFadeStops(this.humidityColor, 0.3, 0.01);
+    // Eased multi-stop fade: a plain two-stop ramp ends in a visible edge where
+    // the slope changes. The temperature fade is eased by its band blends below.
+    const humidityGradient = verticalFadeStops(this.humidityColor, 0.3, 0.012, 7);
 
     const gridLines: TemplateResult[] = [];
     if (this.showGrid) {
