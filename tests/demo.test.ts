@@ -56,7 +56,7 @@ describe('demo environment', () => {
     };
     chart.setSize(360, 90);
     await chart.updateComplete;
-    // One continuous path per series, no visible break despite the data hole.
+    // One continuous path per series, no visible break despite the sample holes.
     expect(chart.shadowRoot.querySelectorAll('.series-line')).toHaveLength(2);
   });
 

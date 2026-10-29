@@ -130,9 +130,8 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(2);
   });
 
-  it('never interpolates holes longer than maxGapMinutes', async () => {
-    const step = 5 * 60_000;
-    // A five hour hole inside a six hour window.
+  it('keeps one continuous line through long constant phases', async () => {
+    // No samples for almost five hours because the value did not change.
     const sparse = [
       { t: now - 6 * 3600_000, v: 20 },
       { t: now - 5.9 * 3600_000, v: 20.5 },
@@ -142,8 +141,62 @@ describe('climate chart', () => {
     const chart = createChart({ temperature: sparse, maxGapMinutes: 120 });
     setSize(chart, 320, 90);
     await chart.updateComplete;
-    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(2);
-    void step;
+    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(1);
+    expect(chart.shadowRoot!.querySelectorAll('path[style*="temp-fill"]')).toHaveLength(1);
+  });
+
+  it('never interpolates an unavailable stretch longer than maxGapMinutes', async () => {
+    const chart = createChart({
+      temperature: [
+        { t: now - 6 * 3600_000, v: 20 },
+        { t: now - 5.9 * 3600_000, v: 20.5 },
+        { t: now - 5.8 * 3600_000, v: null },
+        { t: now - 0.9 * 3600_000, v: 22 },
+        { t: now - 0.8 * 3600_000, v: 22.2 },
+      ],
+      maxGapMinutes: 120,
+    });
+    setSize(chart, 320, 90);
+    await chart.updateComplete;
+    const lines = chart.shadowRoot!.querySelectorAll('.series-line');
+    expect(lines).toHaveLength(2);
+    // Even with a real hole the area stays a single element (no gradient seams).
+    expect(chart.shadowRoot!.querySelectorAll('path[style*="temp-fill"]')).toHaveLength(1);
+  });
+
+  it('bridges a short unavailable stretch', async () => {
+    const chart = createChart({
+      temperature: [
+        { t: now - 6 * 3600_000, v: 20 },
+        { t: now - 5 * 3600_000, v: 20.5 },
+        { t: now - 4.9 * 3600_000, v: null },
+        { t: now - 4.4 * 3600_000, v: 21 },
+        { t: now - 0.5 * 3600_000, v: 22 },
+      ],
+      maxGapMinutes: 120,
+    });
+    setSize(chart, 320, 90);
+    await chart.updateComplete;
+    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(1);
+  });
+
+  it('ignores samples outside the visible window', async () => {
+    const chart = createChart({
+      temperature: [
+        { t: now - 9 * 3600_000, v: 12 },
+        { t: now - 5 * 3600_000, v: 21 },
+        { t: now - 3 * 3600_000, v: 21.5 },
+        { t: now + 2 * 3600_000, v: 30 },
+      ],
+    });
+    setSize(chart, 320, 90);
+    await chart.updateComplete;
+    const d = chart.shadowRoot!.querySelector('.series-line')!.getAttribute('d')!;
+    const numbers = (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+    const ys = numbers.filter((_, index) => index % 2 === 1);
+    // Values from outside the window (12 / 30) would be far outside the plot.
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(90);
   });
 
   it('bridges a hole that is shorter than maxGapMinutes', async () => {

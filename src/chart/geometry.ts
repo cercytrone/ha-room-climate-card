@@ -219,7 +219,8 @@ export function buildSegments(
   const segments: SeriesSegment[] = [];
   let current: SeriesSegment | null = null;
   let previous: ChartSample | null = null;
-  let holeAt: number | null = null;
+  /** Start of an explicit `unavailable` / `unknown` stretch since `previous`. */
+  let unavailableSince: number | null = null;
   let leadingNull = false;
   let trailingNull = false;
 
@@ -227,12 +228,13 @@ export function buildSegments(
     if (current && current.samples.length) segments.push(current);
     current = null;
     previous = null;
+    unavailableSince = null;
   };
 
   for (const sample of samples) {
     if (sample.v === null || !Number.isFinite(sample.v)) {
       if (!previous) leadingNull = true;
-      holeAt = holeAt ?? sample.t;
+      unavailableSince = unavailableSince ?? sample.t;
       trailingNull = true;
       continue;
     }
@@ -241,33 +243,45 @@ export function buildSegments(
     if (!previous || !current) {
       current = { samples: [sample], bridged: [] };
       previous = sample;
-      holeAt = null;
+      unavailableSince = null;
       continue;
     }
 
     const delta = sample.t - previous.t;
 
-    if (delta <= threshold && holeAt === null) {
+    if (delta <= threshold && unavailableSince === null) {
       current.samples.push(sample);
       current.bridged.push(false);
       previous = sample;
       continue;
     }
 
-    const bridgeable = gapMode === 'connect' && delta <= maxGapMs;
+    /*
+     * Two very different situations produce a hole in the series:
+     *
+     * 1. The value simply did not change. Home Assistant only stores state
+     *    changes, so there is no sample – but the value is known to be
+     *    unchanged until the next one. This is *not* missing data and must
+     *    never break the line (the HA frontend chart does not break either).
+     * 2. The entity was explicitly `unavailable` / `unknown`. That is real
+     *    information, so it may be shown as a hole when it lasts too long.
+     */
+    const explicitHole = unavailableSince !== null;
+    const bridgeable =
+      gapMode === 'connect' && (!explicitHole || delta <= maxGapMs);
+
     if (bridgeable) {
       interpolate(current, previous, sample, threshold);
       current.samples.push(sample);
       current.bridged.push(true);
       previous = sample;
-      holeAt = null;
+      unavailableSince = null;
       continue;
     }
 
     flush();
     current = { samples: [sample], bridged: [] };
     previous = sample;
-    holeAt = null;
   }
   flush();
 
@@ -280,7 +294,7 @@ export function buildSegments(
   }
 
   if (trailingNull) {
-    // The sensor stopped reporting before the window ended: do not extend.
+    // The sensor was unavailable at the end of the window: do not extend.
     return segments;
   }
 
@@ -292,6 +306,35 @@ export function buildSegments(
   }
 
   return segments;
+}
+
+/**
+ * Sorts samples, drops duplicated timestamps, ignores invalid values and
+ * removes everything outside the visible window. Live data can contain all of
+ * these – e.g. `include_start_time_state` returns a sample at (or slightly
+ * before) the window start, which would otherwise be drawn off canvas.
+ */
+export function prepareSamples(
+  samples: ChartSample[] | undefined,
+  start?: number,
+  end?: number
+): ChartSample[] {
+  if (!samples || !samples.length) return [];
+  const sorted = [...samples].sort((a, b) => a.t - b.t);
+  const result: ChartSample[] = [];
+  for (const sample of sorted) {
+    if (!Number.isFinite(sample.t)) continue;
+    if (start !== undefined && sample.t < start) continue;
+    if (end !== undefined && sample.t > end) continue;
+    const value = sample.v === null || !Number.isFinite(sample.v as number) ? null : (sample.v as number);
+    const previous = result[result.length - 1];
+    if (previous && previous.t === sample.t) {
+      result[result.length - 1] = { t: sample.t, v: value };
+      continue;
+    }
+    result.push({ t: sample.t, v: value });
+  }
+  return result;
 }
 
 /** Splits a segment into sub-paths at interpolated edges (used for dashed gaps). */

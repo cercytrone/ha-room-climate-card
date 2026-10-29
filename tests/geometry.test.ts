@@ -5,6 +5,7 @@ import {
   buildRuns,
   buildSegments,
   intervalPercentile,
+  prepareSamples,
   splitAtBridges,
   decimate,
   extent,
@@ -192,8 +193,27 @@ describe('segments with interpolation', () => {
     expect(segments).toHaveLength(2);
   });
 
-  it('never bridges beyond maxGapMs', () => {
-    const samples = [at(1, 20), at(1.1, 20.1), at(1.2, 20.2), at(4.5, 22)];
+  it('never breaks the line just because the value did not change', () => {
+    // Home Assistant stores no sample while a value stays constant. Four hours
+    // of silence is "unchanged", not "missing" – the line has to stay whole.
+    const samples = [at(1, 20), at(1.1, 20.1), at(1.2, 20.2), at(5.2, 20.2), at(5.3, 20.3)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(1);
+    expect(segments[0].bridged.some(Boolean)).toBe(true);
+
+    const values = segments[0].samples.map((sample) => sample.v as number);
+    expect(Math.min(...values)).toBeGreaterThanOrEqual(20);
+    expect(Math.max(...values)).toBeLessThanOrEqual(20.3);
+  });
+
+  it('never bridges an explicit unavailable stretch beyond maxGapMs', () => {
+    const samples = [at(1, 20), at(1.1, 20.1), at(1.2, null), at(4.5, 22)];
     const segments = buildSegments(samples, {
       rangeMs: end - start,
       start,
@@ -202,6 +222,18 @@ describe('segments with interpolation', () => {
       maxGapMs: 2 * hour,
     });
     expect(segments).toHaveLength(2);
+  });
+
+  it('bridges a short unavailable stretch', () => {
+    const samples = [at(1, 20), at(1.1, null), at(1.6, 21)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(1);
   });
 
   it('holds the outer samples to the window edges', () => {
@@ -266,6 +298,33 @@ describe('segments with interpolation', () => {
       gapMode: 'connect',
     });
     expect(splitAtBridges(continuous[0])).toHaveLength(1);
+  });
+
+  it('prepares live samples: sorted, de-duplicated, windowed, validated', () => {
+    const prepared = prepareSamples(
+      [
+        { t: 300, v: 3 },
+        { t: 100, v: 1 },
+        { t: 200, v: null },
+        { t: 200, v: 2 },
+        { t: -50, v: 9 },
+        { t: 1_000, v: 9 },
+        { t: 400, v: Number.NaN },
+      ],
+      0,
+      500
+    );
+    expect(prepared).toEqual([
+      { t: 100, v: 1 },
+      { t: 200, v: 2 },
+      { t: 300, v: 3 },
+      { t: 400, v: null },
+    ]);
+  });
+
+  it('handles empty input for prepareSamples', () => {
+    expect(prepareSamples(undefined, 0, 10)).toEqual([]);
+    expect(prepareSamples([], 0, 10)).toEqual([]);
   });
 
   it('computes interval percentiles', () => {
