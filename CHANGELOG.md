@@ -4,6 +4,30 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.0] – 2026-10-29
+
+### Geändert
+
+- **Neue Optik nach dem modernen Layout der Dashboard-Wetterkarte:** flächiger Verlauf
+  (Blau → Indigo im Dunkelmodus, Weiß → kühles Grau im Hellmodus), zwei radiale Farbschleier,
+  eingesetzte Hairline über dem Verlauf, weichere Schatten mit innerem Lichtreflex.
+- **Badges als Kacheln:** transluzente Fläche, farbiger Ring und dezenter Glow statt dünner
+  Rahmen – Fenster offen (Amber), Bewegung erkannt (Mint), inaktiv neutral.
+- **Typografie:** Raumname größer und halbfett, Isttemperatur standardmäßig **42 px**
+  (vorher ≈ 30 px), Luftfeuchte **28 px** (vorher ≈ 21 px), Einheiten und Tropfen-Icon
+  skalieren in `em` mit.
+- **Verlauf:** 2,1 px Linie, etwas kräftigere Verlaufsfläche, Halo-Punkt am aktuellen Wert,
+  feineres Gitter, weitere Laufweite bei den Zeitlabels.
+
+### Hinzugefügt
+
+- **Messwerte unabhängig gestaltbar:** `temperature_font_size`, `temperature_font_family`,
+  `humidity_font_size`, `humidity_font_family` (14–96 px bzw. freie CSS-Schriftartliste).
+  Eigener Editor-Abschnitt **Messwerte (Schrift)** mit je zwei Feldern pro Messwert.
+- Schriftarten werden validiert (keine `;`/Klammern-Ausbrüche), leere Werte erben die
+  Theme-Schrift; die Kartenhöhe wächst mit der gewählten Schriftgröße.
+- README: neuer Abschnitt **Optik**, Optionstabelle für die Messwerte, Beispiele ergänzt.
+
 ## [1.1.2] – 2026-10-29
 
 ### Behoben

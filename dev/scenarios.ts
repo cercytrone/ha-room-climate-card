@@ -74,6 +74,20 @@ export const demoScenarios: DemoScenario[] = [
     },
   },
   {
+    title: 'Kinderzimmer · große, unabhängige Schriftgrößen',
+    config: {
+      type: 'custom:room-climate-card',
+      name: 'Kinderzimmer',
+      icon: 'mdi:teddy-bear',
+      temperature_entity: 'sensor.demo_living_temperature',
+      humidity_entity: 'sensor.demo_living_humidity',
+      window_entity: 'binary_sensor.demo_living_window',
+      temperature_font_size: 54,
+      humidity_font_size: 34,
+      chart_height: 70,
+    },
+  },
+  {
     title: 'Flur · Sensor nicht verfügbar',
     config: {
       type: 'custom:room-climate-card',

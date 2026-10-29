@@ -182,12 +182,13 @@ export class RoomClimateChart extends LitElement {
       font-size: 9.5px;
       fill: var(--rcc-chart-label);
       font-variant-numeric: tabular-nums;
+      letter-spacing: 0.03em;
     }
     .grid-line {
       stroke: var(--rcc-chart-grid);
-      stroke-opacity: 0.1;
+      stroke-opacity: 0.08;
       stroke-width: 1;
-      stroke-dasharray: 2 4;
+      stroke-dasharray: 2 5;
     }
     .baseline {
       stroke: var(--rcc-chart-grid);
@@ -196,18 +197,22 @@ export class RoomClimateChart extends LitElement {
     }
     .series-line {
       fill: none;
-      stroke-width: 1.9;
+      stroke-width: 2.1;
       stroke-linecap: round;
       stroke-linejoin: round;
       vector-effect: non-scaling-stroke;
     }
     .point {
-      stroke-width: 1.2;
+      stroke-width: 1.5;
       fill: var(--rcc-chart-point-fill);
     }
     .end-dot {
       stroke: var(--rcc-chart-point-fill);
-      stroke-width: 1.5;
+      stroke-width: 1.6;
+    }
+    /* Soft glow behind the latest value – the modern-layout accent. */
+    .end-halo {
+      opacity: 0.2;
     }
     @media (prefers-reduced-motion: reduce) {
       * {
@@ -448,11 +453,11 @@ export class RoomClimateChart extends LitElement {
           domain: tempDomain,
           thresholds: this.bands,
           colors: this.bandColors,
-          opacityTop: 0.3,
-          opacityBottom: 0.02,
+          opacityTop: 0.34,
+          opacityBottom: 0.01,
         })
       : [];
-    const humidityGradient = verticalFadeStops(this.humidityColor, 0.28, 0.02);
+    const humidityGradient = verticalFadeStops(this.humidityColor, 0.3, 0.01);
 
     const gridLines: TemplateResult[] = [];
     if (this.showGrid) {
@@ -479,7 +484,7 @@ export class RoomClimateChart extends LitElement {
       segment: SeriesSegment,
       y: (value: number) => number,
       stroke: string,
-      strokeWidth = 1.9
+      strokeWidth = 2.1
     ): TemplateResult[] => {
       const parts = dashedBridges ? splitAtBridges(segment) : [segment.samples];
       return parts
@@ -509,7 +514,7 @@ export class RoomClimateChart extends LitElement {
       ? [svg`<path d=${tempAreaPath} style="fill:url(#${this.uid}-temp-fill)" />`]
       : [];
     const humidityPaths = humiditySegments.flatMap((segment) =>
-      linePaths(segment, humidityY!, this.humidityColor, 1.6)
+      linePaths(segment, humidityY!, this.humidityColor, 1.8)
     );
     const humidityAreaPath = mergedArea(humiditySegments, humidityY!);
     const humidityAreas = humidityAreaPath
@@ -585,12 +590,32 @@ export class RoomClimateChart extends LitElement {
       <line class="baseline" x1=${left} x2=${right} y1=${bottom} y2=${bottom} />
       ${humidityAreas} ${tempAreas} ${humidityPaths} ${tempPaths} ${pointMarkers}
       ${lastHumidity && humidityY
-        ? svg`<circle class="end-dot" r="2.6" cx=${x(lastHumidity.t)} cy=${humidityY(lastHumidity.v as number)} style="fill:${this.humidityColor}" />`
+        ? svg`<circle
+            class="end-halo"
+            r="7"
+            cx=${x(lastHumidity.t)}
+            cy=${humidityY(lastHumidity.v as number)}
+            style="fill:${this.humidityColor}"
+          />
+          <circle
+            class="end-dot"
+            r="3"
+            cx=${x(lastHumidity.t)}
+            cy=${humidityY(lastHumidity.v as number)}
+            style="fill:${this.humidityColor}"
+          />`
         : nothing}
       ${lastTemp && tempY
         ? svg`<circle
+            class="end-halo"
+            r="7.5"
+            cx=${x(lastTemp.t)}
+            cy=${tempY(lastTemp.v as number)}
+            style="fill:${bandColorFor(lastTemp.v as number, this.bands, this.bandColors)}"
+          />
+          <circle
             class="end-dot"
-            r="2.8"
+            r="3.1"
             cx=${x(lastTemp.t)}
             cy=${tempY(lastTemp.v as number)}
             style="fill:${bandColorFor(lastTemp.v as number, this.bands, this.bandColors)}"

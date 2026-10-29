@@ -58,6 +58,18 @@ const BAND_COLORS = {
 const font = (size: number, weight = 400): string =>
   `font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="${size}" font-weight="${weight}"`;
 
+/** Rough advance width for the static preview text (DejaVu/Segoe metrics). */
+function approxWidth(value: string, size: number): number {
+  let width = 0;
+  for (const char of value) {
+    if (char >= '0' && char <= '9') width += 0.62 * size;
+    else if (char === ',' || char === '.') width += 0.3 * size;
+    else if (char === '-') width += 0.4 * size;
+    else width += 0.55 * size;
+  }
+  return width;
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -113,10 +125,11 @@ function badge(
   body: string
 ): string {
   return `<g transform="translate(${x},${y})">
-    <rect x="0" y="0" width="26" height="26" rx="9" fill="${
-      accent ? `${color}26` : 'rgba(100,116,139,0.16)'
-    }" stroke="${accent ? color : 'rgba(148,163,184,0.28)'}" stroke-width="1" />
-    <g transform="translate(5.5,5.5)" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="30" height="30" rx="11" fill="${
+      accent ? `${color}29` : 'rgba(100,116,139,0.14)'
+    }" stroke="${accent ? `${color}73` : 'rgba(148,197,255,0.22)'}" stroke-width="1" />
+    <path d="M 11 1.5 H 19" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+    <g transform="translate(6.4,6.4)" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       ${body}
     </g>
   </g>`;
@@ -132,10 +145,12 @@ const motionIcon =
 
 function renderCard(options: CardOptions): string {
   const { x, y } = options;
-  const chartY = y + CARD_H - 96;
+  const pad = 16;
+  const chartY = y + CARD_H - 100;
   const chartH = 84;
-  const chartTop = chartY + 6;
-  const chartBottom = chartY + chartH - 12;
+  const chartTop = chartY + 8;
+  const chartBottom = chartY + chartH - 16;
+  const axisBaseline = chartY + chartH - 5;
   const rangeMs = 6 * 3600 * 1000;
   const end = Date.now();
   const start = end - rangeMs;
@@ -177,8 +192,8 @@ function renderCard(options: CardOptions): string {
     domain: domain as [number, number],
     thresholds: BANDS,
     colors: BAND_COLORS,
-    opacityTop: 0.3,
-    opacityBottom: 0.02,
+    opacityTop: 0.34,
+    opacityBottom: 0.01,
   });
 
   // Mirror the card: holes are interpolated, the outer samples held to the edges.
@@ -200,7 +215,7 @@ function renderCard(options: CardOptions): string {
     .map((run) => {
       const pts: Point[] = projectRun(run, xScale, yScale);
       return `<path d="${areaPath(pts, chartBottom, smooth)}" fill="url(#${options.cardId}-fill)" />
-        <path d="${seriesPath(pts, smooth)}" fill="none" stroke="url(#${options.cardId}-stroke)" stroke-width="1.9" stroke-linecap="round" />`;
+        <path d="${seriesPath(pts, smooth)}" fill="none" stroke="url(#${options.cardId}-stroke)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />`;
     })
     .join('');
   const humidityPaths =
@@ -210,7 +225,7 @@ function renderCard(options: CardOptions): string {
           .map((run) => {
             const pts: Point[] = projectRun(run, xScale, humidityScale);
             return `<path d="${areaPath(pts, chartBottom, smooth)}" fill="url(#${options.cardId}-humid-fill)" />
-              <path d="${seriesPath(pts, smooth)}" fill="none" stroke="${COLORS.humidity}" stroke-width="1.6" stroke-linecap="round" opacity="0.9" />`;
+              <path d="${seriesPath(pts, smooth)}" fill="none" stroke="${COLORS.humidity}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />`;
           })
           .join('');
 
@@ -219,9 +234,9 @@ function renderCard(options: CardOptions): string {
         .flatMap((run) =>
           run.filter((_, index) => index % 3 === 0).map((sample) => {
             const value = sample.v as number;
-            return `<circle cx="${xScale(sample.t).toFixed(1)}" cy="${yScale(value).toFixed(1)}" r="1.9" fill="${
-              COLORS.card
-            }" stroke="${bandColorFor(value, BANDS, BAND_COLORS)}" stroke-width="1.2" />`;
+            return `<circle cx="${xScale(sample.t).toFixed(1)}" cy="${yScale(value).toFixed(1)}" r="2.1" fill="${COLORS.card}" stroke="${
+              bandColorFor(value, BANDS, BAND_COLORS)
+            }" stroke-width="1.5" />`;
           })
         )
         .join('')
@@ -233,7 +248,7 @@ function renderCard(options: CardOptions): string {
           const lineY = chartTop + ((chartBottom - chartTop) * index) / 2;
           return `<line x1="${x + 1}" x2="${x + CARD_W - 1}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(
             1
-          )}" stroke="rgba(148,163,184,0.16)" stroke-width="1" stroke-dasharray="2 4" />`;
+          )}" stroke="rgba(148,163,184,0.1)" stroke-width="1" stroke-dasharray="2 5" />`;
         })
         .join('')
     : '';
@@ -245,31 +260,38 @@ function renderCard(options: CardOptions): string {
       const date = new Date(tick);
       const label = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
       const anchor = index === 0 ? 'start' : index === 3 ? 'end' : 'middle';
-      return `<text x="${labelScale(tick).toFixed(1)}" y="${chartY + chartH - 5}" ${font(
+      return `<text x="${labelScale(tick).toFixed(1)}" y="${axisBaseline}" ${font(
         9.5
-      )} fill="${COLORS.muted}" text-anchor="${anchor}">${label}</text>`;
+      )} fill="${COLORS.muted}" letter-spacing="0.3" text-anchor="${anchor}">${label}</text>`;
     })
     .join('');
 
+  const setpointLabel = 'SOLL';
+  const setpointX = options.hvacColor ? 26 : 0;
+  // "SOLL" at 9.5 px with letter-spacing ≈ 29 px advance, plus breathing room.
+  const labelWidth = 34;
+  const valueX = setpointX + labelWidth;
+  const valueWidth = approxWidth(options.setpoint ?? '', 16) - (options.setpoint ?? '').length * 0.2;
+  const unitX = valueX + valueWidth + 2.5;
   const setpointRow =
     options.setpoint !== undefined
-      ? `<g transform="translate(${x + 14},${y + 60})">
+      ? `<g transform="translate(${x + pad},${y + 64})">
           ${
             options.hvacColor
-              ? `<rect x="0" y="0" width="19" height="19" rx="6" fill="${options.hvacColor}24" stroke="${options.hvacColor}52" stroke-width="1" />
-                 <g transform="translate(3.5,3.5)" fill="none" stroke="${options.hvacColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              ? `<rect x="0" y="0" width="20" height="20" rx="7" fill="${options.hvacColor}24" stroke="${options.hvacColor}52" stroke-width="1" />
+                 <g transform="translate(4,4)" fill="none" stroke="${options.hvacColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                    <g transform="scale(0.5)">${iconPath('flame')}</g>
                  </g>`
               : ''
           }
-          <text x="${options.hvacColor ? 25 : 0}" y="9.5" ${font(8.5, 600)} fill="${COLORS.muted}" letter-spacing="0.4">SOLL</text>
-          <text x="${(options.hvacColor ? 25 : 0) + 28}" y="10" ${font(13.5, 600)} fill="${COLORS.text}">${escapeXml(
+          <text x="${setpointX}" y="9.6" ${font(9.5, 600)} fill="${COLORS.muted}" letter-spacing="0.66">${setpointLabel}</text>
+          <text x="${valueX}" y="10.5" ${font(16, 600)} fill="${COLORS.text}" letter-spacing="-0.2">${escapeXml(
             options.setpoint
           )}</text>
-          <text x="${(options.hvacColor ? 25 : 0) + 33 + options.setpoint.length * 7.4}" y="10" ${font(10)} fill="${COLORS.muted}">°C</text>
+          <text x="${unitX}" y="10.5" ${font(10.9)} fill="${COLORS.muted}">°C</text>
           ${
             options.hvacMode
-              ? `<text x="${(options.hvacColor ? 25 : 0) + 56 + options.setpoint.length * 7.4}" y="9.5" ${font(9)} fill="${COLORS.muted}">${escapeXml(
+              ? `<text x="${unitX + 20}" y="9.6" ${font(9.5)} fill="${COLORS.muted}">${escapeXml(
                   options.hvacMode
                 )}</text>`
               : ''
@@ -277,22 +299,29 @@ function renderCard(options: CardOptions): string {
         </g>`
       : '';
 
+  // Humidity: right aligned, its own font size (28 px) and unit (13 px).
+  const humRight = x + CARD_W - pad;
+  const humValueWidth = approxWidth(options.humidity ?? '', 28);
+  const humUnitWidth = 11;
+  const humValueX = humRight - humUnitWidth - 3;
   const humidity = options.humidity
     ? `<g>
-        <g transform="translate(${x + CARD_W - 92},${y + 84})" fill="none" stroke="${COLORS.muted}" stroke-width="1.2">
-          <path d="M6.5 1.6c1.5 1.7 3 3.4 3 5.3a3 3 0 0 1-6 0c0-1.9 1.5-3.6 3-5.3Z" />
+        <g transform="translate(${(humValueX - humValueWidth - 8 - 18.5).toFixed(1)},${y + 110})" fill="none" stroke="${
+          COLORS.muted
+        }" stroke-width="1.3" opacity="0.8">
+          <path transform="scale(0.77)" d="M12 2.6c2.8 3.2 5.6 6.4 5.6 9.9a5.6 5.6 0 0 1-11.2 0c0-3.5 2.8-6.7 5.6-9.9Z" />
         </g>
-        <text x="${x + CARD_W - 78}" y="${y + 101}" ${font(21, 400)} fill="${
+        <text x="${humValueX}" y="${y + 128}" ${font(28, 500)} fill="${
           options.humidityColor ?? COLORS.humidity
-        }">${escapeXml(options.humidity)}</text>
-        <text x="${x + CARD_W - 42}" y="${y + 101}" ${font(12)} fill="${COLORS.muted}">%</text>
+        }" text-anchor="end" letter-spacing="-0.7">${escapeXml(options.humidity)}</text>
+        <text x="${humRight}" y="${y + 128}" ${font(12.9)} fill="${COLORS.muted}" text-anchor="end">%</text>
       </g>`
     : '';
 
   const windowBadge =
     options.window && options.window !== 'unknown'
       ? badge(
-          x + CARD_W - 36,
+          x + CARD_W - pad - 30,
           y + 13,
           options.window === 'open' ? COLORS.windowOpen : COLORS.muted,
           options.window === 'open',
@@ -303,7 +332,7 @@ function renderCard(options: CardOptions): string {
   const motionBadge =
     options.motion && options.motion !== 'none'
       ? badge(
-          x + CARD_W - 68,
+          x + CARD_W - pad - 30 - 36,
           y + 13,
           options.motion === 'active' ? COLORS.motion : COLORS.muted,
           options.motion === 'active',
@@ -312,14 +341,74 @@ function renderCard(options: CardOptions): string {
       : '';
 
   const quietLabel = options.quiet
-    ? `<text x="${x + 14}" y="${y + 44}" ${font(9.5)} fill="${COLORS.muted}">${escapeXml(options.quiet)}</text>`
+    ? `<text x="${x + pad}" y="${y + 49}" ${font(10.5)} fill="${COLORS.muted}">${escapeXml(
+        options.quiet
+      )}</text>`
     : '';
+
+  const lastTempPoint = runs.length
+    ? runs[runs.length - 1][runs[runs.length - 1].length - 1]
+    : undefined;
+  const lastTempColor = lastTempPoint
+    ? bandColorFor(lastTempPoint.v as number, BANDS, BAND_COLORS)
+    : COLORS.comfort;
+  const lastHumidityPoint = humidityRuns.length
+    ? humidityRuns[humidityRuns.length - 1][humidityRuns[humidityRuns.length - 1].length - 1]
+    : undefined;
+  const endDots = `${
+    lastHumidityPoint && humidityScale
+      ? `<circle cx="${xScale(lastHumidityPoint.t).toFixed(1)}" cy="${humidityScale(
+          lastHumidityPoint.v as number
+        ).toFixed(1)}" r="7" fill="${COLORS.humidity}" opacity="0.2" />
+         <circle cx="${xScale(lastHumidityPoint.t).toFixed(1)}" cy="${humidityScale(
+           lastHumidityPoint.v as number
+         ).toFixed(1)}" r="3" fill="${COLORS.humidity}" stroke="${COLORS.card}" stroke-width="1.6" />`
+      : ''
+  }${
+    lastTempPoint
+      ? `<circle cx="${xScale(lastTempPoint.t).toFixed(1)}" cy="${yScale(
+          lastTempPoint.v as number
+        ).toFixed(1)}" r="7.5" fill="${lastTempColor}" opacity="0.2" />
+         <circle cx="${xScale(lastTempPoint.t).toFixed(1)}" cy="${yScale(
+           lastTempPoint.v as number
+         ).toFixed(1)}" r="3.1" fill="${lastTempColor}" stroke="${COLORS.card}" stroke-width="1.6" />`
+      : ''
+  }`;
+
+  const cardRadius = 18;
 
   return `<g>
     <clipPath id="${options.cardId}-clip">
-      <rect x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}" rx="18" />
+      <rect x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}" rx="${cardRadius}" />
     </clipPath>
-    <rect x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}" rx="18" fill="${COLORS.card}" stroke="${COLORS.border}" />
+    <defs>
+      <linearGradient id="${options.cardId}-surface" x1="${x}" y1="${y}" x2="${x + CARD_W}" y2="${
+        y + CARD_H
+      }" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#1c2d49" />
+        <stop offset="0.52" stop-color="#152238" />
+        <stop offset="1" stop-color="#0e1828" />
+      </linearGradient>
+      <radialGradient id="${options.cardId}-cyan" cx="${x}" cy="${y}" r="${CARD_W * 0.9}" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#38bdf8" stop-opacity="0.2" />
+        <stop offset="1" stop-color="#38bdf8" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="${options.cardId}-violet" cx="${x + CARD_W}" cy="${y}" r="${
+        CARD_W * 0.85
+      }" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#8b5cf6" stop-opacity="0.17" />
+        <stop offset="1" stop-color="#8b5cf6" stop-opacity="0" />
+      </radialGradient>
+    </defs>
+    <g clip-path="url(#${options.cardId}-clip)">
+      <rect x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}" fill="url(#${options.cardId}-surface)" />
+      <rect x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}" fill="url(#${options.cardId}-cyan)" />
+      <rect x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}" fill="url(#${options.cardId}-violet)" />
+    </g>
+    <rect x="${x + 0.5}" y="${y + 0.5}" width="${CARD_W - 1}" height="${CARD_H - 1}" rx="${
+      cardRadius - 0.5
+    }" fill="none" stroke="${COLORS.border}" />
+    <path d="M ${x + cardRadius} ${y + 1.5} H ${x + CARD_W - cardRadius}" stroke="rgba(255,255,255,0.07)" stroke-width="1" />
     <g clip-path="url(#${options.cardId}-clip)">
       <defs>
         <linearGradient id="${options.cardId}-stroke" gradientUnits="userSpaceOnUse" x1="0" y1="${chartTop}" x2="0" y2="${chartBottom}">
@@ -339,27 +428,31 @@ function renderCard(options: CardOptions): string {
             .join('')}
         </linearGradient>
         <linearGradient id="${options.cardId}-humid-fill" gradientUnits="userSpaceOnUse" x1="0" y1="${chartTop}" x2="0" y2="${chartBottom}">
-          <stop offset="0" stop-color="${COLORS.humidity}" stop-opacity="0.22" />
-          <stop offset="1" stop-color="${COLORS.humidity}" stop-opacity="0.02" />
+          <stop offset="0" stop-color="${COLORS.humidity}" stop-opacity="0.24" />
+          <stop offset="1" stop-color="${COLORS.humidity}" stop-opacity="0.01" />
         </linearGradient>
       </defs>
       ${humidityPaths}
       ${paths}
       ${gridLines}
       ${dots}
-      <line x1="${x + 1}" x2="${x + CARD_W - 1}" y1="${chartBottom}" y2="${chartBottom}" stroke="rgba(148,163,184,0.2)" />
+      <line x1="${x + 1}" x2="${x + CARD_W - 1}" y1="${chartBottom}" y2="${chartBottom}" stroke="rgba(148,163,184,0.18)" />
+      ${endDots}
       ${axis}
     </g>
-    <text x="${x + 14}" y="${y + 29}" ${font(13.5, 700)} fill="${COLORS.text}">${escapeXml(options.name)}</text>
+    <line x1="${x + pad}" x2="${x + CARD_W - pad}" y1="${chartY}" y2="${chartY}" stroke="rgba(148,197,255,0.14)" />
+    <text x="${x + pad}" y="${y + 31}" ${font(17, 500)} fill="${COLORS.text}" letter-spacing="-0.25">${escapeXml(
+      options.name
+    )}</text>
     ${quietLabel}
-    <text x="${x + 14}" y="${y + 101}" ${font(30, 300)} fill="${options.temperatureColor}">${escapeXml(
+    ${setpointRow}
+    <text x="${x + pad}" y="${y + 132}" ${font(42, 600)} fill="${options.temperatureColor}" letter-spacing="-1.5">${escapeXml(
       options.temperature
     )}</text>
-    <text x="${x + 16 + options.temperature.length * 16}" y="${y + 101}" ${font(13)} fill="${COLORS.muted}">${escapeXml(
-      options.unit
-    )}</text>
+    <text x="${x + pad + 6 + options.temperature.length * 26}" y="${
+      y + 132
+    }" ${font(14.3)} fill="${COLORS.muted}">${escapeXml(options.unit)}</text>
     ${humidity}
-    ${setpointRow}
     ${motionBadge}
     ${windowBadge}
   </g>`;

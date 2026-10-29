@@ -84,6 +84,7 @@ describe('room climate card editor', () => {
     expect(titles).toEqual([
       'Allgemein',
       'Sensoren',
+      'Messwerte (Schrift)',
       'Farben & Grenzwerte',
       'Fenster',
       'Bewegung',
@@ -165,6 +166,28 @@ describe('room climate card editor', () => {
     openAll(editor);
     expect(selectorByLabel(editor, 'Icon-Farbe Heizen (z. B. Rot)').disabled).toBe(true);
     expect(selectorByLabel(editor, 'Solltemperatur anzeigen (über Istwert)').disabled).toBe(true);
+  });
+
+  it('offers independent font size and family for temperature and humidity', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+
+    expect(selectorByLabel(editor, 'Schriftgröße Temperatur').value).toBe(42);
+    expect(selectorByLabel(editor, 'Schriftart Temperatur').value).toBe('');
+    expect(selectorByLabel(editor, 'Schriftgröße Luftfeuchte').value).toBe(28);
+    expect(selectorByLabel(editor, 'Schriftart Luftfeuchte').value).toBe('');
+
+    selectorByLabel(editor, 'Schriftgröße Temperatur').emit(56);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.temperature_font_size).toBe(56);
+    expect(editor.config.humidity_font_size).toBeUndefined();
+
+    selectorByLabel(editor, 'Schriftart Luftfeuchte').emit('Inter');
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.humidity_font_family).toBe('Inter');
+    expect(editor.config.temperature_font_family).toBeUndefined();
   });
 
   it('disables chart options when no chart series is enabled', async () => {
@@ -260,7 +283,7 @@ describe('room climate card editor', () => {
 
   it('survives an empty configuration', async () => {
     const editor = await mountEditor(undefined);
-    expect(editor.shadowRoot!.querySelectorAll('.section').length).toBe(7);
+    expect(editor.shadowRoot!.querySelectorAll('.section').length).toBe(8);
     expect(editor.config.type).toBe('custom:room-climate-card');
   });
 });

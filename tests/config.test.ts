@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_OPEN_STATES,
+  DEFAULT_READING_FONT_SIZE,
+  READING_FONT_SIZE_RANGE,
+  asFontFamily,
   configEntityIds,
   hasChart,
   humidityBand,
@@ -30,6 +33,58 @@ describe('normalizeConfig', () => {
     expect(config.motion.enabled).toBe(false);
     expect(config.thermostat.enabled).toBe(false);
     expect(config.chart.showTemperature).toBe(false);
+  });
+
+  it('exposes large, independent default font sizes for both readings', () => {
+    const config = normalizeConfig({});
+    expect(config.typography.temperature.fontSize).toBe(DEFAULT_READING_FONT_SIZE.temperature);
+    expect(config.typography.humidity.fontSize).toBe(DEFAULT_READING_FONT_SIZE.humidity);
+    // Both are clearly larger than the old 1.85rem / 1.3rem defaults.
+    expect(config.typography.temperature.fontSize).toBeGreaterThanOrEqual(40);
+    expect(config.typography.humidity.fontSize).toBeGreaterThanOrEqual(26);
+    expect(config.typography.temperature.fontSize).toBeGreaterThan(
+      config.typography.humidity.fontSize
+    );
+    expect(config.typography.temperature.fontFamily).toBeUndefined();
+    expect(config.typography.humidity.fontFamily).toBeUndefined();
+  });
+
+  it('keeps temperature and humidity typography independent', () => {
+    const config = normalizeConfig({
+      temperature_font_size: 72,
+      humidity_font_size: 19,
+      temperature_font_family: 'Inter',
+      humidity_font_family: '"Roboto Mono", monospace',
+    });
+    expect(config.typography.temperature).toEqual({ fontSize: 72, fontFamily: 'Inter' });
+    expect(config.typography.humidity).toEqual({
+      fontSize: 19,
+      fontFamily: '"Roboto Mono", monospace',
+    });
+  });
+
+  it('clamps font sizes and rejects unusable font families', () => {
+    const clamped = normalizeConfig({ temperature_font_size: 500, humidity_font_size: 1 });
+    expect(clamped.typography.temperature.fontSize).toBe(READING_FONT_SIZE_RANGE.max);
+    expect(clamped.typography.humidity.fontSize).toBe(READING_FONT_SIZE_RANGE.min);
+
+    const invalid = normalizeConfig({
+      temperature_font_family: 'Inter; color: red',
+      humidity_font_family: 'x'.repeat(200),
+    });
+    expect(invalid.typography.temperature.fontFamily).toBeUndefined();
+    expect(invalid.typography.humidity.fontFamily).toBeUndefined();
+
+    const garbage = normalizeConfig({ temperature_font_size: 'viel', humidity_font_family: 42 });
+    expect(garbage.typography.temperature.fontSize).toBe(DEFAULT_READING_FONT_SIZE.temperature);
+    expect(garbage.typography.humidity.fontFamily).toBeUndefined();
+  });
+
+  it('accepts theme variables and quoted font lists', () => {
+    expect(asFontFamily('var(--ha-font-family-body)')).toBe('var(--ha-font-family-body)');
+    expect(asFontFamily('"Segoe UI", Roboto, sans-serif')).toBe('"Segoe UI", Roboto, sans-serif');
+    expect(asFontFamily('   ')).toBeUndefined();
+    expect(asFontFamily(undefined)).toBeUndefined();
   });
 
   it('never throws for nonsense input', () => {

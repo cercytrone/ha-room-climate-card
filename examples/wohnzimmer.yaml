@@ -11,6 +11,12 @@ humidity_entity: sensor.wohnzimmer_humidity
 temperature_decimals: 1
 humidity_decimals: 0
 
+# Messwerte: Temperatur und Luftfeuchte getrennt gestalten.
+temperature_font_size: 44
+temperature_font_family: Inter          # leer = Schrift des HA-Themes
+humidity_font_size: 30
+humidity_font_family: Inter
+
 show_window: true
 window_entity: binary_sensor.wohnzimmer_fenster
 window_open_states: [on, open, tilted]

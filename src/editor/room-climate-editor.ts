@@ -14,6 +14,7 @@ import { hexToRgbArray, rgbArrayToHex } from '../utils/format';
 interface EditorText {
   general: string;
   sensors: string;
+  typography: string;
   colors: string;
   window: string;
   motion: string;
@@ -36,6 +37,12 @@ interface EditorText {
   humidityEntity: string;
   temperatureDecimals: string;
   humidityDecimals: string;
+  temperatureSize: string;
+  temperatureFont: string;
+  humiditySize: string;
+  humidityFont: string;
+  readingSizeHelper: string;
+  readingFontHelper: string;
   coolBelow: string;
   warmAbove: string;
   hotAbove: string;
@@ -90,6 +97,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
   de: {
     general: 'Allgemein',
     sensors: 'Sensoren',
+    typography: 'Messwerte (Schrift)',
     colors: 'Farben & Grenzwerte',
     window: 'Fenster',
     motion: 'Bewegung',
@@ -112,6 +120,14 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityEntity: 'Luftfeuchtesensor',
     temperatureDecimals: 'Dezimalstellen Temperatur',
     humidityDecimals: 'Dezimalstellen Luftfeuchte',
+    temperatureSize: 'Schriftgröße Temperatur',
+    temperatureFont: 'Schriftart Temperatur',
+    humiditySize: 'Schriftgröße Luftfeuchte',
+    humidityFont: 'Schriftart Luftfeuchte',
+    readingSizeHelper:
+      'Wirkt nur auf diesen Messwert. Bei sehr kleinen Kartenhöhen wird die Größe automatisch mitskaliert.',
+    readingFontHelper:
+      'Leer lassen für die Schrift des Home-Assistant-Themes. Beispiele: Inter, „Roboto, sans-serif“, var(--ha-font-family-body).',
     coolBelow: 'Kühl unter',
     warmAbove: 'Warm ab',
     hotAbove: 'Heiß ab',
@@ -165,6 +181,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
   en: {
     general: 'General',
     sensors: 'Sensors',
+    typography: 'Readings (font)',
     colors: 'Colours & thresholds',
     window: 'Window',
     motion: 'Motion',
@@ -187,6 +204,14 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityEntity: 'Humidity sensor',
     temperatureDecimals: 'Temperature decimals',
     humidityDecimals: 'Humidity decimals',
+    temperatureSize: 'Temperature font size',
+    temperatureFont: 'Temperature font family',
+    humiditySize: 'Humidity font size',
+    humidityFont: 'Humidity font family',
+    readingSizeHelper:
+      'Applies to this reading only. Very small card heights scale the size down automatically.',
+    readingFontHelper:
+      'Leave empty to use the Home Assistant theme font. Examples: Inter, "Roboto, sans-serif", var(--ha-font-family-body).',
     coolBelow: 'Cool below',
     warmAbove: 'Warm above',
     hotAbove: 'Hot above',
@@ -239,7 +264,15 @@ const TEXT: Record<'de' | 'en', EditorText> = {
   },
 };
 
-type SectionId = 'general' | 'sensors' | 'colors' | 'window' | 'motion' | 'thermostat' | 'chart';
+type SectionId =
+  | 'general'
+  | 'sensors'
+  | 'typography'
+  | 'colors'
+  | 'window'
+  | 'motion'
+  | 'thermostat'
+  | 'chart';
 
 interface FieldOptions {
   key: string;
@@ -420,6 +453,7 @@ export class RoomClimateCardEditor extends LitElement {
     return html`<div class="editor">
       ${this.renderSection('general', t.general, this.renderGeneral(t))}
       ${this.renderSection('sensors', t.sensors, this.renderSensors(t))}
+      ${this.renderSection('typography', t.typography, this.renderTypography(t))}
       ${this.renderSection('colors', t.colors, this.renderColors(t))}
       ${this.renderSection('window', t.window, this.renderWindow(t))}
       ${this.renderSection('motion', t.motion, this.renderMotion(t))}
@@ -512,6 +546,40 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.humidityDecimals,
         selector: { number: { min: 0, max: 3, step: 1, mode: 'box' } },
         value: this.numberValue('humidity_decimals', 0),
+      })}`;
+  }
+
+  /**
+   * Independent typography for temperature and humidity – the two values are
+   * the visual anchor of the card, so font family and size are separate.
+   */
+  private renderTypography(t: EditorText): TemplateResult {
+    return html`<div class="hint">${t.readingSizeHelper}</div>
+      ${this.renderField({
+        key: 'temperature_font_size',
+        label: t.temperatureSize,
+        selector: { number: { min: 14, max: 96, step: 1, mode: 'box', unit_of_measurement: 'px' } },
+        value: this.numberValue('temperature_font_size', 42),
+      })}
+      ${this.renderField({
+        key: 'temperature_font_family',
+        label: t.temperatureFont,
+        selector: { text: {} },
+        value: this.stringValue('temperature_font_family'),
+        helper: t.readingFontHelper,
+      })}
+      ${this.renderField({
+        key: 'humidity_font_size',
+        label: t.humiditySize,
+        selector: { number: { min: 14, max: 96, step: 1, mode: 'box', unit_of_measurement: 'px' } },
+        value: this.numberValue('humidity_font_size', 28),
+      })}
+      ${this.renderField({
+        key: 'humidity_font_family',
+        label: t.humidityFont,
+        selector: { text: {} },
+        value: this.stringValue('humidity_font_family'),
+        helper: t.readingFontHelper,
       })}`;
   }
 

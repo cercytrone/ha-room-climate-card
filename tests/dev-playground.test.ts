@@ -33,7 +33,7 @@ describe('dev playground', () => {
 
   it('renders all demo cards', () => {
     const cards = document.querySelectorAll('#cards room-climate-card');
-    expect(cards.length).toBe(6);
+    expect(cards.length).toBe(7);
   });
 
   it('wires the editor to the preview card', async () => {
@@ -41,7 +41,7 @@ describe('dev playground', () => {
       shadowRoot: ShadowRoot;
     };
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(editor.shadowRoot.querySelectorAll('details').length).toBe(7);
+    expect(editor.shadowRoot.querySelectorAll('details').length).toBe(8);
 
     const nameSelector = Array.from(editor.shadowRoot.querySelectorAll('ha-selector')).find(
       (element) => (element as unknown as { label: string }).label === 'Raumname'
