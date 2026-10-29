@@ -327,7 +327,10 @@ describe('room climate card', () => {
     expect(reading).not.toBeNull();
     expect(reading!.querySelector('.setpoint-value')?.textContent?.trim()).toBe('22,0');
     expect(reading!.querySelector('.setpoint-unit')?.textContent?.trim()).toBe('°C');
-    expect(styleText).toMatch(/\.setpoint-reading\s*\{[^}]*align-items:\s*baseline/);
+    // Value and unit are centred on their own optical middle; a shared baseline
+    // pushes the small `°C` about 2 px lower than the number.
+    expect(styleText).toMatch(/\.setpoint-reading\s*\{[^}]*align-items:\s*center/);
+    expect(styleText).not.toMatch(/\.setpoint-reading\s*\{[^}]*align-items:\s*baseline/);
     // Both carry an explicit line height so nothing is clipped or shifted.
     expect(styleText).toMatch(/\.setpoint-value\s*\{[^}]*line-height:\s*1/);
     expect(styleText).toMatch(/\.setpoint-unit\s*\{[^}]*line-height:\s*1/);

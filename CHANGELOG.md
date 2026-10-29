@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.3] – 2026-10-29
+
+### Behoben
+
+- **Einheit im Sollwert-Badge saß zu tief:** Wert und Einheit teilten sich eine Grundlinie
+  (`align-items: baseline`). Bei 17 px Zahl und 10,9 px Einheit liegt das kleine `°C` dadurch
+  rund 2,2 px unter der optischen Mitte der Zahl – es wirkte „nach unten gerutscht“. Wert und
+  Einheit werden jetzt an ihrer eigenen optischen Mitte ausgerichtet (`align-items: center`),
+  der Abstand kommt aus einem echten `gap` statt aus einem negativen Margin.
+
 ## [1.2.2] – 2026-10-29
 
 ### Behoben

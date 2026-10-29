@@ -70,6 +70,15 @@ function approxWidth(value: string, size: number): number {
   return width;
 }
 
+/**
+ * Baseline for text whose capital-height centre should sit on `center`.
+ * DejaVu Sans (used by the rasteriser) has a cap height of about 0.729 em, which
+ * is how the card's CSS centring behaves as well.
+ */
+function capBaseline(center: number, size: number): number {
+  return Number((center + (0.729 * size) / 2).toFixed(2));
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -299,24 +308,25 @@ function renderCard(options: CardOptions): string {
       ? `<g transform="translate(${setpointChipX},${rowY})">
           <rect x="0" y="0" width="${chipWidth.toFixed(1)}" height="${chipHeight}" rx="${chipRadius}" fill="rgba(100,116,139,0.14)" stroke="rgba(148,197,255,0.22)" stroke-width="1" />
           <path d="M 11 1.5 H ${(chipWidth - 11).toFixed(1)}" stroke="rgba(255,255,255,0.07)" stroke-width="1" />
-          <text x="11" y="${chipHeight / 2 + 3.4}" ${font(9.5, 600)} fill="${
+          <text x="11" y="${capBaseline(chipHeight / 2, 9.5)}" ${font(9.5, 600)} fill="${
             COLORS.muted
           }" letter-spacing="0.66">SOLL</text>
-          <text x="${11 + labelWidth + 5}" y="${chipHeight / 2 + 5.2}" ${font(
+          <text x="${11 + labelWidth + 5}" y="${capBaseline(chipHeight / 2, 17)}" ${font(
             17,
             500
           )} fill="${COLORS.text}" letter-spacing="-0.2">${escapeXml(options.setpoint)}</text>
-          <text x="${11 + labelWidth + 5 + valueWidth + 1.5}" y="${
-            chipHeight / 2 + 5.2
-          }" ${font(10.9)} fill="${COLORS.muted}">°C</text>
+          <text x="${11 + labelWidth + 5 + valueWidth + 3}" y="${capBaseline(
+            chipHeight / 2,
+            10.9
+          )}" ${font(10.9)} fill="${COLORS.muted}">°C</text>
         </g>`
       : '';
   const modeChip = options.hvacMode
     ? `<g transform="translate(${setpointChipX + (options.setpoint ? chipWidth + 6 : 0)},${rowY})">
         <rect x="0" y="0" width="${approxWidth(options.hvacMode, 10) + 20}" height="${chipHeight}" rx="${chipRadius}" fill="rgba(100,116,139,0.1)" stroke="rgba(148,197,255,0.22)" stroke-width="1" />
-        <text x="10" y="${chipHeight / 2 + 3.6}" ${font(10)} fill="${COLORS.muted}">${escapeXml(
-          options.hvacMode
-        )}</text>
+        <text x="10" y="${capBaseline(chipHeight / 2, 10)}" ${font(10)} fill="${
+          COLORS.muted
+        }">${escapeXml(options.hvacMode)}</text>
       </g>`
     : '';
   const setpointRow = `${hvacBadge}${setpointChip}${modeChip}`;
