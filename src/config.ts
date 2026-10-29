@@ -26,6 +26,14 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   humidity_entity?: string;
   temperature_decimals?: number;
   humidity_decimals?: number;
+  /** Font size of the big temperature value in pixels (default 42). */
+  temperature_font_size?: number;
+  /** CSS font family for the temperature value; empty = theme font. */
+  temperature_font_family?: string;
+  /** Font size of the humidity value in pixels (default 28). */
+  humidity_font_size?: number;
+  /** CSS font family for the humidity value; empty = theme font. */
+  humidity_font_family?: string;
 
   // Temperature colour bands
   temperature_cool_below?: number;
@@ -127,6 +135,19 @@ export interface TemperatureBandColors {
   hot: string;
 }
 
+/** Per-reading typography, configured independently for both values. */
+export interface ReadingTypography {
+  /** Font size in pixels; `null` = built-in default of the card. */
+  fontSize: number;
+  /** CSS font-family; `undefined` = inherit from the Home Assistant theme. */
+  fontFamily?: string;
+}
+
+export interface TypographyConfig {
+  temperature: ReadingTypography;
+  humidity: ReadingTypography;
+}
+
 export interface HumidityConfig {
   color: string;
   lowThreshold: number;
@@ -148,6 +169,7 @@ export interface ResolvedConfig {
   humidityEntity?: string;
   temperatureDecimals: number;
   humidityDecimals: number;
+  typography: TypographyConfig;
   bands: TemperatureBandConfig;
   bandColors: TemperatureBandColors;
   humidity: HumidityConfig;
@@ -174,7 +196,17 @@ export const DEFAULT_COLORS = {
   off: '#64748b',
 } as const;
 
+/** Built-in reading sizes; both are deliberately large and independently tunable. */
+export const DEFAULT_READING_FONT_SIZE = {
+  temperature: 42,
+  humidity: 28,
+} as const;
+
+/** Range accepted for `*_font_size` (pixels). */
+export const READING_FONT_SIZE_RANGE = { min: 14, max: 96 } as const;
+
 const ENTITY_ID_RE = /^[a-z0-9_]+\.[a-z0-9_]+$/;
+const FONT_FAMILY_RE = /^[-a-zA-Z0-9 ,'"_.()]+$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -210,6 +242,24 @@ function asColor(value: unknown, fallback: string): string {
   if (!color) return fallback;
   // Guard against accidental YAML objects/long garbage.
   return color.length <= 64 ? color : fallback;
+}
+
+/**
+ * Accepts a CSS font-family list ("Inter", "Roboto, sans-serif",
+ * "var(--ha-font-family-body)") and rejects anything that could break out of
+ * the declaration. Empty / invalid values fall back to the theme font.
+ */
+export function asFontFamily(value: unknown): string | undefined {
+  const family = asString(value);
+  if (!family || family.length > 120) return undefined;
+  if (!FONT_FAMILY_RE.test(family)) return undefined;
+  return family;
+}
+
+function readingFontSize(value: unknown, fallback: number): number {
+  return Math.round(
+    asNumber(value, READING_FONT_SIZE_RANGE.min, READING_FONT_SIZE_RANGE.max, fallback)
+  );
 }
 
 function asStringList(value: unknown): string[] {
@@ -278,6 +328,19 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     humidityEntity,
     temperatureDecimals: Math.round(asNumber(config.temperature_decimals, 0, 3, 1)),
     humidityDecimals: Math.round(asNumber(config.humidity_decimals, 0, 3, 0)),
+    typography: {
+      temperature: {
+        fontSize: readingFontSize(
+          config.temperature_font_size,
+          DEFAULT_READING_FONT_SIZE.temperature
+        ),
+        fontFamily: asFontFamily(config.temperature_font_family),
+      },
+      humidity: {
+        fontSize: readingFontSize(config.humidity_font_size, DEFAULT_READING_FONT_SIZE.humidity),
+        fontFamily: asFontFamily(config.humidity_font_family),
+      },
+    },
     bands,
     bandColors: {
       cool: asColor(config.temperature_cool_color, DEFAULT_COLORS.cool),
@@ -400,7 +463,9 @@ export function preferredCardHeight(config: ResolvedConfig): number {
   if (config.height) return config.height;
   const chartHeight = hasChart(config) ? config.chart.height + 26 : 0;
   const statusRow = hasStatusRow(config) ? 26 : 0;
-  return 96 + chartHeight + statusRow;
+  // The readings dominate the header; larger fonts should not shrink the card.
+  const readings = Math.max(config.typography.temperature.fontSize, config.typography.humidity.fontSize);
+  return 62 + Math.round(readings * 0.98) + chartHeight + statusRow;
 }
 
 export function resolveName(config: ResolvedConfig, hass?: HomeAssistant): string {

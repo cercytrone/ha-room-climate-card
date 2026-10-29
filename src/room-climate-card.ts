@@ -339,10 +339,15 @@ export class RoomClimateCard extends LitElement {
       return html`<div class="card theme-auto"><div class="empty">${t.t('roomClimate')}</div></div>`;
     }
     const themeClass = config.theme === 'auto' ? 'theme-auto' : `theme-${config.theme}`;
+    const { temperature: tempType, humidity: humType } = config.typography;
     const style = [
       `--rcc-radius:${config.borderRadius}px`,
       config.height ? `--rcc-height:${config.height}px` : '',
       `--rcc-chart-height:${config.chart.height}px`,
+      `--rcc-temp-size:${tempType.fontSize}px`,
+      `--rcc-hum-size:${humType.fontSize}px`,
+      tempType.fontFamily ? `--rcc-temp-font:${tempType.fontFamily}` : '',
+      humType.fontFamily ? `--rcc-hum-font:${humType.fontFamily}` : '',
     ]
       .filter(Boolean)
       .join(';');
@@ -431,7 +436,10 @@ export class RoomClimateCard extends LitElement {
         : t.t('motionIdle');
     return html`<span
       class="badge motion ${active ? 'is-active' : 'is-idle'}"
-      style="--badge-color:${color};--badge-bg:${withAlpha(active ? MOTION_ACTIVE_COLOR : '#64748b', 0.14)}"
+      style="--badge-color:${color};--badge-bg:${withAlpha(
+        active ? MOTION_ACTIVE_COLOR : '#64748b',
+        active ? 0.16 : 0.12
+      )};--badge-border:${withAlpha(active ? MOTION_ACTIVE_COLOR : '#64748b', active ? 0.45 : 0.22)}"
       title="${label}"
       aria-label="${label}"
       role="img"
@@ -455,7 +463,10 @@ export class RoomClimateCard extends LitElement {
     const color = open ? WINDOW_OPEN_COLOR : NEUTRAL_COLOR;
     return html`<span
       class="badge window ${open ? 'is-open' : ''}"
-      style="--badge-color:${color};--badge-bg:${withAlpha(open ? WINDOW_OPEN_COLOR : '#64748b', open ? 0.16 : 0.12)}"
+      style="--badge-color:${color};--badge-bg:${withAlpha(
+        open ? WINDOW_OPEN_COLOR : '#64748b',
+        open ? 0.18 : 0.12
+      )};--badge-border:${withAlpha(open ? WINDOW_OPEN_COLOR : '#64748b', open ? 0.5 : 0.22)}"
       title="${label}"
       aria-label="${label}"
       role="img"
@@ -658,6 +669,13 @@ export class RoomClimateCard extends LitElement {
       --rcc-shadow: var(--ha-card-box-shadow, 0 4px 18px rgba(2, 6, 23, 0.22));
       --rcc-neutral: #94a3b8;
       --rcc-radius: 18px;
+      /* Modern layered surface: the gradient sits *behind* the theme colour. */
+      --rcc-surface: none;
+      --rcc-hairline: var(--divider-color, rgba(148, 197, 255, 0.16));
+      --rcc-temp-size: 42px;
+      --rcc-hum-size: 28px;
+      --rcc-temp-font: inherit;
+      --rcc-hum-font: inherit;
       color: var(--rcc-text);
       font-family: var(--ha-font-family-body, inherit);
       -webkit-font-smoothing: antialiased;
@@ -669,9 +687,10 @@ export class RoomClimateCard extends LitElement {
       box-sizing: border-box;
       height: var(--rcc-height, auto);
       min-height: 0;
-      padding: 11px 14px 2px;
+      padding: 13px 16px 3px;
       overflow: hidden;
-      background: var(--rcc-bg);
+      background-color: var(--rcc-bg);
+      background-image: var(--rcc-surface);
       border: 1px solid var(--rcc-border);
       border-radius: var(--rcc-radius);
       box-shadow: var(--rcc-shadow);
@@ -681,19 +700,29 @@ export class RoomClimateCard extends LitElement {
         color 0.2s ease;
     }
     .card.theme-dark {
-      --rcc-bg: #162032;
+      --rcc-bg: #101b2c;
+      --rcc-surface:
+        radial-gradient(120% 92% at 0% 0%, rgba(56, 189, 248, 0.16) 0%, rgba(56, 189, 248, 0) 58%),
+        radial-gradient(110% 85% at 100% 0%, rgba(139, 92, 246, 0.14) 0%, rgba(139, 92, 246, 0) 62%),
+        linear-gradient(158deg, #1c2d49 0%, #152238 52%, #0e1828 100%);
       --rcc-text: #eaf0fb;
-      --rcc-muted: #93a4bd;
-      --rcc-border: rgba(148, 163, 184, 0.22);
-      --rcc-shadow: 0 10px 30px rgba(2, 6, 23, 0.45);
+      --rcc-muted: #93a7c2;
+      --rcc-border: rgba(148, 197, 255, 0.16);
+      --rcc-hairline: rgba(148, 197, 255, 0.14);
+      --rcc-shadow:
+        0 22px 46px -26px rgba(2, 6, 23, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.06);
       --rcc-neutral: #94a3b8;
     }
     .card.theme-light {
       --rcc-bg: #ffffff;
+      --rcc-surface:
+        radial-gradient(120% 90% at 0% 0%, rgba(56, 189, 248, 0.1) 0%, rgba(56, 189, 248, 0) 56%),
+        linear-gradient(162deg, #ffffff 0%, #f8fafc 58%, #eef3fa 100%);
       --rcc-text: #0f172a;
       --rcc-muted: #64748b;
-      --rcc-border: rgba(15, 23, 42, 0.1);
-      --rcc-shadow: 0 8px 24px rgba(15, 23, 42, 0.09);
+      --rcc-border: rgba(15, 23, 42, 0.08);
+      --rcc-hairline: rgba(15, 23, 42, 0.08);
+      --rcc-shadow: 0 18px 38px -26px rgba(15, 23, 42, 0.38), inset 0 1px 0 #ffffff;
       --rcc-neutral: #94a3b8;
     }
 
@@ -730,10 +759,10 @@ export class RoomClimateCard extends LitElement {
     }
     .name {
       margin: 0;
-      font-size: 0.875rem;
-      font-weight: 600;
+      font-size: 1.0625rem;
+      font-weight: 500;
       line-height: 1.25;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.015em;
       color: var(--rcc-text);
       overflow: hidden;
       display: -webkit-box;
@@ -742,8 +771,8 @@ export class RoomClimateCard extends LitElement {
       overflow-wrap: anywhere;
     }
     .subtle {
-      margin-top: 1px;
-      font-size: 10px;
+      margin-top: 2px;
+      font-size: 10.5px;
       line-height: 1.3;
       color: var(--rcc-muted);
       font-variant-numeric: tabular-nums;
@@ -754,39 +783,43 @@ export class RoomClimateCard extends LitElement {
     .badges {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       flex: none;
     }
     .badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 9px;
+      width: 30px;
+      height: 30px;
+      border-radius: 11px;
       color: var(--badge-color, var(--rcc-neutral));
       background: var(--badge-bg, transparent);
-      border: 1px solid var(--rcc-border);
+      border: 1px solid var(--badge-border, var(--rcc-border));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
       transition:
         color 0.18s ease,
         background-color 0.18s ease,
-        border-color 0.18s ease;
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
     }
     .badge.window.is-open,
     .badge.motion.is-active {
-      border-color: var(--badge-color);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 8px 18px -12px var(--badge-color);
     }
     .badge .icon {
-      width: 15px;
-      height: 15px;
+      width: 17px;
+      height: 17px;
     }
 
     .metrics {
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
-      gap: 8px;
-      margin-top: 6px;
+      gap: 10px;
+      margin-top: 8px;
       min-height: 0;
     }
     .metric {
@@ -794,48 +827,59 @@ export class RoomClimateCard extends LitElement {
       align-items: baseline;
       min-width: 0;
     }
+    /*
+     * Temperature and humidity are sized independently. Unit and drop icon use
+     * em units, so they always scale with their own value.
+     */
+    .temperature {
+      font-size: var(--rcc-temp-size, 42px);
+      font-family: var(--rcc-temp-font, inherit);
+    }
     .temperature .value {
-      font-size: 1.85rem;
-      font-weight: 300;
-      line-height: 0.95;
-      letter-spacing: -0.03em;
+      font-size: 1em;
+      font-weight: 600;
+      line-height: 0.94;
+      letter-spacing: -0.035em;
       font-variant-numeric: tabular-nums;
       font-feature-settings: 'tnum' 1;
       transition: color 0.2s ease;
     }
     .temperature .unit {
-      margin-left: 2px;
-      font-size: 0.75rem;
+      margin-left: 0.16em;
+      font-size: 0.34em;
       font-weight: 400;
+      letter-spacing: 0;
       color: var(--rcc-muted);
     }
     .humidity {
-      gap: 4px;
+      gap: 0.28em;
       align-items: baseline;
+      font-size: var(--rcc-hum-size, 28px);
+      font-family: var(--rcc-hum-font, inherit);
     }
     .drop-icon {
       display: inline-flex;
       align-self: center;
       color: var(--rcc-muted);
-      opacity: 0.85;
+      opacity: 0.8;
     }
     .drop-icon .icon {
-      width: 14px;
-      height: 14px;
+      width: 0.66em;
+      height: 0.66em;
     }
     .humidity-value {
-      font-size: 1.3rem;
-      font-weight: 400;
+      font-size: 1em;
+      font-weight: 500;
       line-height: 1;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.025em;
       font-feature-settings: 'tnum' 1;
     }
     .humidity-unit {
-      font-size: 0.75rem;
+      font-size: 0.46em;
       font-weight: 400;
       color: var(--rcc-muted);
-      margin-left: -2px;
+      margin-left: -0.1em;
     }
 
     .setpoint-row {
@@ -843,7 +887,7 @@ export class RoomClimateCard extends LitElement {
       align-items: center;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 5px;
+      margin-top: 6px;
       min-height: 18px;
     }
     .hvac-icon {
@@ -851,9 +895,9 @@ export class RoomClimateCard extends LitElement {
       align-items: center;
       justify-content: center;
       flex: none;
-      width: 19px;
-      height: 19px;
-      border-radius: 6px;
+      width: 20px;
+      height: 20px;
+      border-radius: 7px;
       color: var(--hvac-color, var(--rcc-muted));
       background: var(--hvac-tint, transparent);
       border: 1px solid var(--hvac-ring, transparent);
@@ -893,13 +937,13 @@ export class RoomClimateCard extends LitElement {
     }
     .setpoint-label {
       font-size: 9.5px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
+      font-weight: 600;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
       opacity: 0.85;
     }
     .setpoint-value {
-      font-size: 0.95rem;
+      font-size: 1rem;
       font-weight: 500;
       line-height: 1;
       color: var(--rcc-text);
@@ -923,8 +967,19 @@ export class RoomClimateCard extends LitElement {
       position: relative;
       display: flex;
       flex-direction: column;
-      margin: 5px -14px 0;
+      margin: 9px -16px 0;
       min-height: 0;
+    }
+    /* Hairline divider like the reference dashboard card (inset, not full width). */
+    .chart-slot::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 16px;
+      right: 16px;
+      height: 1px;
+      background: var(--rcc-hairline);
+      pointer-events: none;
     }
     .chart-slot > room-climate-chart {
       flex: 1 1 auto;
@@ -972,10 +1027,13 @@ export class RoomClimateCard extends LitElement {
     }
 
     .density-xs .metrics {
-      margin-top: 3px;
+      margin-top: 4px;
     }
-    .density-xs .temperature .value {
-      font-size: 1.4rem;
+    .density-xs .temperature {
+      font-size: calc(var(--rcc-temp-size, 42px) * 0.6);
+    }
+    .density-xs .humidity {
+      font-size: calc(var(--rcc-hum-size, 28px) * 0.72);
     }
     .density-xs .setpoint-row {
       margin-top: 3px;
@@ -992,30 +1050,26 @@ export class RoomClimateCard extends LitElement {
     .density-xs .setpoint-value {
       font-size: 0.85rem;
     }
-    .density-xs .humidity-value {
-      font-size: 1.05rem;
-    }
-    .density-xs .drop-icon .icon {
-      width: 12px;
-      height: 12px;
-    }
     .density-xs .subtle {
       display: none;
     }
-    .density-sm .temperature .value {
-      font-size: 1.6rem;
+    .density-sm .temperature {
+      font-size: calc(var(--rcc-temp-size, 42px) * 0.82);
     }
-    .density-sm .humidity-value {
-      font-size: 1.18rem;
+    .density-sm .humidity {
+      font-size: calc(var(--rcc-hum-size, 28px) * 0.88);
     }
     .density-xs .badge {
-      width: 22px;
-      height: 22px;
-      border-radius: 7px;
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
     }
     .density-xs .badge .icon {
-      width: 13px;
-      height: 13px;
+      width: 14px;
+      height: 14px;
+    }
+    .density-xs .name {
+      font-size: 0.95rem;
     }
 
     @media (prefers-reduced-motion: reduce) {

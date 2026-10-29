@@ -26,6 +26,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
   - [Ressource prüfen / Browser-Cache leeren](#ressource-prüfen--browser-cache-leeren)
 - [Schnellstart](#schnellstart)
 - [Konfiguration](#konfiguration)
+- [Optik](#optik)
 - [Visueller Editor](#visueller-editor)
 - [Verlaufs-Chart](#verlaufs-chart)
 - [Kartenhöhe & responsive Darstellung](#kartenhöhe--responsive-darstellung)
@@ -45,13 +46,14 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | Bereich | Details |
 | --- | --- |
 | **Raumname** | Frei konfigurierbar, optional aus einer Entität (`name_entity`) oder dem Friendly Name des Temperatursensors, optionales Icon. Lange Namen werden zweizeilig gekürzt. |
-| **Temperatur** | Zentraler Messwert, Einheit aus der Entität, konfigurierbare Dezimalstellen, Farbcodierung nach vier konfigurierbaren Temperaturbereichen. |
-| **Luftfeuchte** | Prozentwert mit eigener Farbwelt und optionalen Grenzwerten (trocken/feucht); bewusst größer gesetzt als früher, aber immer kleiner als die Temperatur. |
+| **Temperatur** | Zentraler Messwert in großzügiger Schrift (Standard 42 px), Einheit aus der Entität, konfigurierbare Dezimalstellen, Farbcodierung nach vier konfigurierbaren Temperaturbereichen. Schriftgröße und Schriftart sind im Editor frei einstellbar. |
+| **Luftfeuchte** | Prozentwert (Standard 28 px) mit eigener Farbwelt und optionalen Grenzwerten (trocken/feucht). Schriftgröße und Schriftart werden **unabhängig von der Temperatur** eingestellt – Standard bleibt bewusst kleiner als die Temperatur. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Thermostat** | Optional. Solltemperatur oberhalb der Isttemperatur; der Heizstatus wird nur durch die Farbe des Flammen-Icons davor gezeigt (rot = heizt, grün = ruht, grau = aus), optional zusätzlich der HVAC-Modus. |
 | **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende, Gitter, Datenpunkte. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
+| **Optik** | Modernes, flächiges Design mit Farbverlauf, Farbschleiern, Badge-Kacheln mit farbigem Ring und Halo am aktuellen Messpunkt – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
 | **Robustheit** | `unavailable`/`unknown`/fehlende Entitäten, fehlende Attribute, kaputtes YAML – die Karte stürzt nicht ab. |
 
@@ -96,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.1.2`.
+  `ROOM-CLIMATE-CARD v1.2.0`.
 
 ---
 
@@ -145,6 +147,24 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `humidity_entity` | entity | – | Luftfeuchtesensor. |
 | `temperature_decimals` | number | `1` | Dezimalstellen Temperatur (0–3). |
 | `humidity_decimals` | number | `0` | Dezimalstellen Luftfeuchte (0–3). |
+
+### Messwerte (Schrift)
+
+Temperatur und Luftfeuchte sind die Blickfänge der Karte und lassen sich **unabhängig
+voneinander** gestalten – Größe und Schriftart jeweils getrennt:
+
+| Option | Typ | Standard | Beschreibung |
+| --- | --- | --- | --- |
+| `temperature_font_size` | number (px) | `42` | Schriftgröße der Temperatur (14–96). |
+| `temperature_font_family` | string | Theme | CSS-Schriftart der Temperatur, z. B. `Inter` oder `"Roboto Mono", monospace`. |
+| `humidity_font_size` | number (px) | `28` | Schriftgröße der Luftfeuchte (14–96). |
+| `humidity_font_family` | string | Theme | CSS-Schriftart der Luftfeuchte. |
+
+- Einheiten (`°C`, `%`) und das Tropfen-Icon skalieren automatisch mit ihrem eigenen Messwert.
+- Bei sehr kleinen Kartenhöhen (`density-sm`/`density-xs`) werden beide Größen anteilig
+  verkleinert, statt umzubrechen.
+- Leere Schriftart = Schrift des Home-Assistant-Themes. Ungültige Werte (z. B. mit `;`) werden
+  verworfen, damit nichts aus der CSS-Deklaration ausbricht.
 
 ### Temperaturfarben & Grenzwerte
 
@@ -226,13 +246,14 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 
 ## Visueller Editor
 
-Der Editor ist in sieben Abschnitte gegliedert und nutzt ausschließlich native
+Der Editor ist in acht Abschnitte gegliedert und nutzt ausschließlich native
 Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zustand):
 
 | Abschnitt | Felder |
 | --- | --- |
 | **Allgemein** | Raumname, Name aus Entität, Icon, automatische Höhe, Kartenhöhe, Eckenradius, Darstellung |
 | **Sensoren** | Temperatursensor, Luftfeuchtesensor, Dezimalstellen |
+| **Messwerte (Schrift)** | Schriftgröße und Schriftart für Temperatur und Luftfeuchte – jeweils getrennt |
 | **Farben & Grenzwerte** | Temperaturgrenzen (kühl/warm/heiß), vier Temperaturfarben, Feuchtefarbe, Feuchte-Grenzwerte und -Farben |
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
@@ -245,6 +266,25 @@ Konfiguration bleibt beim erneuten Öffnen vollständig erhalten. Unbekannte Sch
 YAML bleiben unangetastet.
 
 ---
+
+## Optik
+
+Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
+
+- **Flächige Tiefe:** weicher Verlauf von Blau zu Indigo (dunkel) bzw. Weiß zu kühlem Grau
+  (hell), darüber zwei radiale Farbschleier (Cyan, Violett) – kein flaches Rechteck.
+- **Badges als Kacheln:** transluzente Fläche, farbiger Ring, dezenter Lichtreflex; Fenster
+  offen = Amber, Bewegung erkannt = Mint, inaktiv = neutral. Kein Badge ohne Funktion.
+- **Hairline statt Rahmen:** eine eingesetzte Trennlinie über dem Verlauf, wie in der Vorlage.
+- **Große, ruhige Typografie:** Raumname halbfett, Isttemperatur 42 px (Standard) mit
+  negativer Laufweite, Luftfeuchte 28 px – beides im Editor getrennt einstellbar.
+- **Verlauf:** 2,1 px Linie, Farbverlaufsfläche, Halo-Punkt am aktuellen Wert, feines
+  gestricheltes Gitter, Zeitlabels bleiben von den Ecken frei.
+- **Hell und dunkel:** beide Varianten sind vollständig ausgestaltet und respektieren
+  `theme: auto` (HA-Theme).
+
+Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variablen
+(`--ha-card-background`, `--primary-text-color`, `--divider-color`) überschreiben.
 
 ## Verlaufs-Chart
 
@@ -389,17 +429,17 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 189 Tests in 10 Dateien aus (Stand 1.1.2):
+`npm test` führt 196 Tests in 10 Dateien aus (Stand 1.2.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
-| `tests/config.test.ts` | Standardwerte, kaputte Eingaben, optionale Bereiche, Grenzwerte, Namensauflösung |
+| `tests/config.test.ts` | Standardwerte, kaputte Eingaben, optionale Bereiche, Grenzwerte, Namensauflösung, Schriftgrößen-Clamping und Schriftart-Validierung |
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
 | `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Legende, Punkte, Gitter |
-| `tests/card.test.ts` | Rendering, Formatierung, Farben, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
-| `tests/editor.test.ts` | Abschnitte, Selektoren, Werte, `config-changed`, deaktivierte Felder, Persistenz, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
+| `tests/card.test.ts` | Rendering, Formatierung, Farben, unabhängige Schriftgrößen/-arten je Messwert, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
+| `tests/editor.test.ts` | Abschnitte, Selektoren, Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |
 | `tests/dev-playground.test.ts` | Entwicklungsumgebung inkl. Editor↔Vorschau-Verdrahtung |

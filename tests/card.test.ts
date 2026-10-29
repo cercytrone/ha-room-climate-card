@@ -315,19 +315,48 @@ describe('room climate card', () => {
     expect(q(card, '.hvac-icon')).toBeNull();
   });
 
-  it('renders the humidity larger than before but smaller than the temperature', async () => {
+  it('sizes both readings from CSS variables and keeps humidity smaller by default', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
-    const styleSheets = (
-      card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
-    ).elementStyles;
-    const styleText = Array.from(styleSheets ?? [])
+    const container = q(card, '.card') as HTMLElement;
+    expect(container.style.getPropertyValue('--rcc-temp-size').trim()).toBe('42px');
+    expect(container.style.getPropertyValue('--rcc-hum-size').trim()).toBe('28px');
+    // No custom family configured -> the element keeps inheriting the theme font.
+    expect(container.style.getPropertyValue('--rcc-temp-font')).toBe('');
+    expect(container.style.getPropertyValue('--rcc-hum-font')).toBe('');
+
+    const styleText = Array.from(
+      (
+        card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
+      ).elementStyles ?? []
+    )
       .map((sheet) => sheet.cssText ?? '')
       .join('\n');
-    expect(styleText).toContain('.humidity-value');
-    expect(styleText).toMatch(/\.humidity-value\s*\{[^}]*font-size:\s*1\.3rem/);
-    expect(styleText).toMatch(/\.temperature \.value\s*\{[^}]*font-size:\s*1\.85rem/);
+    expect(styleText).toMatch(/\.temperature\s*\{[^}]*font-size:\s*var\(--rcc-temp-size/);
+    expect(styleText).toMatch(/\.humidity\s*\{[^}]*font-size:\s*var\(--rcc-hum-size/);
+    expect(styleText).toMatch(
+      /\.density-xs \.temperature\s*\{[^}]*calc\(var\(--rcc-temp-size[^}]*\) \* 0\.6\)/
+    );
     expect(text(card, '.humidity-value')).toBe('50,4');
+  });
+
+  it('applies independent font sizes and families per reading', async () => {
+    const card = mount(
+      {
+        ...fullConfig,
+        temperature_font_size: 64,
+        temperature_font_family: 'Inter, sans-serif',
+        humidity_font_size: 33,
+        humidity_font_family: 'Roboto Mono',
+      },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    const container = q(card, '.card') as HTMLElement;
+    expect(container.style.getPropertyValue('--rcc-temp-size').trim()).toBe('64px');
+    expect(container.style.getPropertyValue('--rcc-hum-size').trim()).toBe('33px');
+    expect(container.style.getPropertyValue('--rcc-temp-font').trim()).toBe('Inter, sans-serif');
+    expect(container.style.getPropertyValue('--rcc-hum-font').trim()).toBe('Roboto Mono');
   });
 
   it('applies a fixed height and density classes', async () => {
