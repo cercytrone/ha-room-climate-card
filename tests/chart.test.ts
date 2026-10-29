@@ -315,6 +315,23 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelectorAll('.point').length).toBeGreaterThan(0);
   });
 
+  it('shows series names only in the legend, without repeating the values', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      showLegend: true,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const legend = chart.shadowRoot!.querySelector('.legend')!;
+    const items = Array.from(legend.querySelectorAll('.legend-item'));
+    expect(items.map((item) => item.textContent?.trim())).toEqual(['Temperatur', 'Luftfeuchte']);
+    // The current values live in the big readings above the chart.
+    expect(legend.querySelector('.legend-value')).toBeNull();
+    expect(legend.textContent).not.toContain('°C');
+    expect(legend.textContent).not.toContain('%');
+  });
+
   it('hides the legend on small charts', async () => {
     const chart = createChart({ temperature: samples([20, 21]), showLegend: true });
     setSize(chart, 320, 70);

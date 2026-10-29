@@ -4,6 +4,22 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.2] – 2026-10-29
+
+### Behoben
+
+- **Sollwert-Badge saß zu hoch:** Das Badge richtete seinen Inhalt an der Grundlinie aus
+  (`align-items: baseline`). In der festen 30-px-Höhe wanderte die Zeile dadurch an die obere
+  Kante – „SOLL“ wirkte mittig, die Temperatur klebte direkt unter dem Rand. Jetzt wird der
+  Inhalt mittig zentriert; Wert und Einheit bilden eine eigene Gruppe, die untereinander die
+  Grundlinie teilt, sodass `22,0` und `°C` gemeinsam auf der Mittellinie sitzen.
+
+### Geändert
+
+- **Legende ohne doppelte Werte:** Unter dem Verlauf wurden Temperatur und Luftfeuchte erneut mit
+  ihrem aktuellen Wert aufgeführt (`Temperatur · 21,8 °C`). Diese Werte stehen bereits groß über
+  dem Chart. Die Legende zeigt jetzt nur noch die Reihennamen mit ihrem Farbpunkt.
+
 ## [1.2.1] – 2026-10-29
 
 ### Behoben

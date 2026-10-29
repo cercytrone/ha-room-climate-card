@@ -279,7 +279,7 @@ function renderCard(options: CardOptions): string {
   const rowY = y + 56;
   const labelWidth = 29; // "SOLL" at 9.5 px with 0.66 px letter-spacing
   const valueWidth = approxWidth(options.setpoint ?? '', 17);
-  const chipWidth = 11 + labelWidth + 5 + valueWidth + 3 + 17 + 11;
+  const chipWidth = 11 + labelWidth + 5 + valueWidth + 1.5 + 17 + 11;
   const hvacBadge = options.hvacColor
     ? `<g transform="translate(${x + pad},${rowY})">
         <rect x="0" y="0" width="${chipHeight}" height="${chipHeight}" rx="${chipRadius}" fill="${
@@ -306,7 +306,7 @@ function renderCard(options: CardOptions): string {
             17,
             500
           )} fill="${COLORS.text}" letter-spacing="-0.2">${escapeXml(options.setpoint)}</text>
-          <text x="${11 + labelWidth + 5 + valueWidth + 3}" y="${
+          <text x="${11 + labelWidth + 5 + valueWidth + 1.5}" y="${
             chipHeight / 2 + 5.2
           }" ${font(10.9)} fill="${COLORS.muted}">°C</text>
         </g>`

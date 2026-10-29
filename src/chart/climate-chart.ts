@@ -70,8 +70,6 @@ export class RoomClimateChart extends LitElement {
   static properties = {
     temperature: { attribute: false },
     humidity: { attribute: false },
-    temperatureValue: { attribute: false },
-    humidityValue: { attribute: false },
     bandColors: { attribute: false },
     bands: { attribute: false },
     humidityColor: { attribute: false },
@@ -135,11 +133,6 @@ export class RoomClimateChart extends LitElement {
       height: 6px;
       border-radius: 50%;
       flex: none;
-    }
-    .legend-value {
-      color: var(--rcc-text, inherit);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
     }
     svg {
       display: block;
@@ -224,8 +217,6 @@ export class RoomClimateChart extends LitElement {
 
   temperature?: ChartSample[];
   humidity?: ChartSample[];
-  temperatureValue?: string;
-  humidityValue?: string;
   bandColors: TemperatureBandColors = {
     cool: '#38bdf8',
     comfort: '#34d399',
@@ -350,17 +341,18 @@ export class RoomClimateChart extends LitElement {
     return html`<div class="wrap">${this.renderLegend(height)}${this.renderChart(width, height)}</div>`;
   }
 
+  /**
+   * Legend with series names only – the current values are already the two big
+   * readings above the chart, so repeating them here was redundant.
+   */
   private renderLegend(height: number): TemplateResult | typeof nothing {
     if (!this.showLegend || height < 96) return nothing;
-    const compact = this.chartSize.width < 210;
     const items: TemplateResult[] = [];
     if (this.temperature?.length) {
       items.push(
         html`<span class="legend-item"
           ><span class="legend-dot" style="background:${this.bandColors.comfort}"></span
-          >${this.labels.temperature}${!compact && this.temperatureValue
-            ? html`<span class="legend-value">· ${this.temperatureValue}</span>`
-            : nothing}</span
+          >${this.labels.temperature}</span
         >`
       );
     }
@@ -368,9 +360,7 @@ export class RoomClimateChart extends LitElement {
       items.push(
         html`<span class="legend-item"
           ><span class="legend-dot" style="background:${this.humidityColor}"></span
-          >${this.labels.humidity}${!compact && this.humidityValue
-            ? html`<span class="legend-value">· ${this.humidityValue}</span>`
-            : nothing}</span
+          >${this.labels.humidity}</span
         >`
       );
     }

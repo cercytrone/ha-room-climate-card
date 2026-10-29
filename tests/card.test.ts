@@ -305,6 +305,34 @@ describe('room climate card', () => {
     expect(text(card, '.setpoint-row')).not.toContain('Heizt');
   });
 
+  it('centres setpoint value and unit vertically inside the badge', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+
+    const styleText = Array.from(
+      (
+        card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
+      ).elementStyles ?? []
+    )
+      .map((sheet) => sheet.cssText ?? '')
+      .join('\n');
+
+    // The badge itself must centre its content; baseline alignment pushed the
+    // value to the top edge of the 30 px box.
+    expect(styleText).toMatch(/\.setpoint\s*\{[^}]*align-items:\s*center/);
+    expect(styleText).not.toMatch(/\.setpoint\s*\{[^}]*align-items:\s*baseline/);
+
+    // Value and unit sit in their own group and share a baseline with each other.
+    const reading = q(card, '.setpoint-reading');
+    expect(reading).not.toBeNull();
+    expect(reading!.querySelector('.setpoint-value')?.textContent?.trim()).toBe('22,0');
+    expect(reading!.querySelector('.setpoint-unit')?.textContent?.trim()).toBe('°C');
+    expect(styleText).toMatch(/\.setpoint-reading\s*\{[^}]*align-items:\s*baseline/);
+    // Both carry an explicit line height so nothing is clipped or shifted.
+    expect(styleText).toMatch(/\.setpoint-value\s*\{[^}]*line-height:\s*1/);
+    expect(styleText).toMatch(/\.setpoint-unit\s*\{[^}]*line-height:\s*1/);
+  });
+
   it('keeps the badge look for the unknown state', async () => {
     const card = mount(
       fullConfig,
