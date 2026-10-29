@@ -1,4 +1,4 @@
-const D = "room-climate-card", Y = "room-climate-card-editor", Jt = "Room Climate Card", Qt = "Raumklima auf einen Blick: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlauf.", ei = "1.1.4";
+const D = "room-climate-card", Y = "room-climate-card-editor", Jt = "Room Climate Card", Qt = "Raumklima auf einen Blick: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlauf.", ei = "1.2.1";
 const me = globalThis, Me = me.ShadowRoot && (me.ShadyCSS === void 0 || me.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, He = /* @__PURE__ */ Symbol(), Qe = /* @__PURE__ */ new WeakMap();
 let Et = class {
   constructor(e, t, i) {

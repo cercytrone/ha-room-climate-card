@@ -4,6 +4,55 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.1] – 2026-10-29
+
+### Behoben
+
+- **Versionsnummern liefen rückwärts:** `1.1.3` und `1.1.4` wurden *nach* `1.2.0` veröffentlicht.
+  Jedes Release war für sich korrekt, aber HACS vergleicht **Versionsnummern**, nicht
+  Veröffentlichungsdaten – angeboten wurde deshalb weiterhin `1.2.0`. In dieser Fassung fehlten
+  die Badges für Solltemperatur und Heizmodus, die Editor-Korrekturen und die punktierte
+  Feuchtekurve, obwohl alle drei bereits veröffentlicht waren. `1.2.1` führt alle Stände wieder
+  zusammen und ist die höchste Version.
+
+### Enthalten (aus den zuvor getrennt veröffentlichten Ständen)
+
+- Moderne Optik mit Farbverläufen, Badge-Kacheln und **unabhängigen Schriftgrößen/-arten** für
+  Temperatur und Luftfeuchte (`temperature_font_size`, `humidity_font_size`, …) – aus 1.2.0.
+- **Solltemperatur und Heizstatus-Icon als Badges** sowie die Editor-Korrekturen für leere
+  Eingabefelder und unvollständige Zahlen – aus 1.1.3.
+- **Punktierte Feuchtekurve** über `chart_humidity_line_style: dotted` – aus 1.1.4.
+
+### Technisch
+
+- Neuer Wächter `tests/version.test.ts`: Die CHANGELOG-Reihenfolge muss streng absteigend sein,
+  der oberste Eintrag muss zu `package.json` passen, die Version muss im ausgelieferten Bundle
+  und in der README stehen. Genau diese Prüfung hätte die falsche Reihenfolge verhindert.
+
+## [1.2.0] – 2026-10-29
+
+### Geändert
+
+- **Neue Optik nach dem modernen Layout der Dashboard-Wetterkarte:** flächiger Verlauf
+  (Blau → Indigo im Dunkelmodus, Weiß → kühles Grau im Hellmodus), zwei radiale Farbschleier,
+  eingesetzte Hairline über dem Verlauf, weichere Schatten mit innerem Lichtreflex.
+- **Badges als Kacheln:** transluzente Fläche, farbiger Ring und dezenter Glow statt dünner
+  Rahmen – Fenster offen (Amber), Bewegung erkannt (Mint), inaktiv neutral.
+- **Typografie:** Raumname größer und halbfett, Isttemperatur standardmäßig **42 px**
+  (vorher ≈ 30 px), Luftfeuchte **28 px** (vorher ≈ 21 px), Einheiten und Tropfen-Icon
+  skalieren in `em` mit.
+- **Verlauf:** 2,1 px Linie, etwas kräftigere Verlaufsfläche, Halo-Punkt am aktuellen Wert,
+  feineres Gitter, weitere Laufweite bei den Zeitlabels.
+
+### Hinzugefügt
+
+- **Messwerte unabhängig gestaltbar:** `temperature_font_size`, `temperature_font_family`,
+  `humidity_font_size`, `humidity_font_family` (14–96 px bzw. freie CSS-Schriftartliste).
+  Eigener Editor-Abschnitt **Messwerte (Schrift)** mit je zwei Feldern pro Messwert.
+- Schriftarten werden validiert (keine `;`/Klammern-Ausbrüche), leere Werte erben die
+  Theme-Schrift; die Kartenhöhe wächst mit der gewählten Schriftgröße.
+- README: neuer Abschnitt **Optik**, Optionstabelle für die Messwerte, Beispiele ergänzt.
+
 ## [1.1.4] – 2026-10-29
 
 ### Hinzugefügt
@@ -47,30 +96,6 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
   im Icon-Farbcode (rot/grün/grau).
 - Dichte-Stufe `xs` skaliert die Badges auf 24 px; `preferredCardHeight` berücksichtigt die
   höhere Statuszeile.
-
-## [1.2.0] – 2026-10-29
-
-### Geändert
-
-- **Neue Optik nach dem modernen Layout der Dashboard-Wetterkarte:** flächiger Verlauf
-  (Blau → Indigo im Dunkelmodus, Weiß → kühles Grau im Hellmodus), zwei radiale Farbschleier,
-  eingesetzte Hairline über dem Verlauf, weichere Schatten mit innerem Lichtreflex.
-- **Badges als Kacheln:** transluzente Fläche, farbiger Ring und dezenter Glow statt dünner
-  Rahmen – Fenster offen (Amber), Bewegung erkannt (Mint), inaktiv neutral.
-- **Typografie:** Raumname größer und halbfett, Isttemperatur standardmäßig **42 px**
-  (vorher ≈ 30 px), Luftfeuchte **28 px** (vorher ≈ 21 px), Einheiten und Tropfen-Icon
-  skalieren in `em` mit.
-- **Verlauf:** 2,1 px Linie, etwas kräftigere Verlaufsfläche, Halo-Punkt am aktuellen Wert,
-  feineres Gitter, weitere Laufweite bei den Zeitlabels.
-
-### Hinzugefügt
-
-- **Messwerte unabhängig gestaltbar:** `temperature_font_size`, `temperature_font_family`,
-  `humidity_font_size`, `humidity_font_family` (14–96 px bzw. freie CSS-Schriftartliste).
-  Eigener Editor-Abschnitt **Messwerte (Schrift)** mit je zwei Feldern pro Messwert.
-- Schriftarten werden validiert (keine `;`/Klammern-Ausbrüche), leere Werte erben die
-  Theme-Schrift; die Kartenhöhe wächst mit der gewählten Schriftgröße.
-- README: neuer Abschnitt **Optik**, Optionstabelle für die Messwerte, Beispiele ergänzt.
 
 ## [1.1.2] – 2026-10-29
 
@@ -173,3 +198,4 @@ Erste stabile Version.
 - Entwicklungsumgebung mit klar gekennzeichneten Testdaten, Showcase-Renderer für die README.
 - 156 automatisierte Tests (Vitest/jsdom), Typecheck und Produktionsbuild.
 - GitHub-Actions-Workflows für Build/Test und Release, HACS-Validierung.
+
