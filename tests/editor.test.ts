@@ -229,6 +229,107 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Kartenhöhe').disabled).toBe(false);
   });
 
+  it('keeps manual height when the height field is cleared', async () => {
+    const editor = await mountEditor({ ...baseConfig, height: 320 });
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Höhe automatisch (Inhalt)').value).toBe(false);
+
+    // The user selects the value and deletes it completely.
+    selectorByLabel(editor, 'Kartenhöhe').emit(undefined);
+    await editor.updateComplete;
+    openAll(editor);
+
+    expect(editor.config.height).toBe(320);
+    expect(selectorByLabel(editor, 'Höhe automatisch (Inhalt)').value).toBe(false);
+    expect(selectorByLabel(editor, 'Kartenhöhe').value).toBe('');
+
+    // Same for an empty string, which some selector versions emit.
+    selectorByLabel(editor, 'Kartenhöhe').emit('');
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(320);
+    expect(selectorByLabel(editor, 'Höhe automatisch (Inhalt)').value).toBe(false);
+  });
+
+  it('does not commit partial numbers but keeps them visible', async () => {
+    const editor = await mountEditor({ ...baseConfig, height: 300 });
+    openAll(editor);
+
+    // Typing "2" on the way to "260" must not clamp to 140 and must not commit.
+    selectorByLabel(editor, 'Kartenhöhe').emit(2);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(300);
+    expect(selectorByLabel(editor, 'Kartenhöhe').value).toBe(2);
+
+    // A complete, in-range number is committed and the draft is dropped.
+    selectorByLabel(editor, 'Kartenhöhe').emit(260);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(260);
+    expect(selectorByLabel(editor, 'Kartenhöhe').value).toBe(260);
+  });
+
+  it('accepts decimal commas from the number field', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    selectorByLabel(editor, 'Warm ab').emit('24,5');
+    await editor.updateComplete;
+    expect(editor.config.temperature_warm_above).toBe(24.5);
+  });
+
+  it('never drops a stored value when a field is emptied', async () => {
+    const editor = await mountEditor({ ...baseConfig, border_radius: 22, humidity_decimals: 2 });
+    openAll(editor);
+    selectorByLabel(editor, 'Eckenradius').emit(undefined);
+    selectorByLabel(editor, 'Dezimalstellen Luftfeuchte').emit('');
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.border_radius).toBe(22);
+    expect(editor.config.humidity_decimals).toBe(2);
+    expect(selectorByLabel(editor, 'Eckenradius').value).toBe('');
+  });
+
+  it('removes text keys when a text field is cleared', async () => {
+    const editor = await mountEditor({
+      ...baseConfig,
+      name: 'Wohnzimmer',
+      temperature_font_family: 'Inter',
+    });
+    openAll(editor);
+    selectorByLabel(editor, 'Raumname').emit('');
+    selectorByLabel(editor, 'Schriftart Temperatur').emit(undefined);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.name).toBeUndefined();
+    expect(editor.config.temperature_font_family).toBeUndefined();
+    expect(selectorByLabel(editor, 'Raumname').value).toBe('');
+  });
+
+  it('restores the last manual height when automatic height is switched off', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    selectorByLabel(editor, 'Höhe automatisch (Inhalt)').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(240);
+
+    selectorByLabel(editor, 'Kartenhöhe').emit(380);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(380);
+
+    selectorByLabel(editor, 'Höhe automatisch (Inhalt)').emit(true);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe('auto');
+
+    selectorByLabel(editor, 'Höhe automatisch (Inhalt)').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.height).toBe(380);
+  });
+
   it('converts colour selector values to hex strings', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

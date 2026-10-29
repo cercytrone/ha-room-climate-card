@@ -282,7 +282,25 @@ interface FieldOptions {
   disabled?: boolean;
   helper?: string;
   warning?: string;
+  /** Reset an unfinished draft when focus leaves the field. */
+  revertOnLeave?: boolean;
   onChange?: (value: unknown) => void;
+}
+
+/**
+ * Parses what a Home Assistant number selector hands back. Returns `null` for
+ * "nothing usable right now" – an empty field, a lone minus sign or the value
+ * `undefined` that `ha-selector` emits while the user is still typing.
+ */
+export function parseEditorNumber(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim().replace(',', '.');
+    if (!trimmed || trimmed === '-' || trimmed === '.') return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 export class RoomClimateCardEditor extends LitElement {
@@ -290,13 +308,22 @@ export class RoomClimateCardEditor extends LitElement {
     hass: { attribute: false },
     _config: { state: true },
     _selectorsReady: { state: true },
+    _drafts: { state: true },
   };
 
   hass?: HomeAssistant;
   _config: RoomClimateCardConfig = { type: `custom:${CARD_TAG}` };
   _selectorsReady = false;
+  /**
+   * Values the user is currently typing. A field may show `''` (or a partial
+   * number) without that ever reaching the configuration – clearing a field
+   * must not delete the stored value or flip a related switch.
+   */
+  _drafts: Record<string, unknown> = {};
 
   private openSections = new Set<SectionId>(['general', 'sensors']);
+  /** Remembers the last manual height so "auto off" can restore it. */
+  private lastManualHeight = 240;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -312,6 +339,9 @@ export class RoomClimateCardEditor extends LitElement {
   }
 
   setConfig(config: unknown): void {
+    // A fresh configuration (e.g. YAML edited outside the editor) wins over
+    // half-typed drafts.
+    this._drafts = {};
     this._config =
       config && typeof config === 'object'
         ? ({ ...(config as RoomClimateCardConfig), type: (config as RoomClimateCardConfig).type ?? `custom:${CARD_TAG}` })
@@ -325,6 +355,27 @@ export class RoomClimateCardEditor extends LitElement {
   private get text(): EditorText {
     const language = baseLanguage(this.hass?.locale?.language ?? this.hass?.language);
     return TEXT[language];
+  }
+
+  /** Value shown in a field: the draft while editing, otherwise the config. */
+  private shownValue(key: string, fallbackValue: unknown): unknown {
+    return Object.prototype.hasOwnProperty.call(this._drafts, key)
+      ? this._drafts[key]
+      : fallbackValue;
+  }
+
+  private setDraft(key: string, value: unknown): void {
+    if (Object.prototype.hasOwnProperty.call(this._drafts, key) && this._drafts[key] === value) {
+      return;
+    }
+    this._drafts = { ...this._drafts, [key]: value };
+  }
+
+  private clearDraft(key: string): void {
+    if (!Object.prototype.hasOwnProperty.call(this._drafts, key)) return;
+    const next = { ...this._drafts };
+    delete next[key];
+    this._drafts = next;
   }
 
   private patch(patch: Record<string, unknown>): void {
@@ -349,6 +400,17 @@ export class RoomClimateCardEditor extends LitElement {
 
   private showFlag(showKey: string, entityKey: string): boolean {
     return this.rawBoolean(showKey) ?? Boolean(asEntityId(this._config[entityKey]));
+  }
+
+  /**
+   * Height to use when "automatic height" is switched off again: the value the
+   * user last entered, or the stored manual height, or a sensible default.
+   */
+  private manualHeight(): number {
+    const stored = this._config.height;
+    const parsed = typeof stored === 'number' ? stored : Number(stored);
+    if (Number.isFinite(parsed) && parsed > 0) this.lastManualHeight = parsed;
+    return this.lastManualHeight;
   }
 
   private numberValue(key: string, fallback: number): number {
@@ -387,12 +449,19 @@ export class RoomClimateCardEditor extends LitElement {
   }
 
   private renderField(options: FieldOptions): TemplateResult {
-    return html`<div class="field ${options.disabled ? 'is-disabled' : ''}">
+    return html`<div
+      class="field ${options.disabled ? 'is-disabled' : ''}"
+      @focusout=${() => {
+        // Leaving the field with an empty or incomplete draft: show the stored
+        // value again instead of an input that looks broken forever.
+        if (options.revertOnLeave) this.clearDraft(options.key);
+      }}
+    >
       <ha-selector
         .hass=${this.hass}
         .selector=${options.selector}
         .label=${options.label}
-        .value=${options.value}
+        .value=${this.shownValue(options.key, options.value)}
         .disabled=${Boolean(options.disabled)}
         @value-changed=${(event: CustomEvent<{ value: unknown }>) => {
           event.stopPropagation();
@@ -424,6 +493,89 @@ export class RoomClimateCardEditor extends LitElement {
       onChange: (value) => {
         if (options.onChange) options.onChange(Boolean(value));
         else this.patch({ [options.key]: Boolean(value) });
+      },
+    });
+  }
+
+  /**
+   * Numeric field. Intermediate states stay local (`_drafts`) instead of being
+   * written to the configuration:
+   *
+   * - clearing the field keeps the stored value and never flips a related switch
+   * - typing "2" on the way to "260" does not commit an out-of-range value
+   * - only a complete, in-range number is committed
+   */
+  private renderNumber(options: {
+    key: string;
+    label: string;
+    min: number;
+    max: number;
+    step: number;
+    unit?: string;
+    fallback: number;
+    disabled?: boolean;
+    helper?: string;
+    onChange?: (value: number) => void;
+  }): TemplateResult {
+    return this.renderField({
+      key: options.key,
+      label: options.label,
+      selector: {
+        number: {
+          min: options.min,
+          max: options.max,
+          step: options.step,
+          mode: 'box',
+          ...(options.unit ? { unit_of_measurement: options.unit } : {}),
+        },
+      },
+      value: this.numberValue(options.key, options.fallback),
+      disabled: options.disabled,
+      helper: options.helper,
+      revertOnLeave: true,
+      onChange: (raw) => {
+        const parsed = parseEditorNumber(raw);
+        if (parsed === null) {
+          // Empty or partial input: keep it visible, change nothing in the config.
+          this.setDraft(options.key, raw === undefined || raw === null ? '' : raw);
+          return;
+        }
+        if (parsed < options.min || parsed > options.max) {
+          this.setDraft(options.key, raw);
+          return;
+        }
+        this.clearDraft(options.key);
+        if (options.onChange) options.onChange(parsed);
+        else this.patch({ [options.key]: parsed });
+      },
+    });
+  }
+
+  /** Text field. Clearing it removes the key so the card default applies. */
+  private renderText(options: {
+    key: string;
+    label: string;
+    fallback?: string;
+    helper?: string;
+    disabled?: boolean;
+  }): TemplateResult {
+    return this.renderField({
+      key: options.key,
+      label: options.label,
+      selector: { text: {} },
+      value: this.stringValue(options.key, options.fallback ?? ''),
+      disabled: options.disabled,
+      helper: options.helper,
+      onChange: (raw) => {
+        const text = typeof raw === 'string' ? raw : '';
+        if (text.trim().length) {
+          this.clearDraft(options.key);
+          this.patch({ [options.key]: text });
+        } else {
+          // Keep the empty draft visible while typing, drop the key itself.
+          this.setDraft(options.key, '');
+          this.patch({ [options.key]: undefined });
+        }
       },
     });
   }
@@ -465,13 +617,7 @@ export class RoomClimateCardEditor extends LitElement {
   private renderGeneral(t: EditorText): TemplateResult {
     const autoHeight = !this._config.height || this._config.height === 'auto';
     return html`<div class="hint">${t.generalHelper}</div>
-      ${this.renderField({
-        key: 'name',
-        label: t.name,
-        selector: { text: {} },
-        value: this.stringValue('name'),
-        helper: t.nameHelper,
-      })}
+      ${this.renderText({ key: 'name', label: t.name, helper: t.nameHelper })}
       ${this.renderField({
         key: 'name_entity',
         label: t.nameEntity,
@@ -489,21 +635,36 @@ export class RoomClimateCardEditor extends LitElement {
         key: 'auto_height',
         label: t.autoHeight,
         value: autoHeight,
-        onChange: (value) => this.patch({ height: value ? 'auto' : 240 }),
+        onChange: (value) => {
+          // The switch alone decides between automatic and manual height; the
+          // number field never turns "auto" back on while it is being edited.
+          this.clearDraft('height');
+          this.patch({ height: value ? 'auto' : this.manualHeight() });
+        },
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'height',
         label: t.height,
-        selector: { number: { min: 140, max: 900, step: 4, mode: 'box', unit_of_measurement: 'px' } },
-        value: this.numberValue('height', 240),
+        min: 140,
+        max: 900,
+        step: 4,
+        unit: 'px',
+        fallback: 240,
         disabled: autoHeight,
         helper: t.heightHelper,
+        onChange: (value) => {
+          this.lastManualHeight = value;
+          this.patch({ height: value });
+        },
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'border_radius',
         label: t.radius,
-        selector: { number: { min: 0, max: 40, step: 1, mode: 'box', unit_of_measurement: 'px' } },
-        value: this.numberValue('border_radius', 18),
+        min: 0,
+        max: 40,
+        step: 1,
+        unit: 'px',
+        fallback: 18,
       })}
       ${this.renderField({
         key: 'theme',
@@ -535,17 +696,21 @@ export class RoomClimateCardEditor extends LitElement {
         selector: { entity: { domain: 'sensor', multiple: false } },
         value: this.stringValue('humidity_entity'),
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'temperature_decimals',
         label: t.temperatureDecimals,
-        selector: { number: { min: 0, max: 3, step: 1, mode: 'box' } },
-        value: this.numberValue('temperature_decimals', 1),
+        min: 0,
+        max: 3,
+        step: 1,
+        fallback: 1,
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'humidity_decimals',
         label: t.humidityDecimals,
-        selector: { number: { min: 0, max: 3, step: 1, mode: 'box' } },
-        value: this.numberValue('humidity_decimals', 0),
+        min: 0,
+        max: 3,
+        step: 1,
+        fallback: 0,
       })}`;
   }
 
@@ -555,52 +720,63 @@ export class RoomClimateCardEditor extends LitElement {
    */
   private renderTypography(t: EditorText): TemplateResult {
     return html`<div class="hint">${t.readingSizeHelper}</div>
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'temperature_font_size',
         label: t.temperatureSize,
-        selector: { number: { min: 14, max: 96, step: 1, mode: 'box', unit_of_measurement: 'px' } },
-        value: this.numberValue('temperature_font_size', 42),
+        min: 14,
+        max: 96,
+        step: 1,
+        unit: 'px',
+        fallback: 42,
       })}
-      ${this.renderField({
+      ${this.renderText({
         key: 'temperature_font_family',
         label: t.temperatureFont,
-        selector: { text: {} },
-        value: this.stringValue('temperature_font_family'),
         helper: t.readingFontHelper,
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'humidity_font_size',
         label: t.humiditySize,
-        selector: { number: { min: 14, max: 96, step: 1, mode: 'box', unit_of_measurement: 'px' } },
-        value: this.numberValue('humidity_font_size', 28),
+        min: 14,
+        max: 96,
+        step: 1,
+        unit: 'px',
+        fallback: 28,
       })}
-      ${this.renderField({
+      ${this.renderText({
         key: 'humidity_font_family',
         label: t.humidityFont,
-        selector: { text: {} },
-        value: this.stringValue('humidity_font_family'),
         helper: t.readingFontHelper,
       })}`;
   }
 
   private renderColors(t: EditorText): TemplateResult {
-    return html`${this.renderField({
+    return html`${this.renderNumber({
         key: 'temperature_cool_below',
         label: t.coolBelow,
-        selector: { number: { min: -30, max: 50, step: 0.5, mode: 'box', unit_of_measurement: '°C' } },
-        value: this.numberValue('temperature_cool_below', 19),
+        min: -30,
+        max: 50,
+        step: 0.5,
+        unit: '°C',
+        fallback: 19,
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'temperature_warm_above',
         label: t.warmAbove,
-        selector: { number: { min: -20, max: 60, step: 0.5, mode: 'box', unit_of_measurement: '°C' } },
-        value: this.numberValue('temperature_warm_above', 25),
+        min: -20,
+        max: 60,
+        step: 0.5,
+        unit: '°C',
+        fallback: 25,
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'temperature_hot_above',
         label: t.hotAbove,
-        selector: { number: { min: -10, max: 70, step: 0.5, mode: 'box', unit_of_measurement: '°C' } },
-        value: this.numberValue('temperature_hot_above', 28),
+        min: -10,
+        max: 70,
+        step: 0.5,
+        unit: '°C',
+        fallback: 28,
       })}
       ${this.renderColor({ key: 'temperature_cool_color', label: t.coolColor, fallback: DEFAULT_COLORS.cool })}
       ${this.renderColor({
@@ -611,17 +787,23 @@ export class RoomClimateCardEditor extends LitElement {
       ${this.renderColor({ key: 'temperature_warm_color', label: t.warmColor, fallback: DEFAULT_COLORS.warm })}
       ${this.renderColor({ key: 'temperature_hot_color', label: t.hotColor, fallback: DEFAULT_COLORS.hot })}
       ${this.renderColor({ key: 'humidity_color', label: t.humidityColor, fallback: DEFAULT_COLORS.humidity })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'humidity_low_threshold',
         label: t.humidityLow,
-        selector: { number: { min: 0, max: 100, step: 1, mode: 'box', unit_of_measurement: '%' } },
-        value: this.numberValue('humidity_low_threshold', 35),
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: '%',
+        fallback: 35,
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'humidity_high_threshold',
         label: t.humidityHigh,
-        selector: { number: { min: 0, max: 100, step: 1, mode: 'box', unit_of_measurement: '%' } },
-        value: this.numberValue('humidity_high_threshold', 65),
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: '%',
+        fallback: 65,
       })}
       ${this.renderColor({
         key: 'humidity_low_color',
@@ -787,11 +969,14 @@ export class RoomClimateCardEditor extends LitElement {
           this.patch({ chart_hours: Number.isFinite(hours) ? hours : 6 });
         },
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'chart_height',
         label: t.chartHeight,
-        selector: { number: { min: 40, max: 240, step: 4, mode: 'box', unit_of_measurement: 'px' } },
-        value: this.numberValue('chart_height', 84),
+        min: 40,
+        max: 240,
+        step: 4,
+        unit: 'px',
+        fallback: 84,
         disabled: !anyChart,
       })}
       ${this.renderField({
@@ -826,11 +1011,14 @@ export class RoomClimateCardEditor extends LitElement {
         helper: t.gapHelper,
         onChange: (value) => this.patch({ chart_gap_mode: String(value) }),
       })}
-      ${this.renderField({
+      ${this.renderNumber({
         key: 'chart_max_gap_minutes',
         label: t.maxGap,
-        selector: { number: { min: 5, max: 720, step: 5, mode: 'box', unit_of_measurement: 'min' } },
-        value: this.numberValue('chart_max_gap_minutes', 120),
+        min: 5,
+        max: 720,
+        step: 5,
+        unit: 'min',
+        fallback: 120,
         disabled: !anyChart || this.stringValue('chart_gap_mode', 'connect') === 'break',
       })}
       ${this.renderField({

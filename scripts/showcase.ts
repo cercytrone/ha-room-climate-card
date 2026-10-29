@@ -266,38 +266,56 @@ function renderCard(options: CardOptions): string {
     })
     .join('');
 
-  const setpointLabel = 'SOLL';
-  const setpointX = options.hvacColor ? 26 : 0;
-  // "SOLL" at 9.5 px with letter-spacing ≈ 29 px advance, plus breathing room.
-  const labelWidth = 34;
-  const valueX = setpointX + labelWidth;
-  const valueWidth = approxWidth(options.setpoint ?? '', 16) - (options.setpoint ?? '').length * 0.2;
-  const unitX = valueX + valueWidth + 2.5;
-  const setpointRow =
+  /*
+   * Status row: heating-mode badge + setpoint badge. Both use the same surface
+   * as the window/motion badges (30 px, radius 11, tinted fill, coloured ring).
+   */
+  const chipHeight = 30;
+  const chipRadius = 11;
+  const rowY = y + 56;
+  const labelWidth = 29; // "SOLL" at 9.5 px with 0.66 px letter-spacing
+  const valueWidth = approxWidth(options.setpoint ?? '', 17);
+  const chipWidth = 11 + labelWidth + 5 + valueWidth + 3 + 17 + 11;
+  const hvacBadge = options.hvacColor
+    ? `<g transform="translate(${x + pad},${rowY})">
+        <rect x="0" y="0" width="${chipHeight}" height="${chipHeight}" rx="${chipRadius}" fill="${
+          options.hvacColor
+        }24" stroke="${options.hvacColor}57" stroke-width="1" />
+        <path d="M 11 1.5 H 19" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+        <g transform="translate(6.4,6.4)" fill="none" stroke="${
+          options.hvacColor
+        }" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <g transform="scale(0.72)">${iconPath('flame')}</g>
+        </g>
+      </g>`
+    : '';
+  const setpointChipX = x + pad + (options.hvacColor ? chipHeight + 6 : 0);
+  const setpointChip =
     options.setpoint !== undefined
-      ? `<g transform="translate(${x + pad},${y + 64})">
-          ${
-            options.hvacColor
-              ? `<rect x="0" y="0" width="20" height="20" rx="7" fill="${options.hvacColor}24" stroke="${options.hvacColor}52" stroke-width="1" />
-                 <g transform="translate(4,4)" fill="none" stroke="${options.hvacColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                   <g transform="scale(0.5)">${iconPath('flame')}</g>
-                 </g>`
-              : ''
-          }
-          <text x="${setpointX}" y="9.6" ${font(9.5, 600)} fill="${COLORS.muted}" letter-spacing="0.66">${setpointLabel}</text>
-          <text x="${valueX}" y="10.5" ${font(16, 600)} fill="${COLORS.text}" letter-spacing="-0.2">${escapeXml(
-            options.setpoint
-          )}</text>
-          <text x="${unitX}" y="10.5" ${font(10.9)} fill="${COLORS.muted}">°C</text>
-          ${
-            options.hvacMode
-              ? `<text x="${unitX + 20}" y="9.6" ${font(9.5)} fill="${COLORS.muted}">${escapeXml(
-                  options.hvacMode
-                )}</text>`
-              : ''
-          }
+      ? `<g transform="translate(${setpointChipX},${rowY})">
+          <rect x="0" y="0" width="${chipWidth.toFixed(1)}" height="${chipHeight}" rx="${chipRadius}" fill="rgba(100,116,139,0.14)" stroke="rgba(148,197,255,0.22)" stroke-width="1" />
+          <path d="M 11 1.5 H ${(chipWidth - 11).toFixed(1)}" stroke="rgba(255,255,255,0.07)" stroke-width="1" />
+          <text x="11" y="${chipHeight / 2 + 3.4}" ${font(9.5, 600)} fill="${
+            COLORS.muted
+          }" letter-spacing="0.66">SOLL</text>
+          <text x="${11 + labelWidth + 5}" y="${chipHeight / 2 + 5.2}" ${font(
+            17,
+            500
+          )} fill="${COLORS.text}" letter-spacing="-0.2">${escapeXml(options.setpoint)}</text>
+          <text x="${11 + labelWidth + 5 + valueWidth + 3}" y="${
+            chipHeight / 2 + 5.2
+          }" ${font(10.9)} fill="${COLORS.muted}">°C</text>
         </g>`
       : '';
+  const modeChip = options.hvacMode
+    ? `<g transform="translate(${setpointChipX + (options.setpoint ? chipWidth + 6 : 0)},${rowY})">
+        <rect x="0" y="0" width="${approxWidth(options.hvacMode, 10) + 20}" height="${chipHeight}" rx="${chipRadius}" fill="rgba(100,116,139,0.1)" stroke="rgba(148,197,255,0.22)" stroke-width="1" />
+        <text x="10" y="${chipHeight / 2 + 3.6}" ${font(10)} fill="${COLORS.muted}">${escapeXml(
+          options.hvacMode
+        )}</text>
+      </g>`
+    : '';
+  const setpointRow = `${hvacBadge}${setpointChip}${modeChip}`;
 
   // Humidity: right aligned, its own font size (28 px) and unit (13 px).
   const humRight = x + CARD_W - pad;
