@@ -50,7 +50,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Luftfeuchte** | Prozentwert (Standard 28 px) mit eigener Farbwelt und optionalen Grenzwerten (trocken/feucht). Schriftgröße und Schriftart werden **unabhängig von der Temperatur** eingestellt – Standard bleibt bewusst kleiner als die Temperatur. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
-| **Thermostat** | Optional. Solltemperatur oberhalb der Isttemperatur; der Heizstatus wird nur durch die Farbe des Flammen-Icons davor gezeigt (rot = heizt, grün = ruht, grau = aus), optional zusätzlich der HVAC-Modus. |
+| **Thermostat** | Optional. Solltemperatur und Heizstatus-Icon sitzen als **Badges** in derselben Optik wie Fenster- und Bewegungs-Badge. Der Status steckt nur in der Farbe des Icons (rot = heizt, grün = ruht, grau = aus), optional zusätzlich der HVAC-Modus als Chip. |
 | **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende, Gitter, Datenpunkte. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Modernes, flächiges Design mit Farbverlauf, Farbschleiern, Badge-Kacheln mit farbigem Ring und Halo am aktuellen Messpunkt – vollständig in Hell und Dunkel. |
@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.2.0`.
+  `ROOM-CLIMATE-CARD v1.1.3`.
 
 ---
 
@@ -216,9 +216,9 @@ Empfehlung**.
 | --- | --- | --- | --- |
 | `show_thermostat` | boolean | automatisch | Thermostatzeile anzeigen. |
 | `climate_entity` | entity | – | Climate-Entität. |
-| `show_setpoint` | boolean | `true` | Solltemperatur oberhalb der Isttemperatur anzeigen. |
-| `show_hvac_status` | boolean | `true` | Status-Icon (Flamme) vor der Solltemperatur anzeigen. |
-| `show_hvac_mode` | boolean | `false` | HVAC-Modus zusätzlich als Text anzeigen. |
+| `show_setpoint` | boolean | `true` | Solltemperatur als Badge oberhalb der Isttemperatur anzeigen. |
+| `show_hvac_status` | boolean | `true` | Status-Icon (Flamme) als Badge vor der Solltemperatur anzeigen. |
+| `show_hvac_mode` | boolean | `false` | HVAC-Modus zusätzlich als Chip in derselben Zeile anzeigen. |
 | `heating_color` | color | `#ef4444` (rot) | Icon-Farbe, wenn die Heizung läuft. |
 | `heating_idle_color` | color | `#34d399` (grün) | Icon-Farbe, wenn die Heizung aktiv, aber ohne Heizanforderung ist. |
 | `heating_off_color` | color | `#64748b` (grau) | Icon-Farbe bei ausgeschalteter Heizung. |
@@ -257,8 +257,13 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Farben & Grenzwerte** | Temperaturgrenzen (kühl/warm/heiß), vier Temperaturfarben, Feuchtefarbe, Feuchte-Grenzwerte und -Farben |
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
-| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur (über Istwert), Heizstatus-Icon, HVAC-Modus, drei Icon-Farben (rot/grün/grau) |
+| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur-Badge (über Istwert), Heizstatus-Icon-Badge, HVAC-Modus-Chip, drei Icon-Farben (rot/grün/grau) |
 | **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenart, Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Legende, Datenpunkte |
+
+Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
+die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
+dadurch springt der Schalter „Höhe automatisch“ nicht mehr um, wenn das Höhenfeld beim Tippen
+kurz leer ist, und Felder lassen sich vollständig leeren.
 
 Nicht benötigte Felder werden automatisch deaktiviert (z. B. Farben ohne Thermostat,
 Chart-Optionen ohne aktive Kurve). Jede Änderung löst sofort `config-changed` aus; die
@@ -346,7 +351,12 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 
 ## Heizstatus: was die Karte wirklich anzeigt
 
-Der Status steckt ausschließlich im Flammen-Icon links vor der Solltemperatur:
+Solltemperatur und Heizstatus-Icon liegen als Badges in einer Zeile direkt über der
+Isttemperatur – gleiche Fläche, gleicher Radius, gleicher farbiger Ring wie Fenster- und
+Bewegungs-Badge im Kopf. Das Sollwert-Badge fasst Beschriftung, Wert und Einheit zusammen
+(`SOLL 22,0 °C`), das Icon-Badge zeigt nur das Symbol.
+
+Der Status steckt ausschließlich in der Farbe des Flammen-Icons:
 
 | Icon | Bedeutung | Bedingung |
 | --- | --- | --- |
@@ -398,6 +408,7 @@ heating_off_color: '#64748b'    # grau, wenn ausgeschaltet ist
 | Linie wirkt an einer Stelle „gerade“ | Dort wurde ein kurzer Ausfall überbrückt (Standard: durchgezogen). Mit `chart_gap_style: dashed` wird der Abschnitt als überbrückt markiert. |
 | Thermostat-Icon bleibt grau/gestrichelt | Die Integration liefert kein `hvac_action`. Bewusst kein erfundenes „Heizt“ – der Tooltip nennt den Grund. |
 | Icon-Farbe passt nicht | `heating_color`, `heating_idle_color`, `heating_off_color` im Editor setzen. |
+| Feld im Editor lässt sich nicht leeren / Schalter springt um | Behoben in 1.1.3: Eingaben sind jetzt Entwürfe, leere Zwischenstände ändern die Konfiguration nicht. |
 | Änderungen im Editor erscheinen nicht | Browser-Cache: Hard-Reload; Versionsparameter an der Ressourcen-URL ergänzen. |
 | Karte nach Update unverändert | HACS-Update durchführen, danach HA-Frontend neu laden und Browser-Cache leeren. |
 
@@ -429,7 +440,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 196 Tests in 10 Dateien aus (Stand 1.2.0):
+`npm test` führt 204 Tests in 10 Dateien aus (Stand 1.1.3):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
@@ -438,8 +449,8 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
 | `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Legende, Punkte, Gitter |
-| `tests/card.test.ts` | Rendering, Formatierung, Farben, unabhängige Schriftgrößen/-arten je Messwert, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
-| `tests/editor.test.ts` | Abschnitte, Selektoren, Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
+| `tests/card.test.ts` | Rendering, Formatierung, Farben, unabhängige Schriftgrößen/-arten je Messwert, Sollwert-/Heiz-Icon-Badges, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
+| `tests/editor.test.ts` | Abschnitte, Selektoren, Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |
 | `tests/dev-playground.test.ts` | Entwicklungsumgebung inkl. Editor↔Vorschau-Verdrahtung |

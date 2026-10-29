@@ -4,6 +4,33 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.3] – 2026-10-29
+
+### Behoben
+
+- **Leere Eingabefelder im visuellen Editor:** Wurde ein Zahlenfeld vollständig geleert, schrieb
+  der Editor sofort `undefined` in die Konfiguration. Bei der Kartenhöhe fiel sie dadurch auf
+  „automatisch“ zurück – der Schalter sprang um. Alle Zahlen- und Textfelder arbeiten jetzt mit
+  einem lokalen Entwurf: Ein leeres oder unvollständiges Feld bleibt sichtbar, ohne die
+  Konfiguration zu verändern (Feld verlassen setzt den gespeicherten Wert zurück).
+- **Unvollständige Zahlen wurden übernommen:** Beim Tippen von „260“ wurde die Zwischenstufe „2“
+  auf den Mindestwert geklemmt und gespeichert. Jetzt wird nur ein vollständiger, gültiger Wert
+  übernommen; Dezimalkommas (`24,5`) werden akzeptiert.
+- **„Höhe automatisch“ merkt sich den manuellen Wert:** Beim Zurückschalten wird die zuletzt
+  eingegebene Höhe wiederhergestellt statt eines festen 240-px-Werts.
+- **Textfelder lassen sich leeren:** Ein geleertes Textfeld (Raumname, Schriftart) entfernt den
+  Schlüssel, statt den alten Wert zu behalten.
+
+### Geändert
+
+- **Solltemperatur und Heizstatus-Icon als Badges:** Beide sitzen jetzt in derselben Optik wie
+  Fenster- und Bewegungs-Badge (30 px, Radius 11, transluzente Fläche, farbiger Ring,
+  Lichtreflex). Das Sollwert-Badge fasst `SOLL`, Wert und Einheit zu einer Kachel zusammen; der
+  optionale HVAC-Modus erscheint als Chip in derselben Zeile. Die Information bleibt unverändert
+  im Icon-Farbcode (rot/grün/grau).
+- Dichte-Stufe `xs` skaliert die Badges auf 24 px; `preferredCardHeight` berücksichtigt die
+  höhere Statuszeile.
+
 ## [1.2.0] – 2026-10-29
 
 ### Geändert

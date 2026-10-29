@@ -462,7 +462,8 @@ export function hasStatusRow(config: ResolvedConfig): boolean {
 export function preferredCardHeight(config: ResolvedConfig): number {
   if (config.height) return config.height;
   const chartHeight = hasChart(config) ? config.chart.height + 26 : 0;
-  const statusRow = hasStatusRow(config) ? 26 : 0;
+  // Badge height (30 px) plus its top margin.
+  const statusRow = hasStatusRow(config) ? 38 : 0;
   // The readings dominate the header; larger fonts should not shrink the card.
   const readings = Math.max(config.typography.temperature.fontSize, config.typography.humidity.fontSize);
   return 62 + Math.round(readings * 0.98) + chartHeight + statusRow;

@@ -553,13 +553,15 @@ export class RoomClimateCard extends LitElement {
         ? `${formatNumber(thermostat.setpoint, language, config.temperatureDecimals)} ${thermostat.unit}`
         : '';
 
+    // Both the heating-mode icon and the setpoint live in badges, exactly like
+    // the window and motion badges in the header.
     return html`<div class="setpoint-row">
       ${showStatus
         ? html`<span
-            class="hvac-icon is-${thermostat.colorKey} status-${thermostat.status}"
-            style="--hvac-color:${color};--hvac-tint:${withAlpha(color, 0.14)};--hvac-ring:${withAlpha(
+            class="badge hvac-icon is-${thermostat.colorKey} status-${thermostat.status}"
+            style="--badge-color:${color};--badge-bg:${withAlpha(color, 0.14)};--badge-border:${withAlpha(
               color,
-              0.32
+              0.34
             )}"
             role="img"
             aria-label="${statusLabel}"
@@ -568,7 +570,7 @@ export class RoomClimateCard extends LitElement {
           >`
         : nothing}
       ${showSetpoint
-        ? html`<span class="setpoint" title="${t.t('setpoint')} ${setpointText}">
+        ? html`<span class="badge setpoint" title="${t.t('setpoint')} ${setpointText}">
             <span class="setpoint-label">${t.t('setpoint')}</span>
             <span class="setpoint-value"
               >${formatNumber(thermostat.setpoint as number, language, config.temperatureDecimals)}</span
@@ -786,15 +788,21 @@ export class RoomClimateCard extends LitElement {
       gap: 6px;
       flex: none;
     }
+    /*
+     * Shared badge surface. Square badges (window, motion, heating mode) and the
+     * wider setpoint badge use the same radius, fill, ring and inner highlight.
+     */
     .badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 30px;
+      gap: 5px;
+      box-sizing: border-box;
       height: 30px;
+      min-width: 30px;
       border-radius: 11px;
       color: var(--badge-color, var(--rcc-neutral));
-      background: var(--badge-bg, transparent);
+      background: var(--badge-bg, rgba(100, 116, 139, 0.12));
       border: 1px solid var(--badge-border, var(--rcc-border));
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
       transition:
@@ -803,8 +811,15 @@ export class RoomClimateCard extends LitElement {
         border-color 0.18s ease,
         box-shadow 0.18s ease;
     }
+    .badge.window,
+    .badge.motion,
+    .badge.hvac-icon {
+      width: 30px;
+      padding: 0;
+    }
     .badge.window.is-open,
-    .badge.motion.is-active {
+    .badge.motion.is-active,
+    .badge.hvac-icon.is-heating {
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
         0 8px 18px -12px var(--badge-color);
@@ -887,31 +902,15 @@ export class RoomClimateCard extends LitElement {
       align-items: center;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 6px;
-      min-height: 18px;
+      margin-top: 8px;
+      min-height: 30px;
     }
     .hvac-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
       flex: none;
-      width: 20px;
-      height: 20px;
-      border-radius: 7px;
-      color: var(--hvac-color, var(--rcc-muted));
-      background: var(--hvac-tint, transparent);
-      border: 1px solid var(--hvac-ring, transparent);
-      transition:
-        color 0.18s ease,
-        background-color 0.18s ease,
-        border-color 0.18s ease;
     }
     .hvac-icon .icon {
-      width: 12px;
-      height: 12px;
-    }
-    .hvac-icon.is-heating {
-      filter: drop-shadow(0 0 4px var(--hvac-ring, transparent));
+      width: 17px;
+      height: 17px;
     }
     /* Unknown / unavailable: never look like a confident state. */
     .hvac-icon.is-unknown,
@@ -927,10 +926,10 @@ export class RoomClimateCard extends LitElement {
     .hvac-icon.status-missing .icon {
       opacity: 0.7;
     }
+    /* Setpoint badge: same surface, wider, so label and value sit as one chip. */
     .setpoint {
-      display: inline-flex;
+      padding: 0 11px;
       align-items: baseline;
-      gap: 3px;
       min-width: 0;
       font-variant-numeric: tabular-nums;
       color: var(--rcc-muted);
@@ -941,24 +940,30 @@ export class RoomClimateCard extends LitElement {
       letter-spacing: 0.07em;
       text-transform: uppercase;
       opacity: 0.85;
+      align-self: center;
     }
     .setpoint-value {
-      font-size: 1rem;
+      font-size: 1.0625rem;
       font-weight: 500;
       line-height: 1;
       color: var(--rcc-text);
       letter-spacing: -0.01em;
     }
     .setpoint-unit {
+      margin-left: -2px;
       font-size: 0.68rem;
       font-weight: 400;
     }
     .mode-label {
-      font-size: 9.5px;
-      line-height: 1.2;
-      padding: 1px 6px;
-      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      box-sizing: border-box;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 11px;
+      font-size: 10px;
       color: var(--rcc-muted);
+      background: rgba(100, 116, 139, 0.1);
       border: 1px solid var(--rcc-border);
       white-space: nowrap;
     }
@@ -1036,19 +1041,35 @@ export class RoomClimateCard extends LitElement {
       font-size: calc(var(--rcc-hum-size, 28px) * 0.72);
     }
     .density-xs .setpoint-row {
-      margin-top: 3px;
+      margin-top: 5px;
       gap: 5px;
+      min-height: 24px;
     }
-    .density-xs .hvac-icon {
-      width: 17px;
-      height: 17px;
+    .density-xs .badge {
+      height: 24px;
+      min-width: 24px;
+      border-radius: 9px;
     }
+    .density-xs .badge.window,
+    .density-xs .badge.motion,
+    .density-xs .badge.hvac-icon {
+      width: 24px;
+    }
+    .density-xs .badge .icon,
     .density-xs .hvac-icon .icon {
-      width: 11px;
-      height: 11px;
+      width: 14px;
+      height: 14px;
+    }
+    .density-xs .setpoint {
+      padding: 0 9px;
     }
     .density-xs .setpoint-value {
-      font-size: 0.85rem;
+      font-size: 0.9rem;
+    }
+    .density-xs .mode-label {
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 9px;
     }
     .density-xs .subtle {
       display: none;
