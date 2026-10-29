@@ -946,10 +946,15 @@ export class RoomClimateCard extends LitElement {
       text-transform: uppercase;
       opacity: 0.85;
     }
-    /* Value and unit keep a shared baseline with each other. */
+    /*
+     * Value and unit are centred on their own optical middle instead of sharing
+     * a baseline. On a shared baseline the small degree-Celsius unit (10.9 px)
+     * sits about 2 px lower than the 17 px number, which reads as slipped down.
+     */
     .setpoint-reading {
       display: inline-flex;
-      align-items: baseline;
+      align-items: center;
+      gap: 2px;
       min-width: 0;
     }
     .setpoint-value {
@@ -960,7 +965,6 @@ export class RoomClimateCard extends LitElement {
       letter-spacing: -0.01em;
     }
     .setpoint-unit {
-      margin-left: 1px;
       font-size: 0.68rem;
       font-weight: 400;
       line-height: 1;

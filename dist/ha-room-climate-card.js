@@ -1,4 +1,4 @@
-const R = "room-climate-card", Z = "room-climate-card-editor", Jt = "Room Climate Card", Qt = "Raumklima auf einen Blick: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlauf.", ei = "1.2.2";
+const R = "room-climate-card", Z = "room-climate-card-editor", Jt = "Room Climate Card", Qt = "Raumklima auf einen Blick: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlauf.", ei = "1.2.3";
 const ue = globalThis, Ee = ue.ShadowRoot && (ue.ShadyCSS === void 0 || ue.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, Me = /* @__PURE__ */ Symbol(), Je = /* @__PURE__ */ new WeakMap();
 let Et = class {
   constructor(e, t, i) {
@@ -36,7 +36,7 @@ const ti = (r) => new Et(typeof r == "string" ? r : r + "", void 0, Me), He = (r
   for (const i of e.cssRules) t += i.cssText;
   return ti(t);
 })(r) : r;
-const { is: ri, defineProperty: ni, getOwnPropertyDescriptor: si, getOwnPropertyNames: oi, getOwnPropertySymbols: ai, getPrototypeOf: li } = Object, fe = globalThis, et = fe.trustedTypes, hi = et ? et.emptyScript : "", ci = fe.reactiveElementPolyfillSupport, se = (r, e) => r, ke = { toAttribute(r, e) {
+const { is: ri, defineProperty: ni, getOwnPropertyDescriptor: si, getOwnPropertyNames: oi, getOwnPropertySymbols: ai, getPrototypeOf: li } = Object, fe = globalThis, et = fe.trustedTypes, hi = et ? et.emptyScript : "", ci = fe.reactiveElementPolyfillSupport, se = (r, e) => r, Ce = { toAttribute(r, e) {
   switch (e) {
     case Boolean:
       r = r ? hi : null;
@@ -64,7 +64,7 @@ const { is: ri, defineProperty: ni, getOwnPropertyDescriptor: si, getOwnProperty
       }
   }
   return t;
-} }, Mt = (r, e) => !ri(r, e), tt = { attribute: !0, type: String, converter: ke, reflect: !1, useDefault: !1, hasChanged: Mt };
+} }, Mt = (r, e) => !ri(r, e), tt = { attribute: !0, type: String, converter: Ce, reflect: !1, useDefault: !1, hasChanged: Mt };
 Symbol.metadata ??= /* @__PURE__ */ Symbol("metadata"), fe.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
 let q = class extends HTMLElement {
   static addInitializer(e) {
@@ -163,14 +163,14 @@ let q = class extends HTMLElement {
   _$ET(e, t) {
     const i = this.constructor.elementProperties.get(e), n = this.constructor._$Eu(e, i);
     if (n !== void 0 && i.reflect === !0) {
-      const s = (i.converter?.toAttribute !== void 0 ? i.converter : ke).toAttribute(t, i.type);
+      const s = (i.converter?.toAttribute !== void 0 ? i.converter : Ce).toAttribute(t, i.type);
       this._$Em = e, s == null ? this.removeAttribute(n) : this.setAttribute(n, s), this._$Em = null;
     }
   }
   _$AK(e, t) {
     const i = this.constructor, n = i._$Eh.get(e);
     if (n !== void 0 && this._$Em !== n) {
-      const s = i.getPropertyOptions(n), o = typeof s.converter == "function" ? { fromAttribute: s.converter } : s.converter?.fromAttribute !== void 0 ? s.converter : ke;
+      const s = i.getPropertyOptions(n), o = typeof s.converter == "function" ? { fromAttribute: s.converter } : s.converter?.fromAttribute !== void 0 ? s.converter : Ce;
       this._$Em = n;
       const l = o.fromAttribute(t, s.type);
       this[n] = l ?? this._$Ej?.get(n) ?? l, this._$Em = null;
@@ -515,8 +515,8 @@ const $i = ["on", "open", "opening", "tilted", "gekippt"], xi = ["off", "closed"
 }, ht = {
   temperature: 42,
   humidity: 28
-}, ct = { min: 14, max: 96 }, Si = /^[a-z0-9_]+\.[a-z0-9_]+$/, ki = /^[-a-zA-Z0-9 ,'"_.()]+$/;
-function Ci(r) {
+}, ct = { min: 14, max: 96 }, Si = /^[a-z0-9_]+\.[a-z0-9_]+$/, Ci = /^[-a-zA-Z0-9 ,'"_.()]+$/;
+function ki(r) {
   return typeof r == "object" && r !== null;
 }
 function L(r) {
@@ -544,7 +544,7 @@ function z(r, e) {
 }
 function dt(r) {
   const e = J(r);
-  if (!(!e || e.length > 120) && ki.test(e))
+  if (!(!e || e.length > 120) && Ci.test(e))
     return e;
 }
 function ut(r, e) {
@@ -556,7 +556,7 @@ function Ai(r) {
   return Array.isArray(r) ? r.map((e) => typeof e == "string" ? e.trim().toLowerCase() : "").filter((e) => e.length > 0) : typeof r == "string" ? r.split(",").map((e) => e.trim().toLowerCase()).filter((e) => e.length > 0) : [];
 }
 function Ei(r) {
-  const e = Ci(r) ? r : {}, t = L(e.temperature_entity), i = L(e.humidity_entity), n = L(e.window_entity), s = L(e.motion_entity), o = L(e.climate_entity), l = L(e.name_entity), a = Mi(e), h = Ai(e.window_open_states), d = A(e.show_window) ?? !!n, c = A(e.show_motion) ?? !!s, w = A(e.show_thermostat) ?? !!o, g = A(e.show_temperature_chart) ?? !!t, b = A(e.show_humidity_chart) ?? !!i, x = e.height, y = x === "auto" || x === void 0 || x === null || x === 0 ? null : E(x, 120, 2e3, 0) || null, S = e.theme === "dark" || e.theme === "light" || e.theme === "auto" ? e.theme : "auto", _ = e.chart_curve === "linear" ? "linear" : "smooth", D = e.chart_gap_mode === "break" ? "break" : "connect", K = e.chart_gap_style === "dashed" ? "dashed" : "solid", T = e.chart_humidity_line_style === "dotted" ? "dotted" : "solid";
+  const e = ki(r) ? r : {}, t = L(e.temperature_entity), i = L(e.humidity_entity), n = L(e.window_entity), s = L(e.motion_entity), o = L(e.climate_entity), l = L(e.name_entity), a = Mi(e), h = Ai(e.window_open_states), d = A(e.show_window) ?? !!n, c = A(e.show_motion) ?? !!s, w = A(e.show_thermostat) ?? !!o, g = A(e.show_temperature_chart) ?? !!t, b = A(e.show_humidity_chart) ?? !!i, x = e.height, y = x === "auto" || x === void 0 || x === null || x === 0 ? null : E(x, 120, 2e3, 0) || null, S = e.theme === "dark" || e.theme === "light" || e.theme === "auto" ? e.theme : "auto", _ = e.chart_curve === "linear" ? "linear" : "smooth", D = e.chart_gap_mode === "break" ? "break" : "connect", K = e.chart_gap_style === "dashed" ? "dashed" : "solid", T = e.chart_humidity_line_style === "dotted" ? "dotted" : "solid";
   return {
     raw: e,
     name: J(e.name),
@@ -802,13 +802,13 @@ const Di = {
     fan_only: "Fan only"
   }
 }, Oi = Di;
-function Ce(r) {
+function ke(r) {
   return (r ?? "en").toLowerCase().startsWith("de") ? "de" : "en";
 }
 function Ni(r) {
-  const e = Ce(r) === "de" ? Oi : Fi;
+  const e = ke(r) === "de" ? Oi : Fi;
   return {
-    language: Ce(r),
+    language: ke(r),
     t(t) {
       return e[t];
     },
@@ -1088,35 +1088,35 @@ class er {
     this.cache.clear(), this.inflight.clear();
   }
 }
-const C = (r) => f`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${r}</svg>`, H = {
-  thermometer: () => C(f`<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z" /><path d="M12 16.5v-6" />`),
-  water: () => C(f`<path d="M12 3.2c2.6 2.9 5.2 5.9 5.2 9.1a5.2 5.2 0 0 1-10.4 0c0-3.2 2.6-6.2 5.2-9.1Z" />`),
-  windowClosed: () => C(
+const k = (r) => f`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${r}</svg>`, H = {
+  thermometer: () => k(f`<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z" /><path d="M12 16.5v-6" />`),
+  water: () => k(f`<path d="M12 3.2c2.6 2.9 5.2 5.9 5.2 9.1a5.2 5.2 0 0 1-10.4 0c0-3.2 2.6-6.2 5.2-9.1Z" />`),
+  windowClosed: () => k(
     f`<rect x="3.5" y="4" width="17" height="16" rx="2" /><path d="M12 4v16M3.5 12h17" />`
   ),
-  windowOpen: () => C(
+  windowOpen: () => k(
     f`<path d="M4 4.5h11.5V20H4z" /><path d="M15.5 7.5 20.5 4v16l-5-3.5" /><path d="M7.5 8.5h4" />`
   ),
-  motion: () => C(
+  motion: () => k(
     f`<circle cx="13" cy="4.4" r="1.9" /><path d="M10 21l2.6-5.6 3 1.9 2.2-4.6" /><path d="M7.4 13.4l3.4-2.7.9-3.4-3-1-2.8 3.6" />`
   ),
-  motionOff: () => C(
+  motionOff: () => k(
     f`<circle cx="13" cy="4.4" r="1.9" /><path d="M10 21l2.6-5.6 3 1.9 2.2-4.6" /><path d="M7.4 13.4l3.4-2.7.9-3.4-3-1-2.8 3.6" />`
   ),
-  flame: () => C(
+  flame: () => k(
     f`<path d="M12 21a6.3 6.3 0 0 1-6.3-6.3c0-2 .9-3.7 2.2-5.1.8-.9 2-2.1 2.7-3.4.5-.9.9-1.9 1.1-2.7.2-.7 1.1-.9 1.5-.3.8 1.3 1.8 3 2.4 4.6.5 1.2.7 2.3.7 3.2 0 1-.3 2-.8 2.8" /><path d="M12 21a3.4 3.4 0 0 1-3.4-3.4c0-1.4.8-2.5 1.7-3.5.5-.6 1-1.3 1.3-2 .1-.4.7-.4.8 0 .3.7.8 1.4 1.3 2 .9 1 1.7 2.1 1.7 3.5A3.4 3.4 0 0 1 12 21Z" />`
   ),
-  radiator: () => C(
+  radiator: () => k(
     f`<rect x="3" y="5.5" width="18" height="13" rx="2.2" /><path d="M7.5 8.5v7M12 8.5v7M16.5 8.5v7" />`
   ),
-  snowflake: () => C(f`<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9" />`),
-  fan: () => C(
+  snowflake: () => k(f`<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9" />`),
+  fan: () => k(
     f`<path d="M12 12a3 3 0 1 0 0 .01" /><path d="M12 9c0-3.5-1.6-6-4-6s-4 2-4 4.5S6 12 9 12" /><path d="M15 12c3.5 0 6-1.6 6-4s-2-4-4.5-4S12 6 12 9" /><path d="M12 15c0 3.5 1.6 6 4 6s4-2 4-4.5S18 12 15 12" /><path d="M9 12c-3.5 0-6 1.6-6 4s2 4 4.5 4S12 18 12 15" />`
   ),
-  power: () => C(f`<path d="M12 3v9" /><path d="M7.5 6.3a7 7 0 1 0 9 0" />`),
-  info: () => C(f`<circle cx="12" cy="12" r="9" /><path d="M12 11v5.5M12 7.8v.02" />`),
-  chart: () => C(f`<path d="M4 19V5" /><path d="M4 19h16" /><path d="M7.5 15.5l3.5-4 3 2.2 4.5-6" />`),
-  home: () => C(
+  power: () => k(f`<path d="M12 3v9" /><path d="M7.5 6.3a7 7 0 1 0 9 0" />`),
+  info: () => k(f`<circle cx="12" cy="12" r="9" /><path d="M12 11v5.5M12 7.8v.02" />`),
+  chart: () => k(f`<path d="M4 19V5" /><path d="M4 19h16" /><path d="M7.5 15.5l3.5-4 3 2.2 4.5-6" />`),
+  home: () => k(
     f`<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1Z" />`
   )
 }, $ = (r) => Number.isFinite(r) ? (Math.round(r * 100) / 100).toString() : "0";
@@ -1601,16 +1601,16 @@ class pr extends U {
     }) : [], Vt = lr(this.humidityColor, 0.3, 0.01), Pe = [];
     if (this.showGrid)
       for (let u = 0; u < 3; u++) {
-        const k = l + h * u / 2;
-        Pe.push(f`<line class="grid-line" x1=${d} x2=${c} y1=${k} y2=${k} />`);
+        const C = l + h * u / 2;
+        Pe.push(f`<line class="grid-line" x1=${d} x2=${c} y1=${C} y2=${C} />`);
       }
-    const Ue = s ? hr(this.start, this.end, cr(e)) : [], Kt = Ue.map((u, k) => {
-      const M = this.formatTime(u), ee = k === 0 ? "start" : k === Ue.length - 1 ? "end" : "middle";
+    const Ue = s ? hr(this.start, this.end, cr(e)) : [], Kt = Ue.map((u, C) => {
+      const M = this.formatTime(u), ee = C === 0 ? "start" : C === Ue.length - 1 ? "end" : "middle";
       return f`<text class="axis-label" x=${x(u)} y=${y} text-anchor=${ee}>
         ${M}
       </text>`;
-    }), Ve = this.curve === "smooth", Gt = this.gapStyle === "dashed", jt = "0.1 5.5", Ke = (u, k, M, ee = 2.1, G = !1) => (Gt ? sr(u) : [u.samples]).filter((te) => te.length > 1).map((te) => {
-      const j = $t(te, g, k);
+    }), Ve = this.curve === "smooth", Gt = this.gapStyle === "dashed", jt = "0.1 5.5", Ke = (u, C, M, ee = 2.1, G = !1) => (Gt ? sr(u) : [u.samples]).filter((te) => te.length > 1).map((te) => {
+      const j = $t(te, g, C);
       return f`<path
             class="series-line"
             d=${Nt(j, Ve)}
@@ -1618,7 +1618,7 @@ class pr extends U {
           />`;
     }), Wt = we.flatMap(
       (u) => Ke(u, O, `url(#${this.uid}-temp-stroke)`)
-    ), Ge = (u, k) => u.filter((M) => M.samples.length > 1).map((M) => ar($t(M.samples, g, k), a, Ve)).join(" "), je = Ge(we, O), qt = je ? [f`<path d=${je} style="fill:url(#${this.uid}-temp-fill)" />`] : [], We = this.humidityLineStyle === "dotted", Zt = _e.flatMap(
+    ), Ge = (u, C) => u.filter((M) => M.samples.length > 1).map((M) => ar($t(M.samples, g, C), a, Ve)).join(" "), je = Ge(we, O), qt = je ? [f`<path d=${je} style="fill:url(#${this.uid}-temp-fill)" />`] : [], We = this.humidityLineStyle === "dotted", Zt = _e.flatMap(
       (u) => Ke(
         u,
         N,
@@ -1629,8 +1629,8 @@ class pr extends U {
       )
     ), qe = Ge(_e, N), Yt = qe ? [f`<path d=${qe} style="fill:url(#${this.uid}-humidity-fill)" />`] : [], Ze = [];
     if (this.showPoints) {
-      const u = (k, M, ee) => {
-        const G = k.filter((j) => j.v !== null);
+      const u = (C, M, ee) => {
+        const G = C.filter((j) => j.v !== null);
         if (!G.length) return;
         const te = Math.max(1, Math.ceil(G.length / 24));
         G.forEach((j, Ye) => {
@@ -1642,13 +1642,13 @@ class pr extends U {
         });
       };
       O && we.forEach(
-        (k) => u(
-          k.samples,
+        (C) => u(
+          C.samples,
           O,
           (M) => me(M, this.bands, this.bandColors)
         )
       ), N && _e.forEach(
-        (k) => u(k.samples, N, () => this.humidityColor)
+        (C) => u(C.samples, N, () => this.humidityColor)
       );
     }
     const B = [...De].reverse().find((u) => u.v !== null), Q = [...Fe].reverse().find((u) => u.v !== null);
@@ -1724,8 +1724,8 @@ class pr extends U {
     }
   }
 }
-const kt = "room-climate-chart";
-typeof customElements < "u" && !customElements.get(kt) && customElements.define(kt, pr);
+const Ct = "room-climate-chart";
+typeof customElements < "u" && !customElements.get(Ct) && customElements.define(Ct, pr);
 const fr = {
   de: {
     general: "Allgemein",
@@ -1933,7 +1933,7 @@ class Bt extends U {
     return this._config;
   }
   get text() {
-    const e = Ce(this.hass?.locale?.language ?? this.hass?.language);
+    const e = ke(this.hass?.locale?.language ?? this.hass?.language);
     return fr[e];
   }
   /** Value shown in a field: the draft while editing, otherwise the config. */
@@ -2641,7 +2641,7 @@ class Bt extends U {
   }
 }
 typeof customElements < "u" && !customElements.get(Z) && customElements.define(Z, Bt);
-const xe = "#fbbf24", Se = "#34d399", Ct = "var(--rcc-neutral)";
+const xe = "#fbbf24", Se = "#34d399", kt = "var(--rcc-neutral)";
 class yr extends U {
   constructor() {
     super(...arguments), this._history = {}, this._historyLoading = !1, this._density = "md", this._now = Date.now(), this._historyWindow = {
@@ -2856,7 +2856,7 @@ class yr extends U {
     return this._haIconReady ? p`<ha-icon .icon=${e.icon}></ha-icon>` : H.home();
   }
   renderMotionBadge(e, t) {
-    const i = e.status === "active", n = i ? Se : Ct, s = i ? t.t("motionDetected") : e.status === "unavailable" || e.status === "missing" ? t.t("unavailable") : t.t("motionIdle");
+    const i = e.status === "active", n = i ? Se : kt, s = i ? t.t("motionDetected") : e.status === "unavailable" || e.status === "missing" ? t.t("unavailable") : t.t("motionIdle");
     return p`<span
       class="badge motion ${i ? "is-active" : "is-idle"}"
       style="--badge-color:${n};--badge-bg:${W(
@@ -2873,7 +2873,7 @@ class yr extends U {
     const i = e.status === "open", n = e.status === "open" ? t.t("windowOpen") : e.status === "closed" ? t.t("windowClosed") : e.status === "missing" || e.status === "unavailable" ? t.t("unavailable") : t.t("windowUnknown");
     return p`<span
       class="badge window ${i ? "is-open" : ""}"
-      style="--badge-color:${i ? xe : Ct};--badge-bg:${W(
+      style="--badge-color:${i ? xe : kt};--badge-bg:${W(
       i ? xe : "#64748b",
       i ? 0.18 : 0.12
     )};--badge-border:${W(i ? xe : "#64748b", i ? 0.5 : 0.22)}"
@@ -3294,10 +3294,15 @@ class yr extends U {
       text-transform: uppercase;
       opacity: 0.85;
     }
-    /* Value and unit keep a shared baseline with each other. */
+    /*
+     * Value and unit are centred on their own optical middle instead of sharing
+     * a baseline. On a shared baseline the small degree-Celsius unit (10.9 px)
+     * sits about 2 px lower than the 17 px number, which reads as slipped down.
+     */
     .setpoint-reading {
       display: inline-flex;
-      align-items: baseline;
+      align-items: center;
+      gap: 2px;
       min-width: 0;
     }
     .setpoint-value {
@@ -3308,7 +3313,6 @@ class yr extends U {
       letter-spacing: -0.01em;
     }
     .setpoint-unit {
-      margin-left: 1px;
       font-size: 0.68rem;
       font-weight: 400;
       line-height: 1;
