@@ -1,21 +1,19 @@
 import { LitElement, css, html, nothing, svg, type TemplateResult } from 'lit';
 import { MAX_CHART_POINTS } from '../const';
-import type { TemperatureBandColors } from '../config';
 import {
   areaPath,
-  bandColorFor,
   buildSegments,
   prepareSamples,
   extent,
   linearScale,
+  movingAverage,
   padDomain,
   projectRun,
   seriesPath,
+  smoothingWindow,
   splitAtBridges,
-  temperatureGradientStops,
   tickCountForWidth,
   timeTicks,
-  verticalFadeStops,
   type ChartSample,
   type GapMode,
   type SeriesSegment,
@@ -52,7 +50,13 @@ function decimateSegment(segment: SeriesSegment, maxPoints: number): SeriesSegme
 }
 
 const FALLBACK_WIDTH = 320;
-const FALLBACK_HEIGHT = 84;
+const FALLBACK_HEIGHT = 112;
+
+/** Plot geometry, in fractions of the usable height. */
+const HUMIDITY_BAND_HEIGHT = 0.3;
+const TEMPERATURE_BAND_TOP = 0.44;
+
+export type ChartSeriesKey = 'temperature' | 'humidity';
 
 let uidCounter = 0;
 
@@ -64,18 +68,23 @@ export interface ChartLabels {
   aria: string;
   temperature: string;
   humidity: string;
+  /** Short label of the right-most axis tick. */
+  now: string;
+  /** Two-letter caption of the dashed setpoint reference line. */
+  setpoint: string;
 }
 
 export class RoomClimateChart extends LitElement {
   static properties = {
     temperature: { attribute: false },
     humidity: { attribute: false },
-    bandColors: { attribute: false },
-    bands: { attribute: false },
+    accentColor: { attribute: false },
     humidityColor: { attribute: false },
+    setpoint: { attribute: false },
+    setpointUnit: { attribute: false },
+    hiddenSeries: { attribute: false },
     start: { attribute: false },
     end: { attribute: false },
-    showLegend: { attribute: false },
     showPoints: { attribute: false },
     showGrid: { attribute: false },
     curve: { attribute: false },
@@ -97,9 +106,9 @@ export class RoomClimateChart extends LitElement {
       height: 100%;
       min-height: 0;
       position: relative;
-      --rcc-chart-label: var(--rcc-muted, #94a3b8);
-      --rcc-chart-grid: var(--rcc-text, #e2e8f0);
-      --rcc-chart-point-fill: var(--rcc-bg, #162032);
+      --rcc-chart-label: var(--rcc-tertiary, rgba(255, 255, 255, 0.32));
+      --rcc-chart-rule: var(--rcc-text, #ffffff);
+      --rcc-chart-point-fill: var(--rcc-bg, #0e1013);
     }
     :host([hidden]) {
       display: none;
@@ -110,29 +119,6 @@ export class RoomClimateChart extends LitElement {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-    }
-    .legend {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      padding: 0 14px 2px;
-      font-size: 10px;
-      line-height: 1.2;
-      color: var(--rcc-chart-label);
-      letter-spacing: 0.01em;
-    }
-    .legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-    .legend-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex: none;
     }
     svg {
       display: block;
@@ -146,15 +132,15 @@ export class RoomClimateChart extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 2px;
-      padding: 6px 16px 10px;
+      padding: 4px 0 8px;
       color: var(--rcc-chart-label);
       text-align: center;
     }
     .state-title {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       color: var(--rcc-text);
-      opacity: 0.85;
+      opacity: 0.6;
     }
     .state-hint {
       font-size: 10px;
@@ -172,41 +158,52 @@ export class RoomClimateChart extends LitElement {
       opacity: 0.7;
       margin-bottom: 2px;
     }
+    /* Reduced axis: 10.5 px at 32 % – present, never loud. */
     .axis-label {
-      font-size: 9.5px;
+      font-size: 10.5px;
+      font-weight: 400;
       fill: var(--rcc-chart-label);
       font-variant-numeric: tabular-nums;
-      letter-spacing: 0.03em;
+      font-feature-settings: 'tnum' 1;
+      letter-spacing: 0.01em;
     }
     .grid-line {
-      stroke: var(--rcc-chart-grid);
-      stroke-opacity: 0.08;
+      stroke: var(--rcc-chart-rule);
+      stroke-opacity: 0.06;
       stroke-width: 1;
-      stroke-dasharray: 2 5;
+      stroke-dasharray: 2 6;
     }
+    /* One hairline instead of a grey bar. */
     .baseline {
-      stroke: var(--rcc-chart-grid);
-      stroke-opacity: 0.16;
+      stroke: var(--rcc-chart-rule);
+      stroke-opacity: 0.1;
       stroke-width: 1;
     }
     .series-line {
       fill: none;
-      stroke-width: 2.1;
+      stroke-width: 1.9;
       stroke-linecap: round;
       stroke-linejoin: round;
       vector-effect: non-scaling-stroke;
     }
     .point {
-      stroke-width: 1.5;
-      fill: var(--rcc-chart-point-fill);
+      stroke-width: 1.4;
     }
     .end-dot {
       stroke: var(--rcc-chart-point-fill);
-      stroke-width: 1.6;
+      stroke-width: 1.4;
     }
-    /* Soft glow behind the latest value – the modern-layout accent. */
-    .end-halo {
-      opacity: 0.2;
+    .setpoint-line {
+      stroke-width: 1;
+      stroke-dasharray: 3 4;
+      vector-effect: non-scaling-stroke;
+    }
+    .setpoint-caption {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.09em;
+      fill: var(--rcc-chart-label);
+      text-transform: uppercase;
     }
     @media (prefers-reduced-motion: reduce) {
       * {
@@ -217,19 +214,19 @@ export class RoomClimateChart extends LitElement {
 
   temperature?: ChartSample[];
   humidity?: ChartSample[];
-  bandColors: TemperatureBandColors = {
-    cool: '#38bdf8',
-    comfort: '#34d399',
-    warm: '#fbbf24',
-    hot: '#f43f5e',
-  };
-  bands: { cool: number; warm: number; hot: number } = { cool: 19, warm: 25, hot: 28 };
-  humidityColor = '#34d399';
+  /** Accent of the temperature curve – the only accent of the card. */
+  accentColor = '#4FD1A5';
+  /** Subdued indigo of the humidity curve. */
+  humidityColor = '#8B86D6';
+  /** Target temperature, drawn as a dashed reference line. */
+  setpoint: number | null = null;
+  setpointUnit = '°C';
+  /** Series switched off with a click on the matching reading. */
+  hiddenSeries: ChartSeriesKey[] = [];
   start = Date.now() - 6 * 3600 * 1000;
   end = Date.now();
-  showLegend = false;
   showPoints = false;
-  showGrid = true;
+  showGrid = false;
   curve: 'smooth' | 'linear' = 'smooth';
   /** `connect` interpolates holes, `break` leaves them visible. */
   gapMode: GapMode = 'connect';
@@ -240,7 +237,7 @@ export class RoomClimateChart extends LitElement {
   /** `dotted` renders the humidity curve as a row of dots. */
   humidityLineStyle: 'solid' | 'dotted' = 'solid';
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
-  cornerRadius = 18;
+  cornerRadius = 26;
   language = 'de';
   loading = false;
   error?: string;
@@ -252,6 +249,8 @@ export class RoomClimateChart extends LitElement {
     aria: 'Verlaufsdiagramm',
     temperature: 'Temperatur',
     humidity: 'Luftfeuchte',
+    now: 'Jetzt',
+    setpoint: 'Soll',
   };
 
   private uid = `rcc-chart-${++uidCounter}`;
@@ -319,8 +318,22 @@ export class RoomClimateChart extends LitElement {
     </div>`;
   }
 
+  private isVisible(key: ChartSeriesKey): boolean {
+    return !(this.hiddenSeries ?? []).includes(key);
+  }
+
+  private get temperatureVisible(): boolean {
+    return this.isVisible('temperature') && Boolean(this.temperature?.some((s) => s.v !== null));
+  }
+
+  private get humidityVisible(): boolean {
+    return this.isVisible('humidity') && Boolean(this.humidity?.some((s) => s.v !== null));
+  }
+
   private get hasData(): boolean {
-    return Boolean(this.temperature?.some((s) => s.v !== null) || this.humidity?.some((s) => s.v !== null));
+    return Boolean(
+      this.temperature?.some((s) => s.v !== null) || this.humidity?.some((s) => s.v !== null)
+    );
   }
 
   protected render(): TemplateResult | typeof nothing {
@@ -330,49 +343,22 @@ export class RoomClimateChart extends LitElement {
     const errorIcon = svg`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>`;
     const emptyIcon = svg`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5" /><path d="M4 19h16" /><path d="M7.5 15.5l3.5-4 3 2.2 4.5-6" /></svg>`;
 
-    if (this.error && !this.hasData) {
-      return this.stateView(errorIcon, this.labels.error);
-    }
     if (!this.hasData) {
+      if (this.error) return this.stateView(errorIcon, this.labels.error);
       if (this.loading) return this.stateView(emptyIcon, this.labels.loading);
       return this.stateView(emptyIcon, this.labels.empty, this.labels.emptyHint);
     }
 
-    return html`<div class="wrap">${this.renderLegend(height)}${this.renderChart(width, height)}</div>`;
-  }
-
-  /**
-   * Legend with series names only – the current values are already the two big
-   * readings above the chart, so repeating them here was redundant.
-   */
-  private renderLegend(height: number): TemplateResult | typeof nothing {
-    if (!this.showLegend || height < 96) return nothing;
-    const items: TemplateResult[] = [];
-    if (this.temperature?.length) {
-      items.push(
-        html`<span class="legend-item"
-          ><span class="legend-dot" style="background:${this.bandColors.comfort}"></span
-          >${this.labels.temperature}</span
-        >`
-      );
-    }
-    if (this.humidity?.length) {
-      items.push(
-        html`<span class="legend-item"
-          ><span class="legend-dot" style="background:${this.humidityColor}"></span
-          >${this.labels.humidity}</span
-        >`
-      );
-    }
-    return html`<div class="legend">${items}</div>`;
+    // Both series switched off: keep the box (no layout jump), draw only the
+    // hairline baseline so the card does not look broken.
+    return html`<div class="wrap">${this.renderChart(width, height)}</div>`;
   }
 
   private renderChart(width: number, height: number): TemplateResult {
-    const legendSpace = this.showLegend && height >= 96 ? 14 : 0;
-    const chartHeight = Math.max(20, height - legendSpace);
+    const chartHeight = height;
     const showAxis = chartHeight >= 62;
-    const axisSpace = showAxis ? 16 : 2;
-    const top = 5;
+    const axisSpace = showAxis ? 20 : 2;
+    const top = 6;
     const bottom = chartHeight - axisSpace;
     const plotHeight = Math.max(6, bottom - top);
     const left = 1;
@@ -380,31 +366,51 @@ export class RoomClimateChart extends LitElement {
     const rangeMs = Math.max(1, this.end - this.start);
     const x = linearScale([this.start, this.end], [left, right]);
     // The curves may run into the rounded corners, the labels may not.
-    const cornerInset = showAxis ? Math.min(Math.max(this.cornerRadius, 0), 24) + 2 : 0;
+    const cornerInset = showAxis ? Math.min(Math.max(this.cornerRadius, 0), 30) + 2 : 0;
     const labelX = linearScale([this.start, this.end], [left + cornerInset, right - cornerInset]);
-    const labelBaseline = chartHeight - 5;
+    const labelBaseline = chartHeight - 6;
 
-    const temperatureValues = (this.temperature ?? [])
+    // Humidity owns the upper third, temperature the lower half. The two curves
+    // therefore never cross and each one stays readable on its own.
+    const humidityTop = top;
+    const humidityBottom = top + plotHeight * HUMIDITY_BAND_HEIGHT;
+    const temperatureTop = top + plotHeight * TEMPERATURE_BAND_TOP;
+    const temperatureBottom = bottom;
+
+    const visibleTemperature = this.temperatureVisible ? this.temperature ?? [] : [];
+    const visibleHumidity = this.humidityVisible ? this.humidity ?? [] : [];
+
+    const temperatureValues = visibleTemperature
       .map((sample) => sample.v)
       .filter((value): value is number => value !== null && Number.isFinite(value));
-    const humidityValues = (this.humidity ?? [])
+    const humidityValues = visibleHumidity
       .map((sample) => sample.v)
       .filter((value): value is number => value !== null && Number.isFinite(value));
 
-    const tempExtent = extent(temperatureValues);
+    const setpointValue =
+      typeof this.setpoint === 'number' && Number.isFinite(this.setpoint) ? this.setpoint : null;
+    // The target belongs to the domain: otherwise a setpoint above or below the
+    // measured range would silently drop the reference line.
+    const tempValues =
+      setpointValue !== null ? [...temperatureValues, setpointValue] : temperatureValues;
+    const tempExtent = extent(tempValues);
     const humidityExtent = extent(humidityValues);
-    const tempDomain = tempExtent ? padDomain(tempExtent[0], tempExtent[1], { minSpan: 0.8, padding: 0.14 }) : null;
+    const tempDomain = tempExtent
+      ? padDomain(tempExtent[0], tempExtent[1], { minSpan: 0.8, padding: 0.18 })
+      : null;
     const humidityDomain = humidityExtent
-      ? padDomain(humidityExtent[0], humidityExtent[1], { minSpan: 6, padding: 0.16 })
+      ? padDomain(humidityExtent[0], humidityExtent[1], { minSpan: 6, padding: 0.2 })
       : null;
 
-    const tempY = tempDomain ? linearScale(tempDomain, [bottom, top]) : null;
-    const humidityY = humidityDomain ? linearScale(humidityDomain, [bottom, top]) : null;
+    const tempY = tempDomain ? linearScale(tempDomain, [temperatureBottom, temperatureTop]) : null;
+    const humidityY = humidityDomain
+      ? linearScale(humidityDomain, [humidityBottom, humidityTop])
+      : null;
 
     // Defensive clean-up: live history may be unsorted, contain duplicates or
     // reach outside the window – all of which would draw artefacts.
-    const tempSeries = prepareSamples(this.temperature, this.start, this.end);
-    const humiditySeries = prepareSamples(this.humidity, this.start, this.end);
+    const tempSeries = prepareSamples(visibleTemperature, this.start, this.end);
+    const humiditySeries = prepareSamples(visibleHumidity, this.start, this.end);
 
     // Build segments first (holes get interpolated or stay broken), then limit
     // the point count per segment while keeping the bridge flags.
@@ -415,129 +421,115 @@ export class RoomClimateChart extends LitElement {
       gapMode: this.gapMode,
       maxGapMs: Math.max(5, this.maxGapMinutes) * 60 * 1000,
     };
-    const rawTempSegments: SeriesSegment[] = tempDomain
-      ? buildSegments(tempSeries, segmentOptions)
-      : [];
+    const rawTempSegments: SeriesSegment[] = tempDomain ? buildSegments(tempSeries, segmentOptions) : [];
     const rawHumiditySegments: SeriesSegment[] = humidityDomain
       ? buildSegments(humiditySeries, segmentOptions)
       : [];
     const segmentCount = Math.max(1, rawTempSegments.length + rawHumiditySegments.length);
     const perSegmentLimit = Math.max(60, Math.floor(MAX_CHART_POINTS / segmentCount));
-    const tempSegments = rawTempSegments.map((segment) => decimateSegment(segment, perSegmentLimit));
-    const humiditySegments = rawHumiditySegments.map((segment) =>
-      decimateSegment(segment, perSegmentLimit)
-    );
 
-    const tempGradient = tempDomain
-      ? temperatureGradientStops({
-          top,
-          bottom,
-          domain: tempDomain,
-          thresholds: this.bands,
-          colors: this.bandColors,
-          opacityTop: 1,
-          opacityBottom: 1,
-        })
-      : [];
-    const tempFillGradient = tempDomain
-      ? temperatureGradientStops({
-          top,
-          bottom,
-          domain: tempDomain,
-          thresholds: this.bands,
-          colors: this.bandColors,
-          opacityTop: 0.34,
-          opacityBottom: 0.01,
-        })
-      : [];
-    // Eased multi-stop fade: a plain two-stop ramp ends in a visible edge where
-    // the slope changes. The temperature fade is eased by its band blends below.
-    const humidityGradient = verticalFadeStops(this.humidityColor, 0.3, 0.012, 7);
+    // Denoise before projecting: a centred moving average (only for the smooth
+    // curve) plus the monotone interpolation below. Both keep the values inside
+    // the measured range – no invented peaks.
+    const smooth = this.curve === 'smooth';
+    const prepare = (segments: SeriesSegment[]): SeriesSegment[] =>
+      segments.map((segment) => {
+        const averaged = smooth
+          ? movingAverage(segment.samples, smoothingWindow(segment.samples.length))
+          : segment.samples;
+        return decimateSegment({ samples: averaged, bridged: segment.bridged }, perSegmentLimit);
+      });
+
+    const tempSegments = prepare(rawTempSegments);
+    const humiditySegments = prepare(rawHumiditySegments);
 
     const gridLines: TemplateResult[] = [];
     if (this.showGrid) {
-      for (let i = 0; i < 3; i++) {
-        const y = top + (plotHeight * i) / 2;
+      for (let i = 1; i < 3; i++) {
+        const y = top + (plotHeight * i) / 3;
         gridLines.push(svg`<line class="grid-line" x1=${left} x2=${right} y1=${y} y2=${y} />`);
       }
     }
 
-    const ticks = showAxis ? timeTicks(this.start, this.end, tickCountForWidth(width)) : [];
+    // Three ticks only: start, middle, now. Times stay readable ("Sa 05:40"),
+    // the newest point is labelled by meaning instead of by number.
+    const tickCount = showAxis ? Math.min(3, tickCountForWidth(width)) : 0;
+    const ticks = tickCount >= 2 ? timeTicks(this.start, this.end, Math.max(2, tickCount)) : [];
     const axisLabels = ticks.map((tick, index) => {
-      const label = this.formatTime(tick);
-      const anchor = index === 0 ? 'start' : index === ticks.length - 1 ? 'end' : 'middle';
+      const isLast = index === ticks.length - 1;
+      const anchor = index === 0 ? 'start' : isLast ? 'end' : 'middle';
       return svg`<text class="axis-label" x=${labelX(tick)} y=${labelBaseline} text-anchor=${anchor}>
-        ${label}
+        ${this.formatAxisLabel(tick, isLast)}
       </text>`;
     });
 
-    const smooth = this.curve === 'smooth';
-    const dashedBridges = this.gapStyle === 'dashed';
+    const projectPoints = (samples: ChartSample[], y: (value: number) => number) =>
+      projectRun(samples, x, y);
 
-    /*
-     * Dots are short dashes with round caps: 0.1 px dash + 5.5 px gap renders a
-     * clean row of round dots in every renderer (a zero-length dash is not
-     * handled consistently). Everything else stays a continuous stroke.
-     */
-    const dottedDash = '0.1 5.5';
+    const linePaths = (segment: SeriesSegment, y: (value: number) => number) => {
+      // Dashed gap style: interpolated stretches are drawn as separate paths so
+      // they can be recognised as "no measurement here".
+      const parts =
+        this.gapStyle === 'dashed' ? splitAtBridges(segment) : [segment.samples];
+      return parts
+        .filter((part) => part.length > 1)
+        .map((part) => seriesPath(projectPoints(part, y), smooth))
+        .filter((path) => path.length > 0);
+    };
 
-    /** One line path per segment – or several when bridged parts are dashed. */
-    const linePaths = (
+    const seriesElement = (
       segment: SeriesSegment,
       y: (value: number) => number,
       stroke: string,
-      strokeWidth = 2.1,
-      dashed = false
+      options: { color?: string; dashed?: boolean; width?: number } = {}
     ): TemplateResult[] => {
-      const parts = dashedBridges ? splitAtBridges(segment) : [segment.samples];
-      return parts
-        .filter((part) => part.length > 1)
-        .map((part) => {
-          const points = projectRun(part, x, y);
-          return svg`<path
-            class="series-line"
-            d=${seriesPath(points, smooth)}
-            style="stroke:${stroke};stroke-width:${strokeWidth}${dashed ? `;stroke-dasharray:${dottedDash}` : ''}"
-          />`;
-        });
+      const paths = linePaths(segment, y);
+      return paths.map((path) => {
+        const style = [
+          options.color ? `stroke:${options.color}` : `stroke:${stroke}`,
+          options.width ? `stroke-width:${options.width}` : '',
+          options.dashed ? 'stroke-dasharray:0.1 5.5' : '',
+        ]
+          .filter(Boolean)
+          .join(';');
+        return svg`<path class="series-line" d=${path} style=${style}></path>`;
+      });
     };
 
-    const tempPaths = tempSegments.flatMap((segment) =>
-      linePaths(segment, tempY!, `url(#${this.uid}-temp-stroke)`)
-    );
-    // All areas of one series live in a single <path> with sub-paths, so the
-    // gradient can never show seams where a real hole splits the data.
+    const tempPaths = smooth
+      ? tempSegments.flatMap((segment) =>
+          seriesElement(segment, tempY!, `url(#${this.uid}-temp-stroke)`)
+        )
+      : tempSegments.flatMap((segment) =>
+          seriesElement(segment, tempY!, this.accentColor, { color: this.accentColor })
+        );
+
+    // A single, very restrained area fill – only under the accent series.
     const mergedArea = (segmentsToDraw: SeriesSegment[], y: (value: number) => number): string =>
       segmentsToDraw
         .filter((segment) => segment.samples.length > 1)
-        .map((segment) => areaPath(projectRun(segment.samples, x, y), bottom, smooth))
+        .map((segment) => areaPath(projectPoints(segment.samples, y), bottom, smooth))
         .join(' ');
-    const tempAreaPath = mergedArea(tempSegments, tempY!);
+    const tempAreaPath = tempY ? mergedArea(tempSegments, tempY) : '';
     const tempAreas = tempAreaPath
       ? [svg`<path d=${tempAreaPath} style="fill:url(#${this.uid}-temp-fill)" />`]
       : [];
+
     const humidityDotted = this.humidityLineStyle === 'dotted';
     const humidityPaths = humiditySegments.flatMap((segment) =>
-      linePaths(
-        segment,
-        humidityY!,
-        this.humidityColor,
-        // Dots read better slightly thicker than an uninterrupted line.
-        humidityDotted ? 2.4 : 1.8,
-        humidityDotted
-      )
+      seriesElement(segment, humidityY!, this.humidityColor, {
+        color: this.humidityColor,
+        dashed: humidityDotted,
+        width: humidityDotted ? 2.2 : 1.9,
+      })
     );
-    const humidityAreaPath = mergedArea(humiditySegments, humidityY!);
-    const humidityAreas = humidityAreaPath
-      ? [svg`<path d=${humidityAreaPath} style="fill:url(#${this.uid}-humidity-fill)" />`]
-      : [];
 
     const pointMarkers: TemplateResult[] = [];
     if (this.showPoints) {
       const addPoints = (
         samples: ChartSample[],
         projectY: (v: number) => number,
-        colorFor: (v: number) => string
+        color: string
       ) => {
         const numeric = samples.filter((sample) => sample.v !== null);
         if (!numeric.length) return;
@@ -547,23 +539,34 @@ export class RoomClimateChart extends LitElement {
           if (index % stride !== 0 && index !== numeric.length - 1) return;
           const value = sample.v as number;
           pointMarkers.push(
-            svg`<circle class="point" r="1.9" cx=${x(sample.t)} cy=${projectY(value)} style="stroke:${colorFor(value)}" />`
+            svg`<circle class="point" r="1.7" cx=${x(sample.t)} cy=${projectY(value)} style="stroke:${color}" />`
           );
         });
       };
-      if (tempY) {
-        tempSegments.forEach((segment) =>
-          addPoints(segment.samples, tempY, (value) =>
-            bandColorFor(value, this.bands, this.bandColors)
-          )
-        );
-      }
+      if (tempY) tempSegments.forEach((segment) => addPoints(segment.samples, tempY, this.accentColor));
       if (humidityY) {
         humiditySegments.forEach((segment) =>
-          addPoints(segment.samples, humidityY, () => this.humidityColor)
+          addPoints(segment.samples, humidityY, this.humidityColor)
         );
       }
     }
+
+    // Setpoint reference: how far is the room from its target?
+    const setpointY =
+      setpointValue !== null && tempY ? tempY(setpointValue) : null;
+    const showSetpoint =
+      setpointY !== null &&
+      Number.isFinite(setpointY) &&
+      setpointY >= temperatureTop - 0.5 &&
+      setpointY <= temperatureBottom + 0.5;
+
+    // The caption goes to the end of the line where the curve keeps the most
+    // distance from the reference, so it never sits on top of the series.
+    const firstTempValue = tempSeries.find((sample) => sample.v !== null)?.v ?? null;
+    const lastTempValue = [...tempSeries].reverse().find((sample) => sample.v !== null)?.v ?? null;
+    const distance = (value: number | null) =>
+      value === null || setpointValue === null ? 0 : Math.abs(value - setpointValue);
+    const captionOnRight = distance(lastTempValue) >= distance(firstTempValue);
 
     const lastTemp = [...tempSeries].reverse().find((sample) => sample.v !== null);
     const lastHumidity = [...humiditySeries].reverse().find((sample) => sample.v !== null);
@@ -578,39 +581,42 @@ export class RoomClimateChart extends LitElement {
       focusable="false"
     >
       <defs>
-        <linearGradient id=${`${this.uid}-temp-stroke`} x1="0" y1=${top} x2="0" y2=${bottom} gradientUnits="userSpaceOnUse">
-          ${tempGradient.map(
-            (stop) =>
-              svg`<stop offset=${stop.offset} stop-color=${stop.color} stop-opacity=${stop.opacity} />`
-          )}
+        <linearGradient id=${`${this.uid}-temp-stroke`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color=${this.accentColor} stop-opacity="1" />
+          <stop offset="1" stop-color=${this.accentColor} stop-opacity="1" />
         </linearGradient>
-        <linearGradient id=${`${this.uid}-temp-fill`} x1="0" y1=${top} x2="0" y2=${bottom} gradientUnits="userSpaceOnUse">
-          ${tempFillGradient.map(
-            (stop) =>
-              svg`<stop offset=${stop.offset} stop-color=${stop.color} stop-opacity=${stop.opacity} />`
-          )}
-        </linearGradient>
-        <linearGradient id=${`${this.uid}-humidity-fill`} x1="0" y1=${top} x2="0" y2=${bottom} gradientUnits="userSpaceOnUse">
-          ${humidityGradient.map(
-            (stop) =>
-              svg`<stop offset=${stop.offset} stop-color=${stop.color} stop-opacity=${stop.opacity} />`
-          )}
+        <linearGradient id=${`${this.uid}-temp-fill`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color=${this.accentColor} stop-opacity="0.16" />
+          <stop offset="0.55" stop-color=${this.accentColor} stop-opacity="0.05" />
+          <stop offset="1" stop-color=${this.accentColor} stop-opacity="0" />
         </linearGradient>
       </defs>
       ${gridLines}
+      ${tempAreas}
+      ${showSetpoint
+        ? svg`<line
+            class="setpoint-line"
+            x1=${left}
+            x2=${right}
+            y1=${setpointY}
+            y2=${setpointY}
+            style="stroke:${this.accentColor};stroke-opacity:0.42"
+          ></line>
+          <text
+            class="setpoint-caption"
+            x=${captionOnRight ? right : left}
+            y=${setpointY - 5}
+            text-anchor=${captionOnRight ? 'end' : 'start'}
+          >
+            ${this.labels.setpoint}
+          </text>`
+        : nothing}
       <line class="baseline" x1=${left} x2=${right} y1=${bottom} y2=${bottom} />
-      ${humidityAreas} ${tempAreas} ${humidityPaths} ${tempPaths} ${pointMarkers}
+      ${humidityPaths} ${tempPaths} ${pointMarkers}
       ${lastHumidity && humidityY
         ? svg`<circle
-            class="end-halo"
-            r="7"
-            cx=${x(lastHumidity.t)}
-            cy=${humidityY(lastHumidity.v as number)}
-            style="fill:${this.humidityColor}"
-          />
-          <circle
             class="end-dot"
-            r="3"
+            r="2.6"
             cx=${x(lastHumidity.t)}
             cy=${humidityY(lastHumidity.v as number)}
             style="fill:${this.humidityColor}"
@@ -618,34 +624,45 @@ export class RoomClimateChart extends LitElement {
         : nothing}
       ${lastTemp && tempY
         ? svg`<circle
-            class="end-halo"
-            r="7.5"
-            cx=${x(lastTemp.t)}
-            cy=${tempY(lastTemp.v as number)}
-            style="fill:${bandColorFor(lastTemp.v as number, this.bands, this.bandColors)}"
-          />
-          <circle
             class="end-dot"
-            r="3.1"
+            r="2.8"
             cx=${x(lastTemp.t)}
             cy=${tempY(lastTemp.v as number)}
-            style="fill:${bandColorFor(lastTemp.v as number, this.bands, this.bandColors)}"
+            style="fill:${this.accentColor}"
           />`
         : nothing}
       ${axisLabels}
     </svg>`;
   }
 
-  private formatTime(timestamp: number): string {
+  /**
+   * Axis caption: weekday plus time for the first ticks, plain "now" for the
+   * right-most one. "Sa 05:40" is readable at a glance; "05:40" alone is not.
+   */
+  private formatAxisLabel(timestamp: number, isLast: boolean): string {
+    if (isLast) return this.labels.now;
+    return this.formatDayTime(timestamp);
+  }
+
+  private formatDayTime(timestamp: number): string {
+    const date = new Date(timestamp);
+    const locale = this.language || 'en';
+    let weekday: string;
+    let time: string;
     try {
-      return new Intl.DateTimeFormat(this.language || 'en', {
+      weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' })
+        .format(date)
+        .replace(/[.,]/g, '')
+        .trim();
+      time = new Intl.DateTimeFormat(locale, {
         hour: '2-digit',
         minute: '2-digit',
-      }).format(new Date(timestamp));
+      }).format(date);
     } catch {
-      const date = new Date(timestamp);
-      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+      weekday = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][date.getDay()];
+      time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     }
+    return weekday ? `${weekday} ${time}` : time;
   }
 }
 

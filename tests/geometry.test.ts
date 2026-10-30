@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaPath,
-  bandColorFor,
   buildRuns,
   buildSegments,
   intervalPercentile,
@@ -12,14 +11,13 @@ import {
   gapThreshold,
   linearScale,
   medianInterval,
-  mixColor,
+  movingAverage,
   padDomain,
   seriesPath,
   smoothPath,
-  temperatureGradientStops,
+  smoothingWindow,
   tickCountForWidth,
   timeTicks,
-  verticalFadeStops,
   type ChartSample,
   type Point,
 } from '../src/chart/geometry';
@@ -388,154 +386,55 @@ describe('paths', () => {
   });
 });
 
-describe('gradients', () => {
-  const colors = { cool: '#00f', comfort: '#0f0', warm: '#ff0', hot: '#f00' };
-  const thresholds = { cool: 19, warm: 25, hot: 28 };
+describe('denoising', () => {
+  const series = (values: number[]): ChartSample[] =>
+    values.map((v, i) => ({ t: i * 60_000, v }));
 
-  it('orders stops according to the temperature bands', () => {
-    const stops = temperatureGradientStops({
-      top: 0,
-      bottom: 100,
-      domain: [15, 32],
-      thresholds,
-      colors,
-    });
-    expect(stops[0].color).toBe(colors.hot);
-    expect(stops[stops.length - 1].color).toBe(colors.cool);
-    for (let i = 1; i < stops.length; i++) {
-      expect(stops[i].offset).toBeGreaterThan(stops[i - 1].offset);
+  it('smooths a jagged run with a centred moving average', () => {
+    const jagged = series([20, 22, 20, 22, 20, 22, 20]);
+    const smoothed = movingAverage(jagged, 3);
+    expect(smoothed).toHaveLength(jagged.length);
+    expect(smoothed.map((s) => s.v)).toEqual([21, 20.7, 21.3, 20.7, 21.3, 20.7, 21]);
+    // The overall level must not move – only the jitter disappears.
+    const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+    // Rounding to one decimal may shift the mean by a tenth – no more.
+    expect(Math.abs(mean(smoothed.map((s) => s.v as number)) - mean([20, 22, 20, 22, 20, 22, 20]))).toBeLessThan(0.2);
+  });
+
+  it('keeps timestamps and the newest sample exactly in place', () => {
+    const input = series([20, 21, 22, 23]);
+    const smoothed = movingAverage(input, 3);
+    expect(smoothed.map((s) => s.t)).toEqual(input.map((s) => s.t));
+    // The last sample averages only itself and its neighbour – its time stays.
+    expect(smoothed[3].v).toBe(22.5);
+    expect(smoothed[3].t).toBe(input[3].t);
+  });
+
+  it('leaves short runs and gaps untouched', () => {
+    const short = series([20, 21]);
+    expect(movingAverage(short, 5).map((s) => s.v)).toEqual([20, 21]);
+    const withNull = [{ t: 0, v: 20 }, { t: 60_000, v: null }, { t: 120_000, v: 24 }];
+    expect(movingAverage(withNull, 3).map((s) => s.v)).toEqual([20, null, 24]);
+  });
+
+  it('scales the window with the sample count and keeps it odd', () => {
+    expect(smoothingWindow(3)).toBe(1);
+    expect(smoothingWindow(10)).toBe(3);
+    expect(smoothingWindow(40)).toBe(5);
+    expect(smoothingWindow(100)).toBe(7);
+    expect(smoothingWindow(400)).toBe(9);
+    for (const count of [5, 20, 60, 160, 1000]) {
+      expect(smoothingWindow(count) % 2).toBe(1);
     }
-    const colorsSeen = new Set(stops.map((stop) => stop.color));
-    // Every band colour appears …
-    for (const color of Object.values(colors)) expect(colorsSeen.has(color)).toBe(true);
-    // … plus the blended colours in between.
-    expect(colorsSeen.size).toBeGreaterThan(Object.keys(colors).length);
   });
 
-  it('fades between two bands instead of switching colour in one pixel', () => {
-    const stops = temperatureGradientStops({
-      top: 0,
-      bottom: 200,
-      domain: [15, 32],
-      thresholds,
-      colors,
-    });
-    const comfort = stops.filter((stop) => stop.color === colors.comfort);
-    const warm = stops.filter((stop) => stop.color === colors.warm);
-    expect(comfort.length).toBeGreaterThan(0);
-    expect(warm.length).toBeGreaterThan(0);
-    // The gap between the last amber and the first green stop is the fade. It
-    // used to be 3 px; it must now be a clearly visible ramp.
-    const fadePx = (comfort[0].offset - warm[warm.length - 1].offset) * 200;
-    expect(fadePx).toBeGreaterThan(12);
-    expect(stops.filter((stop) => stop.color !== colors.comfort && stop.color !== colors.warm).length).toBeGreaterThan(2);
-  });
-
-  it('keeps two blends apart when thresholds sit close together', () => {
-    const stops = temperatureGradientStops({
-      top: 0,
-      bottom: 100,
-      domain: [24, 31],
-      thresholds: { cool: 19, warm: 25, hot: 26 },
-      colors,
-    });
-    for (let i = 1; i < stops.length; i++) {
-      expect(stops[i].offset).toBeGreaterThan(stops[i - 1].offset);
+  it('never leaves the measured range', () => {
+    const input = series([18, 19, 25, 21, 20]);
+    const smoothed = movingAverage(input, 3);
+    for (const sample of smoothed) {
+      expect(sample.v as number).toBeGreaterThanOrEqual(18);
+      expect(sample.v as number).toBeLessThanOrEqual(25);
     }
-    // 25 °C and 26 °C are only ~14 px apart, so neither blend may swallow the
-    // other band entirely: a flat stretch of each colour has to survive.
-    expect(stops.some((stop) => stop.color === colors.comfort)).toBe(true);
-    expect(stops.some((stop) => stop.color === colors.warm)).toBe(true);
-  });
-
-  it('mixes band colours in OKLab so the ramp does not dip dark', () => {
-    const luminance = (hex: string): number => {
-      const channels = [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16) / 255);
-      const [r, g, b] = channels.map((channel) =>
-        channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-      );
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-    const naiveMid = '#98c95f'; // (amber + emerald) / 2, channel by channel
-    const mixed = mixColor('#fbbf24', naiveMid, 0) as string;
-    expect(mixed).toBe('#fbbf24');
-    const start = luminance('#fbbf24');
-    const end = luminance('#34d399');
-    const middle = luminance(mixColor('#fbbf24', '#34d399', 0.5) as string);
-    expect(middle).toBeGreaterThan(Math.min(start, end));
-    expect(middle).toBeLessThan(Math.max(start, end));
-    // Plain sRGB averaging dips below both ends here – the muddy olive step
-    // that made the old narrow fade look like a seam.
-    expect(luminance(naiveMid)).toBeLessThan(Math.min(start, end));
-  });
-
-  it('leaves colours it cannot mix to the renderer', () => {
-    expect(mixColor('rgb(1, 2, 3)', '#34d399', 0.5)).toBeNull();
-    expect(mixColor('red', 'blue', 0.5)).toBeNull();
-    const stops = temperatureGradientStops({
-      top: 0,
-      bottom: 100,
-      domain: [15, 32],
-      thresholds,
-      colors: { cool: 'blue', comfort: 'green', warm: 'orange', hot: 'red' },
-    });
-    for (let i = 1; i < stops.length; i++) {
-      expect(stops[i].offset).toBeGreaterThan(stops[i - 1].offset);
-    }
-    expect(stops[0].color).toBe('red');
-  });
-
-  it('fades the area fill from top to bottom', () => {
-    const stops = temperatureGradientStops({
-      top: 0,
-      bottom: 100,
-      domain: [15, 32],
-      thresholds,
-      colors,
-      opacityTop: 0.3,
-      opacityBottom: 0,
-    });
-    expect(stops[0].opacity).toBeCloseTo(0.3, 5);
-    expect(stops[stops.length - 1].opacity).toBeCloseTo(0, 5);
-  });
-
-  it('ignores thresholds outside the visible domain', () => {
-    const stops = temperatureGradientStops({
-      top: 0,
-      bottom: 100,
-      domain: [30, 40],
-      thresholds,
-      colors,
-    });
-    expect(stops[0].color).toBe(colors.hot);
-    expect(stops[stops.length - 1].color).toBe(colors.hot);
-  });
-
-  it('creates simple vertical fades', () => {
-    expect(verticalFadeStops('#0f0', 0.4, 0)).toEqual([
-      { offset: 0, color: '#0f0', opacity: 0.4 },
-      { offset: 1, color: '#0f0', opacity: 0 },
-    ]);
-  });
-
-  it('eases a multi step fade so it has no hard edge', () => {
-    const stops = verticalFadeStops('#a78bfa', 0.3, 0, 7);
-    expect(stops).toHaveLength(7);
-    expect(stops[0]).toEqual({ offset: 0, color: '#a78bfa', opacity: 0.3 });
-    expect(stops[6]).toEqual({ offset: 1, color: '#a78bfa', opacity: 0 });
-    const opacities = stops.map((stop) => stop.opacity);
-    for (let i = 1; i < opacities.length; i++) {
-      expect(opacities[i]).toBeLessThan(opacities[i - 1]);
-    }
-    // Smoothstep: the fade starts flatter than a linear ramp (0.15 vs 0.25).
-    expect(opacities[2]).toBeGreaterThan(0.3 * (1 - 0.33));
-  });
-
-  it('picks band colours for single values', () => {
-    expect(bandColorFor(10, thresholds, colors)).toBe(colors.cool);
-    expect(bandColorFor(21, thresholds, colors)).toBe(colors.comfort);
-    expect(bandColorFor(26, thresholds, colors)).toBe(colors.warm);
-    expect(bandColorFor(30, thresholds, colors)).toBe(colors.hot);
   });
 });
 

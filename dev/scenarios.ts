@@ -18,7 +18,6 @@ export const demoScenarios: DemoScenario[] = [
       window_entity: 'binary_sensor.demo_living_window',
       motion_entity: 'binary_sensor.demo_living_motion',
       climate_entity: 'climate.demo_living_thermostat',
-      chart_show_legend: true,
       chart_show_points: true,
     },
   },

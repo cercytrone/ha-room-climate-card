@@ -11,6 +11,8 @@ const labels: ChartLabels = {
   aria: 'Verlaufsdiagramm der letzten 6 Stunden',
   temperature: 'Temperatur',
   humidity: 'Luftfeuchte',
+  now: 'Jetzt',
+  setpoint: 'Soll',
 };
 
 const now = 1_700_000_000_000;
@@ -90,55 +92,146 @@ describe('climate chart', () => {
     expect(svg.getAttribute('height')).toBe('110');
   });
 
-  it('draws temperature and humidity series with gradient fills', async () => {
+  it('draws both series in their own colour with one restrained area fill', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22, 21, 20.5]),
       humidity: samples([45, 47, 52, 55, 50]),
-      showLegend: true,
     });
     setSize(chart, 360, 130);
     await chart.updateComplete;
     const root = chart.shadowRoot!;
     expect(root.querySelectorAll('.series-line')).toHaveLength(2);
-    // jsdom lowercases type selectors, so gradients are found by attribute.
+    // Gradient definitions exist, but the stroke is a single accent colour…
     expect(root.querySelectorAll('[id$="-temp-stroke"]')).toHaveLength(1);
     expect(root.querySelectorAll('[id$="-temp-fill"]')).toHaveLength(1);
-    expect(root.querySelectorAll('[id$="-humidity-fill"]')).toHaveLength(1);
-    expect(root.querySelectorAll('stop').length).toBeGreaterThan(4);
-    expect(root.querySelectorAll('.legend-item')).toHaveLength(2);
-    expect(root.querySelectorAll('.axis-label').length).toBeGreaterThanOrEqual(2);
-    expect(root.querySelectorAll('.grid-line').length).toBe(3);
+    expect(root.querySelectorAll('stop')).toHaveLength(5);
+    // …and the humidity has no area fill at all: one gradient, one surface.
+    expect(root.querySelectorAll('[id$="-humidity-fill"]')).toHaveLength(0);
+    expect(root.querySelectorAll('path[style*="temp-fill"]')).toHaveLength(1);
+    // No legend: the colour dot lives next to the reading, not in the chart.
+    expect(root.querySelector('.legend')).toBeNull();
+    expect(root.querySelector('.legend-item')).toBeNull();
+    expect(root.querySelectorAll('.axis-label').length).toBe(3);
+    // The grid is opt-in now – by default there is only the hairline baseline.
+    expect(root.querySelectorAll('.grid-line')).toHaveLength(0);
+    expect(root.querySelectorAll('.baseline')).toHaveLength(1);
   });
 
-  it('blends the temperature bands over a wide ramp instead of a hard edge', async () => {
-    // A series that clearly crosses several bands.
+  it('colours the temperature curve with the accent and the humidity with the secondary', async () => {
     const chart = createChart({
-      temperature: samples([16, 18, 21, 24, 27, 29, 27, 24, 21, 18, 16]),
-      bands: { cool: 19, warm: 25, hot: 28 },
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      accentColor: '#4FD1A5',
+      humidityColor: '#8B86D6',
     });
-    setSize(chart, 420, 200);
+    setSize(chart, 360, 130);
     await chart.updateComplete;
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    const humidity = lines.find((line) => line.style.stroke === '#8B86D6');
+    expect(humidity).toBeDefined();
+    const stop = chart.shadowRoot!.querySelector('[id$="-temp-stroke"] stop')!;
+    expect(stop.getAttribute('stop-color')).toBe('#4FD1A5');
+    expect(stop.getAttribute('stop-opacity')).toBe('1');
+  });
 
-    const stroke = chart.shadowRoot!.querySelector('[id$="-temp-stroke"]')!;
-    const stops = Array.from(stroke.querySelectorAll('stop'));
-    // Wide fades need intermediate colours: a two-stop-per-band gradient would
-    // only produce a handful of stops.
-    expect(stops.length).toBeGreaterThan(12);
+  it('keeps the humidity in its own band above the temperature curve', async () => {
+    const chart = createChart({
+      temperature: samples([30, 30, 30, 30, 30]),
+      humidity: samples([10, 10, 10, 10, 10]),
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    const yOf = (line: SVGPathElement): number => {
+      const numbers = (line.getAttribute('d')!.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+      return numbers[1];
+    };
+    const humidityY = Math.min(...lines.map(yOf));
+    const temperatureY = Math.max(...lines.map(yOf));
+    // The two curves never touch: the humidity lives in the upper third.
+    expect(humidityY).toBeLessThan(temperatureY - 12);
+  });
 
-    const colours = new Set(stops.map((stop) => stop.getAttribute('stop-color')));
-    expect(colours.has('#38bdf8')).toBe(true);
-    expect(colours.has('#fbbf24')).toBe(true);
-    // Blended colours in between are neither of the band colours.
-    const mixed = Array.from(colours).filter(
-      (colour) => colour !== '#38bdf8' && colour !== '#fbbf24' && colour !== '#34d399' && colour !== '#f43f5e'
+  it('marks the setpoint with a dashed reference line and a caption', async () => {
+    const chart = createChart({
+      temperature: samples([18, 19, 20, 21]),
+      setpoint: 22,
+      setpointUnit: '°C',
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const line = chart.shadowRoot!.querySelector('.setpoint-line')!;
+    expect(line).not.toBeNull();
+    // Dashes come from the stylesheet, the colour from the accent.
+    expect(line.getAttribute('class')).toContain('setpoint-line');
+    expect(line.getAttribute('style')).toContain('#4FD1A5');
+    const styleText = Array.from(
+      (
+        chart.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
+      ).elementStyles ?? []
+    )
+      .map((sheet) => sheet.cssText ?? '')
+      .join('\n');
+    expect(styleText).toContain('stroke-dasharray: 3 4');
+    const caption = chart.shadowRoot!.querySelector('.setpoint-caption')!;
+    expect(caption.textContent?.trim()).toBe('Soll');
+    // The reference line sits inside the temperature band, above the baseline.
+    const y = Number(line.getAttribute('y1'));
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(130);
+  });
+
+  it('omits the setpoint line without a target value', async () => {
+    const chart = createChart({ temperature: samples([18, 19, 20, 21]) });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    expect(chart.shadowRoot!.querySelector('.setpoint-line')).toBeNull();
+  });
+
+  it('lets one series be switched off without losing the other', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      hiddenSeries: ['humidity'],
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    expect(lines).toHaveLength(1);
+    expect(lines[0].style.stroke).toContain('temp-stroke');
+    expect(chart.shadowRoot!.querySelector('.state-title')).toBeNull();
+  });
+
+  it('keeps the chart box when both series are switched off', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      hiddenSeries: ['temperature', 'humidity'],
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(0);
+    // No empty-state text: the layout must not jump when toggling.
+    expect(chart.shadowRoot!.querySelector('.state-title')).toBeNull();
+    expect(chart.shadowRoot!.querySelector('.baseline')).not.toBeNull();
+  });
+
+  it('labels the axis with day and time, and the newest tick as "Jetzt"', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      language: 'de',
+      start: new Date('2026-10-24T06:00:00Z').getTime(),
+      end: new Date('2026-10-25T06:00:00Z').getTime(),
+    });
+    setSize(chart, 420, 140);
+    await chart.updateComplete;
+    const labels = Array.from(chart.shadowRoot!.querySelectorAll('.axis-label')).map((label) =>
+      label.textContent!.trim()
     );
-    expect(mixed.length).toBeGreaterThan(2);
-
-    // Offsets stay strictly ascending, otherwise SVG ignores the later stops.
-    const offsets = stops.map((stop) => Number(stop.getAttribute('offset')));
-    for (let i = 1; i < offsets.length; i++) {
-      expect(offsets[i]).toBeGreaterThan(offsets[i - 1]);
-    }
+    expect(labels).toHaveLength(3);
+    expect(labels[2]).toBe('Jetzt');
+    // "Sa 24.10." is not helpful; a weekday plus time is.
+    expect(labels[0]).toMatch(/^[A-ZÄÖÜ][a-zäöü]? \d{2}:\d{2}$/);
   });
 
   it('draws the humidity curve as a dotted line when requested', async () => {
@@ -152,16 +245,16 @@ describe('climate chart', () => {
     const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
     expect(lines).toHaveLength(2);
 
-    // Default humidity colour of the chart is #34d399; the temperature uses a
+    // Default humidity colour is the subdued indigo; the temperature uses a
     // gradient reference, so both lines are easy to tell apart.
-    const humidityLine = lines.find((line) => line.style.stroke === '#34d399');
+    const humidityLine = lines.find((line) => line.style.stroke === '#8B86D6');
     const temperatureLine = lines.find((line) => line.style.stroke.includes('temp-stroke'));
     expect(humidityLine).toBeDefined();
     expect(humidityLine?.style.strokeDasharray).toBe('0.1 5.5');
     // The temperature curve is untouched.
     expect(temperatureLine?.style.strokeDasharray).toBe('');
-    // The area underneath stays filled, only the stroke is dotted.
-    expect(chart.shadowRoot!.querySelectorAll('path[style*="humidity-fill"]')).toHaveLength(1);
+    // The humidity has no area fill at all – only its stroke is dotted.
+    expect(chart.shadowRoot!.querySelectorAll('[id$="humidity-fill"]')).toHaveLength(0);
   });
 
   it('keeps both curves solid by default', async () => {
@@ -344,30 +437,6 @@ describe('climate chart', () => {
     setSize(chart, 320, 90);
     await chart.updateComplete;
     expect(chart.shadowRoot!.querySelectorAll('.point').length).toBeGreaterThan(0);
-  });
-
-  it('shows series names only in the legend, without repeating the values', async () => {
-    const chart = createChart({
-      temperature: samples([20, 21, 22]),
-      humidity: samples([45, 47, 52]),
-      showLegend: true,
-    });
-    setSize(chart, 360, 130);
-    await chart.updateComplete;
-    const legend = chart.shadowRoot!.querySelector('.legend')!;
-    const items = Array.from(legend.querySelectorAll('.legend-item'));
-    expect(items.map((item) => item.textContent?.trim())).toEqual(['Temperatur', 'Luftfeuchte']);
-    // The current values live in the big readings above the chart.
-    expect(legend.querySelector('.legend-value')).toBeNull();
-    expect(legend.textContent).not.toContain('°C');
-    expect(legend.textContent).not.toContain('%');
-  });
-
-  it('hides the legend on small charts', async () => {
-    const chart = createChart({ temperature: samples([20, 21]), showLegend: true });
-    setSize(chart, 320, 70);
-    await chart.updateComplete;
-    expect(chart.shadowRoot!.querySelectorAll('.legend-item')).toHaveLength(0);
   });
 
   it('renders nothing below a minimum size instead of distorting', async () => {

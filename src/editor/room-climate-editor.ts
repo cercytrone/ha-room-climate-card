@@ -43,18 +43,9 @@ interface EditorText {
   humidityFont: string;
   readingSizeHelper: string;
   readingFontHelper: string;
-  coolBelow: string;
-  warmAbove: string;
-  hotAbove: string;
-  coolColor: string;
-  comfortColor: string;
-  warmColor: string;
-  hotColor: string;
-  humidityColor: string;
-  humidityLow: string;
-  humidityHigh: string;
-  humidityLowColor: string;
-  humidityHighColor: string;
+  accentColor: string;
+  secondaryColor: string;
+  colorsHelper: string;
   showWindow: string;
   windowEntity: string;
   windowOpenStates: string;
@@ -90,7 +81,6 @@ interface EditorText {
   humidityLineDotted: string;
   humidityLineHelper: string;
   grid: string;
-  legend: string;
   points: string;
   missingEntity: string;
   loading: string;
@@ -132,18 +122,10 @@ const TEXT: Record<'de' | 'en', EditorText> = {
       'Wirkt nur auf diesen Messwert. Bei sehr kleinen Kartenhöhen wird die Größe automatisch mitskaliert.',
     readingFontHelper:
       'Leer lassen für die Schrift des Home-Assistant-Themes. Beispiele: Inter, „Roboto, sans-serif“, var(--ha-font-family-body).',
-    coolBelow: 'Kühl unter',
-    warmAbove: 'Warm ab',
-    hotAbove: 'Heiß ab',
-    coolColor: 'Farbe kühl',
-    comfortColor: 'Farbe angenehm',
-    warmColor: 'Farbe warm',
-    hotColor: 'Farbe heiß',
-    humidityColor: 'Farbe Luftfeuchte',
-    humidityLow: 'Trocken unter (%)',
-    humidityHigh: 'Feucht über (%)',
-    humidityLowColor: 'Farbe trocken',
-    humidityHighColor: 'Farbe feucht',
+    accentColor: 'Akzentfarbe (Temperatur)',
+    secondaryColor: 'Sekundärfarbe (Luftfeuchte)',
+    colorsHelper:
+      'Die Akzentfarbe markiert nur den Primärwert: Punkt am Messwert und Temperaturkurve. Die Sekundärfarbe erscheint ausschließlich am Feuchtepunkt und an der Feuchtekurve.',
     showWindow: 'Fensterstatus anzeigen',
     windowEntity: 'Fensterkontakt',
     windowOpenStates: 'Zustände für „offen“',
@@ -181,7 +163,6 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityLineHelper:
       'Nur die Feuchtekurve. Die Temperaturkurve bleibt unverändert; Fläche, Endpunkt und Farben gelten weiter.',
     grid: 'Gitternetz',
-    legend: 'Legende',
     points: 'Datenpunkte',
     missingEntity: 'Bitte eine Entität auswählen.',
     loading: 'Editor wird geladen …',
@@ -221,18 +202,10 @@ const TEXT: Record<'de' | 'en', EditorText> = {
       'Applies to this reading only. Very small card heights scale the size down automatically.',
     readingFontHelper:
       'Leave empty to use the Home Assistant theme font. Examples: Inter, "Roboto, sans-serif", var(--ha-font-family-body).',
-    coolBelow: 'Cool below',
-    warmAbove: 'Warm above',
-    hotAbove: 'Hot above',
-    coolColor: 'Cool colour',
-    comfortColor: 'Comfort colour',
-    warmColor: 'Warm colour',
-    hotColor: 'Hot colour',
-    humidityColor: 'Humidity colour',
-    humidityLow: 'Dry below (%)',
-    humidityHigh: 'Humid above (%)',
-    humidityLowColor: 'Dry colour',
-    humidityHighColor: 'Humid colour',
+    accentColor: 'Accent colour (temperature)',
+    secondaryColor: 'Secondary colour (humidity)',
+    colorsHelper:
+      'The accent marks the primary value only: the dot next to it and the temperature curve. The secondary colour is used exclusively for the humidity dot and curve.',
     showWindow: 'Show window status',
     windowEntity: 'Window contact',
     windowOpenStates: 'States considered open',
@@ -270,7 +243,6 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityLineHelper:
       'Humidity curve only. The temperature curve is unchanged; area, end marker and colours still apply.',
     grid: 'Grid lines',
-    legend: 'Legend',
     points: 'Data points',
     missingEntity: 'Please select an entity.',
     loading: 'Loading editor …',
@@ -678,7 +650,7 @@ export class RoomClimateCardEditor extends LitElement {
         max: 40,
         step: 1,
         unit: 'px',
-        fallback: 18,
+        fallback: 26,
       })}
       ${this.renderField({
         key: 'theme',
@@ -755,7 +727,7 @@ export class RoomClimateCardEditor extends LitElement {
         max: 96,
         step: 1,
         unit: 'px',
-        fallback: 28,
+        fallback: 20,
       })}
       ${this.renderText({
         key: 'humidity_font_family',
@@ -764,70 +736,18 @@ export class RoomClimateCardEditor extends LitElement {
       })}`;
   }
 
+  /** Two colours, one job each: accent for the hero, secondary for humidity. */
   private renderColors(t: EditorText): TemplateResult {
-    return html`${this.renderNumber({
-        key: 'temperature_cool_below',
-        label: t.coolBelow,
-        min: -30,
-        max: 50,
-        step: 0.5,
-        unit: '°C',
-        fallback: 19,
-      })}
-      ${this.renderNumber({
-        key: 'temperature_warm_above',
-        label: t.warmAbove,
-        min: -20,
-        max: 60,
-        step: 0.5,
-        unit: '°C',
-        fallback: 25,
-      })}
-      ${this.renderNumber({
-        key: 'temperature_hot_above',
-        label: t.hotAbove,
-        min: -10,
-        max: 70,
-        step: 0.5,
-        unit: '°C',
-        fallback: 28,
-      })}
-      ${this.renderColor({ key: 'temperature_cool_color', label: t.coolColor, fallback: DEFAULT_COLORS.cool })}
+    return html`<div class="hint">${t.colorsHelper}</div>
       ${this.renderColor({
-        key: 'temperature_comfort_color',
-        label: t.comfortColor,
-        fallback: DEFAULT_COLORS.comfort,
-      })}
-      ${this.renderColor({ key: 'temperature_warm_color', label: t.warmColor, fallback: DEFAULT_COLORS.warm })}
-      ${this.renderColor({ key: 'temperature_hot_color', label: t.hotColor, fallback: DEFAULT_COLORS.hot })}
-      ${this.renderColor({ key: 'humidity_color', label: t.humidityColor, fallback: DEFAULT_COLORS.humidity })}
-      ${this.renderNumber({
-        key: 'humidity_low_threshold',
-        label: t.humidityLow,
-        min: 0,
-        max: 100,
-        step: 1,
-        unit: '%',
-        fallback: 35,
-      })}
-      ${this.renderNumber({
-        key: 'humidity_high_threshold',
-        label: t.humidityHigh,
-        min: 0,
-        max: 100,
-        step: 1,
-        unit: '%',
-        fallback: 65,
+        key: 'accent_color',
+        label: t.accentColor,
+        fallback: DEFAULT_COLORS.accent,
       })}
       ${this.renderColor({
-        key: 'humidity_low_color',
-        label: t.humidityLowColor,
-        fallback: DEFAULT_COLORS.humidityLow,
-      })}
-      ${this.renderColor({
-        key: 'humidity_high_color',
-        label: t.humidityHighColor,
-        fallback: DEFAULT_COLORS.humidityHigh,
+        key: 'humidity_color',
+        label: t.secondaryColor,
+        fallback: DEFAULT_COLORS.humidity,
       })}`;
   }
 
@@ -1070,13 +990,7 @@ export class RoomClimateCardEditor extends LitElement {
       ${this.renderSwitch({
         key: 'chart_show_grid',
         label: t.grid,
-        value: this.rawBoolean('chart_show_grid') ?? true,
-        disabled: !anyChart,
-      })}
-      ${this.renderSwitch({
-        key: 'chart_show_legend',
-        label: t.legend,
-        value: this.rawBoolean('chart_show_legend') ?? false,
+        value: this.rawBoolean('chart_show_grid') ?? false,
         disabled: !anyChart,
       })}
       ${this.renderSwitch({

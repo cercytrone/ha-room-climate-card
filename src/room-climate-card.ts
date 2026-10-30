@@ -9,11 +9,9 @@ import {
   configEntityIds,
   hasChart,
   hasStatusRow,
-  humidityBandColor,
   normalizeConfig,
   preferredCardHeight,
   resolveName,
-  temperatureBandColor,
   type ResolvedConfig,
   type RoomClimateCardConfig,
 } from './config';
@@ -32,6 +30,7 @@ import type { HomeAssistant } from './types';
 import { formatNumber, formatRelative, withAlpha } from './utils/format';
 import { icons } from './ui/icons';
 import './chart/climate-chart';
+import type { ChartSeriesKey } from './chart/climate-chart';
 import './editor/room-climate-editor';
 
 type Density = 'xs' | 'sm' | 'md';
@@ -51,6 +50,7 @@ export class RoomClimateCard extends LitElement {
     _now: { state: true },
     _historyWindow: { state: true },
     _haIconReady: { state: true },
+    _hiddenSeries: { state: true },
   };
 
   hass?: HomeAssistant;
@@ -59,6 +59,8 @@ export class RoomClimateCard extends LitElement {
   _history: HistoryMap = {};
   _historyLoading = false;
   _historyError?: string;
+  /** Series the user switched off by clicking the matching reading. */
+  _hiddenSeries: ChartSeriesKey[] = [];
   _density: Density = 'md';
   _now = Date.now();
   _historyWindow: { start: number; end: number } = {
@@ -346,6 +348,8 @@ export class RoomClimateCard extends LitElement {
       `--rcc-chart-height:${config.chart.height}px`,
       `--rcc-temp-size:${tempType.fontSize}px`,
       `--rcc-hum-size:${humType.fontSize}px`,
+      `--rcc-accent:${config.accentColor}`,
+      `--rcc-secondary:${config.humidity.color}`,
       tempType.fontFamily ? `--rcc-temp-font:${tempType.fontFamily}` : '',
       humType.fontFamily ? `--rcc-hum-font:${humType.fontFamily}` : '',
     ]
@@ -358,8 +362,8 @@ export class RoomClimateCard extends LitElement {
       role="group"
       aria-label="${this.cellAriaLabel(config, t)}"
     >
-      ${this.renderHeader(config, t)} ${this.renderSetpointRow(config, t)}
-      ${this.renderMetrics(config, t)} ${this.renderChart(config, t)}
+      ${this.renderHeader(config, t)} ${this.renderReadings(config, t)}
+      ${this.renderClimateRow(config, t)} ${this.renderChart(config, t)}
       ${!this.hasAnyEntity(config) ? this.renderEmpty(t) : nothing}
     </div>`;
   }
@@ -474,49 +478,122 @@ export class RoomClimateCard extends LitElement {
     >`;
   }
 
-  private renderMetrics(config: ResolvedConfig, t: Translator): TemplateResult | typeof nothing {
+  /**
+   * Readings block: a caption row (label + series dot) above a single baseline
+   * row with both values. Temperature is the hero, humidity follows at half the
+   * size – both share one baseline, so nothing floats.
+   */
+  private renderReadings(config: ResolvedConfig, t: Translator): TemplateResult | typeof nothing {
     if (!config.temperatureEntity && !config.humidityEntity) return nothing;
     const language = this.language();
     const temperature = readSensor(this.hass, config.temperatureEntity, 'temperature');
     const humidity = readSensor(this.hass, config.humidityEntity, 'humidity');
+    const showTemperature = Boolean(config.temperatureEntity);
+    const showHumidity = Boolean(config.humidityEntity);
 
-    return html`<div class="metrics">
-      ${config.temperatureEntity
-        ? html`<div
-            class="metric temperature"
-            role="group"
-            aria-label="${t.t('temperature')}: ${this.sensorAria(temperature, language, config.temperatureDecimals, t)}"
-          >
-            <span
-              class="value"
-              style="color:${temperature.value !== null
-                ? temperatureBandColor(temperature.value, config)
-                : 'var(--rcc-muted)'}"
-              >${temperature.value !== null
-                ? formatNumber(temperature.value, language, config.temperatureDecimals)
-                : '–'}</span
-            ><span class="unit">${temperature.unit}</span>
-          </div>`
-        : nothing}
-      ${config.humidityEntity
-        ? html`<div
-            class="metric humidity"
-            role="group"
-            aria-label="${t.t('humidity')}: ${this.sensorAria(humidity, language, config.humidityDecimals, t)}"
-          >
-            <span class="drop-icon" aria-hidden="true">${icons.water()}</span>
-            <span
-              class="humidity-value"
-              style="color:${humidity.value !== null
-                ? humidityBandColor(humidity.value, config)
-                : 'var(--rcc-muted)'}"
-              >${humidity.value !== null
-                ? formatNumber(humidity.value, language, config.humidityDecimals)
-                : '–'}</span
-            ><span class="humidity-unit">${humidity.unit}</span>
-          </div>`
-        : nothing}
+    return html`<div class="readings">
+      <div class="reading-labels" aria-hidden="true">
+        ${showTemperature
+          ? html`<span
+              class="series-label ${this._hiddenSeries.includes('temperature') ? 'is-hidden' : ''}"
+              ><span class="series-dot" style="background:${config.accentColor}"></span
+              >${t.t('temperature')}</span
+            >`
+          : nothing}
+        ${showHumidity
+          ? html`<span
+              class="series-label ${this._hiddenSeries.includes('humidity') ? 'is-hidden' : ''}"
+              ><span class="series-dot" style="background:${config.humidity.color}"></span
+              >${t.t('humidity')}</span
+            >`
+          : nothing}
+      </div>
+      <div class="reading-values">
+        ${showTemperature
+          ? this.renderReading({
+              key: 'temperature',
+              className: 'temperature',
+              value: temperature.value,
+              unit: temperature.unit,
+              decimals: config.temperatureDecimals,
+              language,
+              ariaLabel: `${t.t('temperature')}: ${this.sensorAria(
+                temperature,
+                language,
+                config.temperatureDecimals,
+                t
+              )}`,
+              color: config.accentColor,
+              toggleable: config.chart.showTemperature,
+            })
+          : nothing}
+        ${showHumidity
+          ? this.renderReading({
+              key: 'humidity',
+              className: 'humidity',
+              value: humidity.value,
+              unit: humidity.unit,
+              decimals: config.humidityDecimals,
+              language,
+              ariaLabel: `${t.t('humidity')}: ${this.sensorAria(
+                humidity,
+                language,
+                config.humidityDecimals,
+                t
+              )}`,
+              color: config.humidity.color,
+              toggleable: config.chart.showHumidity,
+            })
+          : nothing}
+      </div>
     </div>`;
+  }
+
+  /** One measured value; the accent dot of the caption row marks its series. */
+  private renderReading(options: {
+    key: ChartSeriesKey;
+    className: string;
+    value: number | null;
+    unit: string;
+    decimals: number;
+    language: string;
+    ariaLabel: string;
+    color: string;
+    toggleable: boolean;
+  }): TemplateResult {
+    const hidden = this._hiddenSeries.includes(options.key);
+    const text =
+      options.value !== null
+        ? formatNumber(options.value, options.language, options.decimals)
+        : '–';
+    const content = html`<span class="reading-value">${text}</span
+      ><span class="reading-unit">${options.unit}</span>`;
+
+    if (!options.toggleable) {
+      return html`<span class="reading ${options.className}" style="--series-color:${options.color}">
+        <span class="reading-number" role="text" aria-label="${options.ariaLabel}">${content}</span>
+      </span>`;
+    }
+
+    // A click on the value hides or shows its curve. The state is announced via
+    // aria-pressed and mirrored by the dimmed type and the hollow series dot.
+    return html`<button
+      type="button"
+      class="reading ${options.className} ${hidden ? 'is-hidden' : ''}"
+      style="--series-color:${options.color}"
+      aria-pressed=${!hidden}
+      aria-label="${options.ariaLabel} – ${hidden ? 'Serie eingeblendet' : 'Serie ausgeblendet'}"
+      title="${hidden ? 'Serie einblenden' : 'Serie ausblenden'}"
+      @click=${() => this.toggleSeries(options.key)}
+    >
+      <span class="reading-number">${content}</span>
+    </button>`;
+  }
+
+  private toggleSeries(key: ChartSeriesKey): void {
+    this._hiddenSeries = this._hiddenSeries.includes(key)
+      ? this._hiddenSeries.filter((item) => item !== key)
+      : [...this._hiddenSeries, key];
   }
 
   private sensorAria(
@@ -530,11 +607,11 @@ export class RoomClimateCard extends LitElement {
   }
 
   /**
-   * Target temperature above the actual temperature. The heating state is
-   * conveyed only by the colour of the icon in front of it (red = heating,
-   * green = idle, grey = off), never by an extra text label.
+   * Heating row below the readings: colour-coded flame, the current HVAC action
+   * and the target temperature. Deliberately one line at one size – no badges to
+   * optically centre, nothing to misalign.
    */
-  private renderSetpointRow(
+  private renderClimateRow(
     config: ResolvedConfig,
     t: Translator
   ): TemplateResult | typeof nothing {
@@ -546,44 +623,27 @@ export class RoomClimateCard extends LitElement {
     if (!showSetpoint && !showStatus && !showMode) return nothing;
 
     const color = thermostatStatusColor(thermostat, config);
-    const statusLabel = this.thermostatAria(thermostat);
     const language = this.language();
     const setpointText =
       thermostat.setpoint !== null
-        ? `${formatNumber(thermostat.setpoint, language, config.temperatureDecimals)} ${thermostat.unit}`
+        ? `${formatNumber(thermostat.setpoint, language, config.temperatureDecimals)} ${
+            thermostat.unit
+          }`
         : '';
 
-    // Both the heating-mode icon and the setpoint live in badges, exactly like
-    // the window and motion badges in the header.
-    return html`<div class="setpoint-row">
+    return html`<div class="climate-row" role="status" aria-label="${this.thermostatAria(thermostat)}">
       ${showStatus
-        ? html`<span
-            class="badge hvac-icon is-${thermostat.colorKey} status-${thermostat.status}"
-            style="--badge-color:${color};--badge-bg:${withAlpha(color, 0.14)};--badge-border:${withAlpha(
-              color,
-              0.34
-            )}"
-            role="img"
-            aria-label="${statusLabel}"
-            title="${statusLabel}"
+        ? html`<span class="flame status-${thermostat.status}" style="color:${color}" aria-hidden="true"
             >${this.heatingIcon(thermostat)}</span
           >`
         : nothing}
+      <span class="climate-state">${showMode ? thermostat.modeLabel : thermostat.label}</span>
       ${showSetpoint
-        ? html`<span class="badge setpoint" title="${t.t('setpoint')} ${setpointText}">
-            <span class="setpoint-label">${t.t('setpoint')}</span>
-            <span class="setpoint-reading"
-              ><span class="setpoint-value"
-                >${formatNumber(
-                  thermostat.setpoint as number,
-                  language,
-                  config.temperatureDecimals
-                )}</span
-              ><span class="setpoint-unit">${thermostat.unit}</span></span
-            >
-          </span>`
+        ? html`<span class="climate-sep" aria-hidden="true">·</span>
+            <span class="climate-setpoint"
+              ><span class="climate-setpoint-label">${t.t('setpoint')}</span> ${setpointText}</span
+            >`
         : nothing}
-      ${showMode ? html`<span class="mode-label">${thermostat.modeLabel}</span>` : nothing}
     </div>`;
   }
 
@@ -622,26 +682,30 @@ export class RoomClimateCard extends LitElement {
 
     const language = this.language();
 
+    const thermostat = config.thermostat.enabled ? readThermostat(this.hass, config, t) : undefined;
     const labels = {
       empty: t.t('noHistory'),
       emptyHint: t.t('noHistoryHint'),
       loading: t.t('loadingHistory'),
       error: t.t('historyError'),
       aria: t.chartAria(config.chart.hours),
-      temperature: t.t('legendTemperature'),
-      humidity: t.t('legendHumidity'),
+      temperature: t.t('temperature'),
+      humidity: t.t('humidity'),
+      now: t.t('now'),
+      setpoint: t.t('setpoint'),
     };
 
     return html`<div class="chart-slot">
       <room-climate-chart
         .temperature=${temperatureSamples}
         .humidity=${humiditySamples}
-        .bandColors=${config.bandColors}
-        .bands=${config.bands}
+        .accentColor=${config.accentColor}
         .humidityColor=${config.humidity.color}
+        .setpoint=${thermostat?.setpoint ?? null}
+        .setpointUnit=${thermostat?.unit ?? '°C'}
+        .hiddenSeries=${this._hiddenSeries}
         .start=${this._historyWindow.start}
         .end=${this._historyWindow.end}
-        .showLegend=${config.chart.showLegend}
         .showPoints=${config.chart.showPoints}
         .showGrid=${config.chart.showGrid}
         .curve=${config.chart.curve}
@@ -661,25 +725,47 @@ export class RoomClimateCard extends LitElement {
   // -------------------------------------------------------------------- styles
 
   static styles = css`
+    /*
+     * Design tokens. Everything below is built from these values so the whole
+     * card stays on one 4 px grid and one colour set:
+     *
+     *   surface   #0E1013 (OLED friendly, never pure black)
+     *   hairline  rgba(255,255,255,0.07) – replaces hard borders
+     *   text      0.92 / 0.50 / 0.32 opacity, never pure white
+     *   accent    #4FD1A5 – the only signal, primary value + temperature curve
+     *   secondary #8B86D6 – dot and curve of the humidity, nothing else
+     */
     :host {
       display: block;
-      --rcc-bg: var(--ha-card-background, var(--card-background-color, #162032));
-      --rcc-text: var(--primary-text-color, #e7edf8);
-      --rcc-muted: var(--secondary-text-color, #93a4bd);
-      --rcc-border: var(--ha-card-border-color, var(--divider-color, rgba(148, 163, 184, 0.25)));
-      --rcc-shadow: var(--ha-card-box-shadow, 0 4px 18px rgba(2, 6, 23, 0.22));
-      --rcc-neutral: #94a3b8;
-      --rcc-radius: 18px;
-      /* Modern layered surface: the gradient sits *behind* the theme colour. */
+      --rcc-space-1: 4px;
+      --rcc-space-2: 8px;
+      --rcc-space-3: 12px;
+      --rcc-space-5: 20px;
+
+      --rcc-bg: var(--ha-card-background, var(--card-background-color, #0e1013));
       --rcc-surface: none;
-      --rcc-hairline: var(--divider-color, rgba(148, 197, 255, 0.16));
+      /* Plain values first, then a theme-aware mix, so the auto theme works
+         on light and dark dashboards without any JS. */
+      --rcc-hairline: rgba(255, 255, 255, 0.07);
+      --rcc-hairline: color-mix(in srgb, var(--primary-text-color, #ffffff) 7%, transparent);
+      --rcc-text: var(--primary-text-color, rgba(255, 255, 255, 0.92));
+      --rcc-muted: var(--secondary-text-color, rgba(255, 255, 255, 0.5));
+      --rcc-tertiary: rgba(255, 255, 255, 0.32);
+      --rcc-tertiary: color-mix(in srgb, var(--primary-text-color, #ffffff) 32%, transparent);
+      --rcc-neutral: #94a3b8;
+      --rcc-accent: #4fd1a5;
+      --rcc-secondary: #8b86d6;
+      --rcc-radius: 26px;
+
       --rcc-temp-size: 42px;
-      --rcc-hum-size: 28px;
+      --rcc-hum-size: 20px;
       --rcc-temp-font: inherit;
       --rcc-hum-font: inherit;
+
       color: var(--rcc-text);
       font-family: var(--ha-font-family-body, inherit);
       -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
     .card {
       position: relative;
@@ -688,50 +774,47 @@ export class RoomClimateCard extends LitElement {
       box-sizing: border-box;
       height: var(--rcc-height, auto);
       min-height: 0;
-      padding: 13px 16px 3px;
+      /* One inset for everything: title, values and chart share the same edge. */
+      padding: var(--rcc-space-5);
       overflow: hidden;
       background-color: var(--rcc-bg);
       background-image: var(--rcc-surface);
-      border: 1px solid var(--rcc-border);
+      border: 1px solid var(--rcc-hairline);
       border-radius: var(--rcc-radius);
-      box-shadow: var(--rcc-shadow);
+      box-shadow: 0 8px 24px -22px rgba(0, 0, 0, 0.9);
       transition:
         background-color 0.2s ease,
         border-color 0.2s ease,
         color 0.2s ease;
     }
+    /* Depth instead of a frame: a hairline plus a barely visible light gradient. */
     .card.theme-dark {
-      --rcc-bg: #101b2c;
-      --rcc-surface:
-        radial-gradient(120% 92% at 0% 0%, rgba(56, 189, 248, 0.16) 0%, rgba(56, 189, 248, 0) 58%),
-        radial-gradient(110% 85% at 100% 0%, rgba(139, 92, 246, 0.14) 0%, rgba(139, 92, 246, 0) 62%),
-        linear-gradient(158deg, #1c2d49 0%, #152238 52%, #0e1828 100%);
-      --rcc-text: #eaf0fb;
-      --rcc-muted: #93a7c2;
-      --rcc-border: rgba(148, 197, 255, 0.16);
-      --rcc-hairline: rgba(148, 197, 255, 0.14);
-      --rcc-shadow:
-        0 22px 46px -26px rgba(2, 6, 23, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-      --rcc-neutral: #94a3b8;
+      --rcc-bg: #0e1013;
+      --rcc-surface: radial-gradient(
+        140% 120% at 0% 0%,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0) 54%
+      );
+      --rcc-hairline: rgba(255, 255, 255, 0.07);
+      --rcc-text: rgba(255, 255, 255, 0.92);
+      --rcc-muted: rgba(255, 255, 255, 0.5);
+      --rcc-tertiary: rgba(255, 255, 255, 0.32);
     }
     .card.theme-light {
       --rcc-bg: #ffffff;
-      --rcc-surface:
-        radial-gradient(120% 90% at 0% 0%, rgba(56, 189, 248, 0.1) 0%, rgba(56, 189, 248, 0) 56%),
-        linear-gradient(162deg, #ffffff 0%, #f8fafc 58%, #eef3fa 100%);
-      --rcc-text: #0f172a;
-      --rcc-muted: #64748b;
-      --rcc-border: rgba(15, 23, 42, 0.08);
-      --rcc-hairline: rgba(15, 23, 42, 0.08);
-      --rcc-shadow: 0 18px 38px -26px rgba(15, 23, 42, 0.38), inset 0 1px 0 #ffffff;
-      --rcc-neutral: #94a3b8;
+      --rcc-surface: linear-gradient(160deg, #ffffff 0%, #f7f8fa 100%);
+      --rcc-hairline: rgba(15, 23, 42, 0.07);
+      --rcc-text: rgba(15, 23, 42, 0.92);
+      --rcc-muted: rgba(15, 23, 42, 0.52);
+      --rcc-tertiary: rgba(15, 23, 42, 0.34);
     }
 
+    /* ------------------------------------------------------------- header */
     .header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 8px;
+      gap: var(--rcc-space-2);
       min-height: 0;
     }
     .titles {
@@ -741,29 +824,30 @@ export class RoomClimateCard extends LitElement {
     .name-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--rcc-space-1);
       min-width: 0;
+      min-height: 28px;
     }
     .room-icon {
       display: inline-flex;
       flex: none;
-      color: var(--rcc-muted);
-      opacity: 0.9;
+      color: var(--rcc-tertiary);
     }
     .room-icon .icon {
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
     }
     .room-icon ha-icon {
-      --mdc-icon-size: 15px;
-      color: var(--rcc-muted);
+      --mdc-icon-size: 14px;
+      color: var(--rcc-tertiary);
+      display: inline-flex;
     }
     .name {
       margin: 0;
-      font-size: 1.0625rem;
+      font-size: 15px;
       font-weight: 500;
-      line-height: 1.25;
-      letter-spacing: -0.015em;
+      line-height: 20px;
+      letter-spacing: -0.012em;
       color: var(--rcc-text);
       overflow: hidden;
       display: -webkit-box;
@@ -772,11 +856,12 @@ export class RoomClimateCard extends LitElement {
       overflow-wrap: anywhere;
     }
     .subtle {
-      margin-top: 2px;
+      margin-top: var(--rcc-space-1);
       font-size: 10.5px;
-      line-height: 1.3;
-      color: var(--rcc-muted);
+      line-height: 16px;
+      color: var(--rcc-tertiary);
       font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum' 1;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -784,222 +869,211 @@ export class RoomClimateCard extends LitElement {
     .badges {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--rcc-space-1);
       flex: none;
     }
     /*
-     * Shared badge surface. Square badges (window, motion, heating mode) and the
-     * wider setpoint badge use the same radius, fill, ring and inner highlight.
+     * Shared badge surface. Square badges (window, motion) keep the same radius,
+     * hairline and tint so they read as one family.
      */
     .badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
+      gap: var(--rcc-space-1);
       box-sizing: border-box;
-      height: 30px;
-      min-width: 30px;
-      border-radius: 11px;
+      height: 28px;
+      min-width: 28px;
+      border-radius: 10px;
       color: var(--badge-color, var(--rcc-neutral));
-      background: var(--badge-bg, rgba(100, 116, 139, 0.12));
-      border: 1px solid var(--badge-border, var(--rcc-border));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      background: var(--badge-bg, rgba(148, 163, 184, 0.1));
+      border: 1px solid var(--badge-border, var(--rcc-hairline));
       transition:
         color 0.18s ease,
         background-color 0.18s ease,
-        border-color 0.18s ease,
-        box-shadow 0.18s ease;
+        border-color 0.18s ease;
     }
     .badge.window,
-    .badge.motion,
-    .badge.hvac-icon {
-      width: 30px;
+    .badge.motion {
+      width: 28px;
       padding: 0;
     }
-    .badge.window.is-open,
-    .badge.motion.is-active,
-    .badge.hvac-icon.is-heating {
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 8px 18px -12px var(--badge-color);
-    }
     .badge .icon {
-      width: 17px;
-      height: 17px;
+      width: 16px;
+      height: 16px;
     }
 
-    .metrics {
+    /* ----------------------------------------------------------- readings */
+    .readings {
       display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 8px;
-      min-height: 0;
-    }
-    .metric {
-      display: flex;
-      align-items: baseline;
+      flex-direction: column;
+      gap: var(--rcc-space-1);
+      margin-top: var(--rcc-space-3);
       min-width: 0;
     }
-    /*
-     * Temperature and humidity are sized independently. Unit and drop icon use
-     * em units, so they always scale with their own value.
-     */
-    .temperature {
-      font-size: var(--rcc-temp-size, 42px);
-      font-family: var(--rcc-temp-font, inherit);
+    .reading-labels {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--rcc-space-2);
+      min-height: 16px;
     }
-    .temperature .value {
+    /* Labels in versals with 0.09 em tracking – quiet, but unmistakable. */
+    .series-label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--rcc-space-1);
+      font-size: 10.5px;
+      font-weight: 500;
+      line-height: 16px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--rcc-muted);
+      white-space: nowrap;
+    }
+    .series-label svg,
+    .series-label .icon {
+      width: 10px;
+      height: 10px;
+      opacity: 0.7;
+    }
+    .series-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex: none;
+      transition: opacity 0.18s ease;
+    }
+    .series-label.is-hidden {
+      color: var(--rcc-tertiary);
+    }
+    .series-label.is-hidden .series-dot {
+      opacity: 0.3;
+    }
+
+    .reading-values {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--rcc-space-3);
+      min-width: 0;
+    }
+    .reading {
+      display: inline-flex;
+      align-items: baseline;
+      min-width: 0;
+      border: 0;
+      background: none;
+      /* 8 px of symmetric padding lifts the 20 px humidity value to a 36 px
+         tap target; the negative margin cancels it visually, so the shared
+         baseline of both values is untouched. */
+      padding: 8px 0;
+      margin: -8px 0;
+      color: inherit;
+      font: inherit;
+      border-radius: 8px;
+    }
+    button.reading {
+      cursor: pointer;
+      transition: opacity 0.18s ease;
+    }
+    button.reading:focus-visible {
+      outline: 2px solid var(--rcc-accent);
+      outline-offset: 2px;
+    }
+    .reading.temperature {
+      font-size: var(--rcc-temp-size);
+      font-family: var(--rcc-temp-font);
+    }
+    .reading.humidity {
+      margin-left: auto;
+      font-size: var(--rcc-hum-size);
+      font-family: var(--rcc-hum-font);
+    }
+    /* Hero: tabular figures and tight tracking, so updates never shift. */
+    .reading-number {
       font-size: 1em;
-      font-weight: 600;
-      line-height: 0.94;
+      font-weight: 500;
+      line-height: 1;
       letter-spacing: -0.035em;
       font-variant-numeric: tabular-nums;
       font-feature-settings: 'tnum' 1;
-      transition: color 0.2s ease;
+      color: var(--rcc-text);
+      white-space: nowrap;
     }
-    .temperature .unit {
-      margin-left: 0.16em;
+    .reading.humidity .reading-number {
+      letter-spacing: -0.02em;
+    }
+    /* Units are their own, smaller secondary type – they never compete. */
+    .reading-unit {
+      margin-left: 0.12em;
       font-size: 0.34em;
       font-weight: 400;
       letter-spacing: 0;
       color: var(--rcc-muted);
     }
-    .humidity {
-      gap: 0.28em;
-      align-items: baseline;
-      font-size: var(--rcc-hum-size, 28px);
-      font-family: var(--rcc-hum-font, inherit);
+    .reading.humidity .reading-unit {
+      font-size: 0.5em;
     }
-    .drop-icon {
-      display: inline-flex;
-      align-self: center;
-      color: var(--rcc-muted);
-      opacity: 0.8;
-    }
-    .drop-icon .icon {
-      width: 0.66em;
-      height: 0.66em;
-    }
-    .humidity-value {
-      font-size: 1em;
-      font-weight: 500;
-      line-height: 1;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.025em;
-      font-feature-settings: 'tnum' 1;
-    }
-    .humidity-unit {
-      font-size: 0.46em;
-      font-weight: 400;
-      color: var(--rcc-muted);
-      margin-left: -0.1em;
+    .reading.is-hidden .reading-number,
+    .reading.is-hidden .reading-unit {
+      color: var(--rcc-tertiary);
     }
 
-    .setpoint-row {
+    /* --------------------------------------------------------- heating row */
+    .climate-row {
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-      min-height: 30px;
-    }
-    .hvac-icon {
-      flex: none;
-    }
-    .hvac-icon .icon {
-      width: 17px;
-      height: 17px;
-    }
-    /* Unknown / unavailable: never look like a confident state. */
-    .hvac-icon.is-unknown,
-    .hvac-icon.status-unavailable,
-    .hvac-icon.status-missing {
-      background: transparent;
-      border-style: dashed;
-      border-color: var(--rcc-border);
-      opacity: 0.8;
-    }
-    .hvac-icon.is-unknown .icon,
-    .hvac-icon.status-unavailable .icon,
-    .hvac-icon.status-missing .icon {
-      opacity: 0.7;
-    }
-    /*
-     * Everything inside the setpoint badge is centred on the badge's vertical
-     * axis: label, value and unit share one optical line. Baseline alignment on
-     * the badge itself would push the flex line to the top edge of the fixed
-     * 30 px box, which made the value sit right under the upper border.
-     */
-    .setpoint {
-      padding: 0 11px;
-      align-items: center;
+      flex-wrap: nowrap;
+      gap: var(--rcc-space-1);
+      margin-top: var(--rcc-space-2);
+      min-height: 20px;
       min-width: 0;
-      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      line-height: 16px;
       color: var(--rcc-muted);
-    }
-    .setpoint-label {
-      font-size: 9.5px;
-      font-weight: 600;
-      line-height: 1;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-      opacity: 0.85;
-    }
-    /*
-     * Value and unit are centred on their own optical middle instead of sharing
-     * a baseline. On a shared baseline the small degree-Celsius unit (10.9 px)
-     * sits about 2 px lower than the 17 px number, which reads as slipped down.
-     */
-    .setpoint-reading {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      min-width: 0;
-    }
-    .setpoint-value {
-      font-size: 1.0625rem;
-      font-weight: 500;
-      line-height: 1;
-      color: var(--rcc-text);
-      letter-spacing: -0.01em;
-    }
-    .setpoint-unit {
-      font-size: 0.68rem;
-      font-weight: 400;
-      line-height: 1;
-    }
-    .mode-label {
-      display: inline-flex;
-      align-items: center;
-      box-sizing: border-box;
-      height: 30px;
-      padding: 0 10px;
-      border-radius: 11px;
-      font-size: 10px;
-      color: var(--rcc-muted);
-      background: rgba(100, 116, 139, 0.1);
-      border: 1px solid var(--rcc-border);
       white-space: nowrap;
     }
+    .flame {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+    }
+    .flame .icon {
+      width: 14px;
+      height: 14px;
+    }
+    .flame.status-unknown,
+    .flame.status-unavailable,
+    .flame.status-missing {
+      opacity: 0.5;
+    }
+    .climate-state {
+      color: var(--rcc-text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .climate-sep {
+      color: var(--rcc-tertiary);
+    }
+    .climate-setpoint {
+      color: var(--rcc-muted);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum' 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .climate-setpoint-label {
+      color: var(--rcc-tertiary);
+    }
 
+    /* -------------------------------------------------------------- chart */
     .chart-slot {
       position: relative;
       display: flex;
       flex-direction: column;
-      margin: 9px -16px 0;
+      margin-top: var(--rcc-space-3);
       min-height: 0;
-    }
-    /* Hairline divider like the reference dashboard card (inset, not full width). */
-    .chart-slot::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 16px;
-      right: 16px;
-      height: 1px;
-      background: var(--rcc-hairline);
-      pointer-events: none;
     }
     .chart-slot > room-climate-chart {
       flex: 1 1 auto;
@@ -1007,108 +1081,79 @@ export class RoomClimateCard extends LitElement {
     }
     .auto-height .chart-slot {
       flex: none;
-      height: var(--rcc-chart-height, 84px);
+      height: var(--rcc-chart-height, 112px);
     }
     .fixed-height .chart-slot {
       flex: 1 1 auto;
       min-height: 0;
     }
 
+    /* -------------------------------------------------------- empty state */
     .empty-state {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
-      padding: 6px 0 12px;
+      gap: var(--rcc-space-1);
+      padding: var(--rcc-space-2) 0 var(--rcc-space-3);
       text-align: center;
       color: var(--rcc-muted);
     }
     .empty-state .icon {
       width: 18px;
       height: 18px;
-      opacity: 0.65;
+      opacity: 0.5;
     }
     .empty-title {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 500;
       color: var(--rcc-text);
-      opacity: 0.85;
+      opacity: 0.8;
     }
     .empty-hint {
-      font-size: 10px;
+      font-size: 10.5px;
+      line-height: 16px;
       max-width: 32ch;
-      line-height: 1.35;
-      opacity: 0.75;
+      opacity: 0.7;
     }
     .empty {
-      padding: 16px;
+      padding: var(--rcc-space-5);
       font-size: 12px;
       color: var(--rcc-muted);
     }
 
-    .density-xs .metrics {
-      margin-top: 4px;
+    /* ----------------------------------------------------------- density */
+    /* Dense variant: tighten the vertical rhythm, keep the grid intact. */
+    .density-xs {
+      --rcc-space-3: 8px;
     }
-    .density-xs .temperature {
+    .density-xs .reading.temperature {
       font-size: calc(var(--rcc-temp-size, 42px) * 0.6);
     }
-    .density-xs .humidity {
-      font-size: calc(var(--rcc-hum-size, 28px) * 0.72);
-    }
-    .density-xs .setpoint-row {
-      margin-top: 5px;
-      gap: 5px;
-      min-height: 24px;
+    .density-xs .reading.humidity {
+      font-size: calc(var(--rcc-hum-size, 20px) * 0.9);
     }
     .density-xs .badge {
       height: 24px;
       min-width: 24px;
-      border-radius: 9px;
+      border-radius: 8px;
     }
     .density-xs .badge.window,
-    .density-xs .badge.motion,
-    .density-xs .badge.hvac-icon {
+    .density-xs .badge.motion {
       width: 24px;
     }
     .density-xs .badge .icon,
-    .density-xs .hvac-icon .icon {
-      width: 14px;
-      height: 14px;
-    }
-    .density-xs .setpoint {
-      padding: 0 9px;
-    }
-    .density-xs .setpoint-label {
-      font-size: 9px;
-    }
-    .density-xs .setpoint-value {
-      font-size: 0.9rem;
-    }
-    .density-xs .mode-label {
-      height: 24px;
-      padding: 0 8px;
-      border-radius: 9px;
+    .density-xs .flame .icon {
+      width: 13px;
+      height: 13px;
     }
     .density-xs .subtle {
       display: none;
     }
-    .density-sm .temperature {
+    .density-sm .reading.temperature {
       font-size: calc(var(--rcc-temp-size, 42px) * 0.82);
     }
-    .density-sm .humidity {
-      font-size: calc(var(--rcc-hum-size, 28px) * 0.88);
-    }
-    .density-xs .badge {
-      width: 24px;
-      height: 24px;
-      border-radius: 8px;
-    }
-    .density-xs .badge .icon {
-      width: 14px;
-      height: 14px;
-    }
-    .density-xs .name {
-      font-size: 0.95rem;
+    .density-sm .reading.humidity {
+      font-size: calc(var(--rcc-hum-size, 20px) * 0.95);
     }
 
     @media (prefers-reduced-motion: reduce) {

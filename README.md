@@ -46,14 +46,14 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | Bereich | Details |
 | --- | --- |
 | **Raumname** | Frei konfigurierbar, optional aus einer Entität (`name_entity`) oder dem Friendly Name des Temperatursensors, optionales Icon. Lange Namen werden zweizeilig gekürzt. |
-| **Temperatur** | Zentraler Messwert in großzügiger Schrift (Standard 42 px), Einheit aus der Entität, konfigurierbare Dezimalstellen, Farbcodierung nach vier konfigurierbaren Temperaturbereichen. Schriftgröße und Schriftart sind im Editor frei einstellbar. |
-| **Luftfeuchte** | Prozentwert (Standard 28 px) mit eigener Farbwelt und optionalen Grenzwerten (trocken/feucht). Schriftgröße und Schriftart werden **unabhängig von der Temperatur** eingestellt – Standard bleibt bewusst kleiner als die Temperatur. |
+| **Temperatur** | Der Held der Karte: 42 px, neutrales Weiß, enges Tracking (−0,035 em), Tabellenziffern. Einheit als eigene, kleinere Sekundärschrift. Schriftgröße und Schriftart im Editor frei einstellbar. |
+| **Luftfeuchte** | Folgt rechtsbündig auf **derselben Grundlinie**, halb so groß (20 px). Eigene Schriftgröße und -art im Editor. Über der Zeile steht die Deklaration mit farbigem Punkt; ein Klick auf den Wert blendet die zugehörige Kurve ein und aus. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
-| **Thermostat** | Optional. Solltemperatur und Heizstatus-Icon sitzen als **Badges** in derselben Optik wie Fenster- und Bewegungs-Badge. Der Status steckt nur in der Farbe des Icons (rot = heizt, grün = ruht, grau = aus), optional zusätzlich der HVAC-Modus als Chip. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h, geglättete, überschwingungsfreie Kurven, Farbverläufe nach Temperaturbändern, Datenlücken, Legende (nur Reihennamen), Gitter, Datenpunkte. |
+| **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: Flamme (rot = heizt, grün = bereit, grau = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Gleitender Mittelwert plus monotone Glättung, 1,9 px Linie ohne Leuchten, ein einziger dezenter Flächenverlauf, Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
-| **Optik** | Modernes, flächiges Design mit Farbverlauf, Farbschleiern, Badge-Kacheln mit farbigem Ring und Halo am aktuellen Messpunkt – vollständig in Hell und Dunkel. |
+| **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
 | **Robustheit** | `unavailable`/`unknown`/fehlende Entitäten, fehlende Attribute, kaputtes YAML – die Karte stürzt nicht ab. |
 
@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v1.3.0`.
+  `ROOM-CLIMATE-CARD v2.0.0`.
 
 ---
 
@@ -157,7 +157,7 @@ voneinander** gestalten – Größe und Schriftart jeweils getrennt:
 | --- | --- | --- | --- |
 | `temperature_font_size` | number (px) | `42` | Schriftgröße der Temperatur (14–96). |
 | `temperature_font_family` | string | Theme | CSS-Schriftart der Temperatur, z. B. `Inter` oder `"Roboto Mono", monospace`. |
-| `humidity_font_size` | number (px) | `28` | Schriftgröße der Luftfeuchte (14–96). |
+| `humidity_font_size` | number (px) | `20` | Schriftgröße der Luftfeuchte (14–96). |
 | `humidity_font_family` | string | Theme | CSS-Schriftart der Luftfeuchte. |
 
 - Einheiten (`°C`, `%`) und das Tropfen-Icon skalieren automatisch mit ihrem eigenen Messwert.
@@ -166,33 +166,21 @@ voneinander** gestalten – Größe und Schriftart jeweils getrennt:
 - Leere Schriftart = Schrift des Home-Assistant-Themes. Ungültige Werte (z. B. mit `;`) werden
   verworfen, damit nichts aus der CSS-Deklaration ausbricht.
 
-### Temperaturfarben & Grenzwerte
+### Farben: eine Akzentfarbe, eine Sekundärfarbe
 
-| Option | Typ | Standard |
-| --- | --- | --- |
-| `temperature_cool_below` | number | `19` |
-| `temperature_warm_above` | number | `25` |
-| `temperature_hot_above` | number | `28` |
-| `temperature_cool_color` | color | `#38bdf8` |
-| `temperature_comfort_color` | color | `#34d399` |
-| `temperature_warm_color` | color | `#fbbf24` |
-| `temperature_hot_color` | color | `#f43f5e` |
+| Option | Typ | Standard | Wo sie erscheint |
+| --- | --- | --- | --- |
+| `accent_color` | color | `#4FD1A5` (Mint) | Nur Primärgröße: Punkt über der Temperatur, Temperaturkurve, Soll-Referenzlinie |
+| `humidity_color` | color | `#8B86D6` (gedämpftes Indigo) | Ausschließlich Feuchtepunkt und Feuchtekurve |
+| `temperature_comfort_color` | color | – | **Veralteter Alias** für `accent_color`; wirkt nur, solange `accent_color` nicht gesetzt ist |
 
-Die Grenzwerte werden intern sortiert – eine vertauschte Reihenfolge führt nicht zu Fehlern.
-Die Farbcodierung ist eine reine Komfort-Anzeige und **keine medizinische oder klimatische
-Empfehlung**.
+Eine Farbe pro Aussage: Die Akzentfarbe ist der einzige Signalton der Karte, die Sekundärfarbe
+tritt nur an der Feuchte auf. Beide Werte selbst bleiben neutral – die Farbe tragen die Punkte
+und die Kurven.
 
-### Luftfeuchte
-
-| Option | Typ | Standard |
-| --- | --- | --- |
-| `humidity_color` | color | `#a78bfa` |
-| `humidity_low_threshold` | number (%) | `35` |
-| `humidity_high_threshold` | number (%) | `65` |
-| `humidity_low_color` | color | `#38bdf8` |
-| `humidity_high_color` | color | `#e879f9` |
-
-`0` deaktiviert die jeweilige Grenzwert-Bewertung.
+`temperature_cool_below/-color`, `temperature_warm_above/-color`, `temperature_hot_above/-color`,
+`humidity_low_threshold/-color` und `humidity_high_threshold/-color` gibt es seit 2.0.0 nicht
+mehr.
 
 ### Fenster
 
@@ -216,8 +204,8 @@ Empfehlung**.
 | --- | --- | --- | --- |
 | `show_thermostat` | boolean | automatisch | Thermostatzeile anzeigen. |
 | `climate_entity` | entity | – | Climate-Entität. |
-| `show_setpoint` | boolean | `true` | Solltemperatur als Badge oberhalb der Isttemperatur anzeigen. |
-| `show_hvac_status` | boolean | `true` | Status-Icon (Flamme) als Badge vor der Solltemperatur anzeigen. |
+| `show_setpoint` | boolean | `true` | Solltemperatur in der Heizzeile unter dem Messwert anzeigen. |
+| `show_hvac_status` | boolean | `true` | Flamme vor dem Statuswort anzeigen (Farbe = Zustand). |
 | `show_hvac_mode` | boolean | `false` | HVAC-Modus zusätzlich als Chip in derselben Zeile anzeigen. |
 | `heating_color` | color | `#ef4444` (rot) | Icon-Farbe, wenn die Heizung läuft. |
 | `heating_idle_color` | color | `#34d399` (grün) | Icon-Farbe, wenn die Heizung aktiv, aber ohne Heizanforderung ist. |
@@ -233,15 +221,14 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 | `show_temperature_chart` | boolean | automatisch | Temperaturkurve anzeigen. |
 | `show_humidity_chart` | boolean | automatisch | Feuchtekurve anzeigen. |
 | `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48). |
-| `chart_height` | number | `84` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
+| `chart_height` | number | `112` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
 | `chart_curve` | `smooth` \| `linear` | `smooth` | Geglättete (überschwingungsfreie) oder direkt verbundene Linien. |
 | `chart_humidity_line_style` | `solid` \| `dotted` | `solid` | Feuchtekurve durchgezogen oder **gepunktet** zeichnen. Betrifft nur die Feuchte; Fläche, Endpunkt und Farben bleiben. |
 | `chart_gap_mode` | `connect` \| `break` | `connect` | Echte Ausfälle (`unavailable`/`unknown`) überbrücken oder sichtbar unterbrechen. Konstante Phasen ohne HA-Samples werden **immer** durchgehend gezeichnet. |
 | `chart_max_gap_minutes` | number | `120` | Längste Ausfallzeit (Minuten), die noch überbrückt wird; längere bleiben offen. |
 | `chart_gap_style` | `solid` \| `dashed` | `solid` | Überbrückte Abschnitte wie gemessene zeichnen oder gestrichelt markieren. |
-| `chart_show_legend` | boolean | `false` | Legende mit den Reihennamen (Temperatur, Luftfeuchte). Die aktuellen Werte stehen bereits groß über dem Verlauf. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
-| `chart_show_grid` | boolean | `true` | Feine Gitternetzlinien. |
+| `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
 
 ---
 
@@ -258,8 +245,8 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Farben & Grenzwerte** | Temperaturgrenzen (kühl/warm/heiß), vier Temperaturfarben, Feuchtefarbe, Feuchte-Grenzwerte und -Farben |
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
-| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur-Badge (über Istwert), Heizstatus-Icon-Badge, HVAC-Modus-Chip, drei Icon-Farben (rot/grün/grau) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenverlauf, Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Legende, Datenpunkte |
+| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur, Heizstatus-Flamme, HVAC-Modus, drei Flammenfarben (rot/grün/grau) |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenverlauf, Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -277,15 +264,21 @@ YAML bleiben unangetastet.
 
 Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 
-- **Flächige Tiefe:** weicher Verlauf von Blau zu Indigo (dunkel) bzw. Weiß zu kühlem Grau
-  (hell), darüber zwei radiale Farbschleier (Cyan, Violett) – kein flaches Rechteck.
-- **Badges als Kacheln:** transluzente Fläche, farbiger Ring, dezenter Lichtreflex; Fenster
-  offen = Amber, Bewegung erkannt = Mint, inaktiv = neutral. Kein Badge ohne Funktion.
-- **Hairline statt Rahmen:** eine eingesetzte Trennlinie über dem Verlauf, wie in der Vorlage.
-- **Große, ruhige Typografie:** Raumname halbfett, Isttemperatur 42 px (Standard) mit
-  negativer Laufweite, Luftfeuchte 28 px – beides im Editor getrennt einstellbar.
-- **Verlauf:** 2,1 px Linie, Farbverlaufsfläche, Halo-Punkt am aktuellen Wert, feines
-  gestricheltes Gitter, Zeitlabels bleiben von den Ecken frei.
+- **Tiefe statt Rahmen:** 26 px Radius, 1 px Haarlinie bei 7 % Weiß und ein kaum sichtbarer
+  Lichtverlauf von oben links. Die Fläche ist `#0E1013` – OLED-freundlich, aber kein
+  Reinschwarz.
+- **Nur ein großer Wert:** Temperatur 42 px in neutralem Weiß mit −0,035 em Tracking wird der
+  Held; die Luftfeuchte steht rechtsbündig auf derselben Grundlinie bei 20 px.
+- **Ein 4-px-Raster:** 20 px Innenabstand rundum, alle Abstände in 4-px-Schritten, eine
+  gemeinsame optische Kante für Titel, Werte und Verlauf.
+- **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
+  Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
+  in Versalien mit 0,09 em Laufweite.
+- **Ruhiger Verlauf:** gleitender Mittelwert plus monotone Glättung, 1,9 px Linie ohne
+  Leuchten, ein einziger sehr dezenter Flächenverlauf; die Feuchte bekommt ein eigenes Band im
+  oberen Drittel, statt die Temperaturkurve zu kreuzen.
+- **Reduzierte Achse:** eine Haarlinie als Basis, drei Labels in 10,5 px bei 32 % Deckkraft –
+  „Sa 05:40 · So 05:40 · Jetzt“.
 - **Hell und dunkel:** beide Varianten sind vollständig ausgestaltet und respektieren
   `theme: auto` (HA-Theme).
 
@@ -327,18 +320,11 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 - **Farben:** Die Temperaturkurve nutzt einen vertikalen Verlauf, der exakt an den
   konfigurierten Temperaturbändern ausgerichtet ist; die Fläche darunter blendet von 30 % auf
   2 % Deckkraft aus. Die Feuchtekurve hat ihre eigene Farbe.
-- **Weiche Bandübergänge:** Zwischen zwei Temperaturbändern wird nicht mehr auf drei Pixeln
-  umgeschaltet, sondern über eine breite Rampe geblendet (Standard: ein Drittel der
-  Diagrammhöhe, begrenzt auf 14–46 px). Liegen zwei Schwellen nah beieinander, nutzt jede
-  Rampe höchstens 45 % des Abstands, damit sich zwei Übergänge nie überlagern und jede Stufe
-  sichtbar bleibt. Die Zwischenfarben entstehen in **OKLab** statt in sRGB – dadurch bleibt
-  der Verlauf leuchtend und kippt nicht in ein graues Oliv (sRGB-Mittelwert von Amber und
-  Grün liegt dunkler als beide Enden). Feuchte-Fläche: die Deckkraft läuft über eine
-  Smoothstep-Kurve aus, damit unten keine sichtbare Kante entsteht.
 - **Skalierung:** Beide Reihen werden unabhängig skaliert, damit unterschiedliche Wertebereiche
-  lesbar bleiben.
+  lesbar bleiben – die Feuchte lebt im oberen Drittel, die Temperatur in der unteren Hälfte.
+  Die beiden Kurven kreuzen sich dadurch nie.
 - **Responsiv:** Die Chart zeichnet neu auf Basis der gemessenen Pixelgröße
-  (`ResizeObserver`), Achsenbeschriftungen und Legende entfallen bei zu wenig Platz, unter
+  (`ResizeObserver`), Achsenbeschriftungen entfallen bei zu wenig Platz, unter
   40 × 34 px wird nichts gezeichnet statt zu verzerren. Die Zeitbeschriftung wird um den
   Karten-Eckenradius eingerückt, damit erstes und letztes Label nicht im abgerundeten Eck
   verschwinden.
@@ -364,24 +350,22 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 
 ## Heizstatus: was die Karte wirklich anzeigt
 
-Solltemperatur und Heizstatus-Icon liegen als Badges in einer Zeile direkt über der
-Isttemperatur – gleiche Fläche, gleicher Radius, gleicher farbiger Ring wie Fenster- und
-Bewegungs-Badge im Kopf. Das Sollwert-Badge fasst Beschriftung, Wert und Einheit zusammen
-(`SOLL 22,0 °C`), das Icon-Badge zeigt nur das Symbol.
+Die Heizzeile steht unter dem Messwert und ist bewusst reiner Text: Flamme, Statuswort und
+Solltemperatur auf einer Linie („🔥 Heizt · Soll 22,0 °C“). Keine Badges, keine Grundlinien-
+Tricks – eine Zeile, eine Schriftgröße, alles auf dem 4-px-Raster.
 
 Der Status steckt ausschließlich in der Farbe des Flammen-Icons:
 
 | Icon | Bedeutung | Bedingung |
 | --- | --- | --- |
 | Flamme **rot** | Heizt | `hvac_action == heating` |
-| Flamme **grün** | Ruht (aktiv, keine Heizanforderung) | `hvac_action == idle` |
+| Flamme **grün** | **Bereit** (aktiv, keine Heizanforderung) | `hvac_action == idle` |
 | Flamme **grau, gefüllt** | Aus | HVAC-Modus `off` oder `hvac_action == off` |
 | Schneeflocke / Ventilator / Tropfen | Kühlt / Lüftet / Trocknet | entsprechender `hvac_action`, neutrale Farbe |
-| Flamme **grau, gestrichelter Rahmen** | Status unbekannt | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` |
+| Flamme **gedämpft** | Status unbekannt | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` |
 
-Ein eingeschaltetes Thermostat gilt bewusst **nicht** als „Heizt“. Fehlt `hvac_action`, zeigt
-die Karte das Icon im Unknown-Stil (gestrichelter Rahmen, gedämpft) statt einen Zustand zu
-erfinden; als Titel und Screenreader-Text steht „Status unbekannt“ dahinter.
+Ein eingeschaltetes Thermostat gilt bewusst **nicht** als „Heizt“. Fehlt `hvac_action`, bleibt
+die Flamme gedämpft und es steht „Status unbekannt“ da, statt einen Zustand zu erfinden.
 
 Beispiel:
 
@@ -399,7 +383,12 @@ heating_off_color: '#64748b'    # grau, wenn ausgeschaltet ist
 
 ## Barrierefreiheit
 
-- Messwerte haben `role="group"` mit `aria-label` in der Form „Temperatur: 21,8 °C“.
+- Messwerte melden sich als „Temperatur: 21,8 °C“ bzw. „Luftfeuchte: 50 %“.
+- Jeder Messwert ist ein `<button>` mit `aria-pressed`, sobald seine Kurve gezeichnet wird:
+  Ein Klick blendet die Serie aus, ein zweiter wieder ein. Das Tap-Ziel ist mindestens 36 px
+  hoch, der Fokusring ist sichtbar.
+- Die Heizzeile hat `role="status"` und benennt den Zustand im `aria-label` („Heizt“,
+  „Bereit“, „Aus“, „Status unbekannt“); die Flamme selbst ist `aria-hidden`.
 - Fenster- und Bewegungs-Badges haben `role="img"` plus sprechende `aria-label`
   („Fenster offen“, „Keine Bewegung“, „Nicht verfügbar“).
 - Der Chart hat `role="img"` und eine Beschreibung inklusive Zeitraum.
@@ -453,7 +442,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 224 Tests in 11 Dateien aus (Stand 1.3.0):
+`npm test` führt 228 Tests in 11 Dateien aus (Stand 2.0.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
@@ -461,8 +450,8 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
-| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Legende, Punkte, Gitter |
-| `tests/card.test.ts` | Rendering, Formatierung, Farben, unabhängige Schriftgrößen/-arten je Messwert, Sollwert-/Heiz-Icon-Badges, Solltemperatur-Zeile über dem Istwert, Heizstatus-Icon (rot/grün/grau/unbekannt), alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
+| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung, Punkte, Gitter |
+| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
 | `tests/editor.test.ts` | Abschnitte, Selektoren (inkl. Linienart Feuchte), Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |

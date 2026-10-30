@@ -174,7 +174,7 @@ describe('room climate card editor', () => {
 
     expect(selectorByLabel(editor, 'Schriftgröße Temperatur').value).toBe(42);
     expect(selectorByLabel(editor, 'Schriftart Temperatur').value).toBe('');
-    expect(selectorByLabel(editor, 'Schriftgröße Luftfeuchte').value).toBe(28);
+    expect(selectorByLabel(editor, 'Schriftgröße Luftfeuchte').value).toBe(20);
     expect(selectorByLabel(editor, 'Schriftart Luftfeuchte').value).toBe('');
 
     selectorByLabel(editor, 'Schriftgröße Temperatur').emit(56);
@@ -188,6 +188,29 @@ describe('room climate card editor', () => {
     openAll(editor);
     expect(editor.config.humidity_font_family).toBe('Inter');
     expect(editor.config.temperature_font_family).toBeUndefined();
+  });
+
+  it('offers exactly two series colours: accent and secondary', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+
+    // The colour selector hands out RGB triples.
+    expect(selectorByLabel(editor, 'Akzentfarbe (Temperatur)').value).toEqual([79, 209, 165]);
+    expect(selectorByLabel(editor, 'Sekundärfarbe (Luftfeuchte)').value).toEqual([139, 134, 214]);
+    // The old four band colours are gone – one accent, one secondary.
+    expect(() => selectorByLabel(editor, 'Farbe angenehm')).toThrow();
+
+    // A colour picker emits an RGB triple; the editor stores a hex value.
+    selectorByLabel(editor, 'Akzentfarbe (Temperatur)').emit([255, 0, 0]);
+    await editor.updateComplete;
+    expect(editor.config.accent_color).toBe('#ff0000');
+  });
+
+  it('no longer offers a chart legend', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    // The legend row was removed; the colour dot sits next to the value.
+    expect(() => selectorByLabel(editor, 'Legende')).toThrow();
   });
 
   it('disables chart options when no chart series is enabled', async () => {
@@ -273,9 +296,9 @@ describe('room climate card editor', () => {
   it('accepts decimal commas from the number field', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);
-    selectorByLabel(editor, 'Warm ab').emit('24,5');
+    selectorByLabel(editor, 'Eckenradius').emit('24,5');
     await editor.updateComplete;
-    expect(editor.config.temperature_warm_above).toBe(24.5);
+    expect(editor.config.border_radius).toBe(24.5);
   });
 
   it('never drops a stored value when a field is emptied', async () => {
