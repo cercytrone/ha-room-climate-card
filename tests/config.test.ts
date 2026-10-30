@@ -6,12 +6,9 @@ import {
   asFontFamily,
   configEntityIds,
   hasChart,
-  humidityBand,
   normalizeConfig,
   preferredCardHeight,
   resolveName,
-  temperatureBand,
-  temperatureBandColor,
 } from '../src/config';
 import { createHass, entity } from './helpers';
 
@@ -21,13 +18,16 @@ describe('normalizeConfig', () => {
     expect(config.name).toBeUndefined();
     expect(config.icon).toBe('mdi:home-thermometer-outline');
     expect(config.height).toBeNull();
-    expect(config.borderRadius).toBe(18);
+    expect(config.borderRadius).toBe(26);
     expect(config.theme).toBe('auto');
     expect(config.temperatureDecimals).toBe(1);
     expect(config.humidityDecimals).toBe(0);
-    expect(config.bands).toEqual({ cool: 19, warm: 25, hot: 28 });
+    // One accent, one subdued secondary – no band colours any more.
+    expect(config.accentColor).toBe('#4FD1A5');
+    expect(config.humidity.color).toBe('#8B86D6');
     expect(config.chart.hours).toBe(6);
-    expect(config.chart.height).toBe(84);
+    expect(config.chart.height).toBe(112);
+    expect(config.chart.showGrid).toBe(false);
     expect(config.window.openStates).toEqual(DEFAULT_OPEN_STATES);
     expect(config.window.enabled).toBe(false);
     expect(config.motion.enabled).toBe(false);
@@ -39,11 +39,11 @@ describe('normalizeConfig', () => {
     const config = normalizeConfig({});
     expect(config.typography.temperature.fontSize).toBe(DEFAULT_READING_FONT_SIZE.temperature);
     expect(config.typography.humidity.fontSize).toBe(DEFAULT_READING_FONT_SIZE.humidity);
-    // Both are clearly larger than the old 1.85rem / 1.3rem defaults.
+    // The hero stays clearly dominant; the secondary value follows at half size.
     expect(config.typography.temperature.fontSize).toBeGreaterThanOrEqual(40);
-    expect(config.typography.humidity.fontSize).toBeGreaterThanOrEqual(26);
+    expect(config.typography.humidity.fontSize).toBeGreaterThanOrEqual(18);
     expect(config.typography.temperature.fontSize).toBeGreaterThan(
-      config.typography.humidity.fontSize
+      config.typography.humidity.fontSize * 1.5
     );
     expect(config.typography.temperature.fontFamily).toBeUndefined();
     expect(config.typography.humidity.fontFamily).toBeUndefined();
@@ -162,13 +162,17 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig({ height: 240 }).height).toBe(240);
   });
 
-  it('sorts temperature thresholds so a swapped config still behaves', () => {
-    const config = normalizeConfig({
-      temperature_cool_below: 28,
-      temperature_warm_above: 19,
-      temperature_hot_above: 25,
-    });
-    expect(config.bands).toEqual({ cool: 19, warm: 25, hot: 28 });
+  it('keeps the deprecated comfort colour as an accent alias', () => {
+    // Dashboards from before 2.0.0 must not suddenly change colour.
+    expect(normalizeConfig({ temperature_comfort_color: '#123456' }).accentColor).toBe('#123456');
+    expect(
+      normalizeConfig({ temperature_comfort_color: '#123456', accent_color: '#abcdef' }).accentColor
+    ).toBe('#abcdef');
+  });
+
+  it('falls back to the accent colour for malformed values', () => {
+    expect(normalizeConfig({ accent_color: '' }).accentColor).toBe('#4FD1A5');
+    expect(normalizeConfig({ accent_color: 'x'.repeat(200) }).accentColor).toBe('#4FD1A5');
   });
 
   it('parses comma separated open states and lowercases them', () => {
@@ -240,29 +244,25 @@ describe('normalizeConfig', () => {
   });
 });
 
-describe('temperature & humidity bands', () => {
-  const config = normalizeConfig({});
-
-  it('maps values to bands', () => {
-    expect(temperatureBand(10, config.bands)).toBe('cool');
-    expect(temperatureBand(21, config.bands)).toBe('comfort');
-    expect(temperatureBand(26, config.bands)).toBe('warm');
-    expect(temperatureBand(30, config.bands)).toBe('hot');
+describe('reading typography', () => {
+  it('uses a 42 px hero and a 20 px secondary value by default', () => {
+    const config = normalizeConfig({});
+    expect(config.typography.temperature.fontSize).toBe(42);
+    expect(config.typography.humidity.fontSize).toBe(20);
+    // Half the hero – the humidity may not compete with the temperature.
+    expect(config.typography.humidity.fontSize * 2).toBeLessThanOrEqual(
+      config.typography.temperature.fontSize
+    );
+    expect(DEFAULT_READING_FONT_SIZE.humidity * 2).toBeLessThanOrEqual(
+      DEFAULT_READING_FONT_SIZE.temperature
+    );
   });
 
-  it('maps bands to colours', () => {
-    expect(temperatureBandColor(10, config)).toBe(config.bandColors.cool);
-    expect(temperatureBandColor(21, config)).toBe(config.bandColors.comfort);
-    expect(temperatureBandColor(30, config)).toBe(config.bandColors.hot);
-  });
-
-  it('evaluates humidity thresholds and can disable them', () => {
-    expect(humidityBand(20, config)).toBe('low');
-    expect(humidityBand(50, config)).toBe('normal');
-    expect(humidityBand(90, config)).toBe('high');
-    const disabled = normalizeConfig({ humidity_low_threshold: 0, humidity_high_threshold: 0 });
-    expect(humidityBand(20, disabled)).toBe('normal');
-    expect(humidityBand(99, disabled)).toBe('normal');
+  it('keeps both sizes independently adjustable', () => {
+    const config = normalizeConfig({ temperature_font_size: 56, humidity_font_size: 24 });
+    expect(config.typography.temperature.fontSize).toBe(56);
+    expect(config.typography.humidity.fontSize).toBe(24);
+    expect(READING_FONT_SIZE_RANGE).toEqual({ min: 14, max: 96 });
   });
 });
 

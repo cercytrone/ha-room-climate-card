@@ -47,7 +47,6 @@ function configToYaml(config: RoomClimateCardConfig): string {
 
 const initialEditorConfig: RoomClimateCardConfig = {
   ...demoScenarios[0].config,
-  chart_show_legend: true,
 };
 
 if (editor && preview) {

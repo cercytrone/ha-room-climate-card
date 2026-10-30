@@ -37,21 +37,16 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   /** CSS font family for the humidity value; empty = theme font. */
   humidity_font_family?: string;
 
-  // Temperature colour bands
-  temperature_cool_below?: number;
-  temperature_warm_above?: number;
-  temperature_hot_above?: number;
-  temperature_cool_color?: string;
-  temperature_comfort_color?: string;
-  temperature_warm_color?: string;
-  temperature_hot_color?: string;
-
-  // Humidity colours
+  // Series colours (one accent + one subdued secondary)
+  /** Accent of the primary value: its dot and the temperature curve. */
+  accent_color?: string;
+  /** Subdued secondary colour: the humidity dot and curve, nothing else. */
   humidity_color?: string;
-  humidity_low_threshold?: number;
-  humidity_high_threshold?: number;
-  humidity_low_color?: string;
-  humidity_high_color?: string;
+  /**
+   * Deprecated alias for `accent_color`, kept so existing dashboards do not
+   * change colour. Ignored as soon as `accent_color` is set.
+   */
+  temperature_comfort_color?: string;
 
   // Window
   show_window?: boolean;
@@ -84,7 +79,6 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_gap_style?: GapStyle;
   /** `dotted` renders the humidity curve as dots; the temperature stays as is. */
   chart_humidity_line_style?: HumidityLineStyle;
-  chart_show_legend?: boolean;
   chart_show_points?: boolean;
   chart_show_grid?: boolean;
 }
@@ -122,23 +116,10 @@ export interface ResolvedChartConfig {
   maxGapMinutes: number;
   gapStyle: GapStyle;
   humidityLineStyle: HumidityLineStyle;
-  showLegend: boolean;
   showPoints: boolean;
   showGrid: boolean;
 }
 
-export interface TemperatureBandConfig {
-  cool: number;
-  warm: number;
-  hot: number;
-}
-
-export interface TemperatureBandColors {
-  cool: string;
-  comfort: string;
-  warm: string;
-  hot: string;
-}
 
 /** Per-reading typography, configured independently for both values. */
 export interface ReadingTypography {
@@ -154,11 +135,8 @@ export interface TypographyConfig {
 }
 
 export interface HumidityConfig {
+  /** Dot + curve colour of the secondary series. */
   color: string;
-  lowThreshold: number;
-  highThreshold: number;
-  lowColor: string;
-  highColor: string;
 }
 
 export interface ResolvedConfig {
@@ -175,8 +153,8 @@ export interface ResolvedConfig {
   temperatureDecimals: number;
   humidityDecimals: number;
   typography: TypographyConfig;
-  bands: TemperatureBandConfig;
-  bandColors: TemperatureBandColors;
+  /** Single accent: dot of the primary value and the temperature curve. */
+  accentColor: string;
   humidity: HumidityConfig;
   window: ResolvedWindowConfig;
   motion: ResolvedMotionConfig;
@@ -188,14 +166,11 @@ export const DEFAULT_OPEN_STATES = ['on', 'open', 'opening', 'tilted', 'gekippt'
 export const DEFAULT_CLOSED_STATES = ['off', 'closed', 'closing'];
 
 export const DEFAULT_COLORS = {
-  cool: '#38bdf8',
-  comfort: '#34d399',
-  warm: '#fbbf24',
-  hot: '#f43f5e',
-  humidity: '#a78bfa',
-  humidityLow: '#38bdf8',
-  humidityHigh: '#e879f9',
-  /** Red = heating, green = idle, grey = off (colour-coded HVAC icon). */
+  /** The only accent of the card: mint. */
+  accent: '#4FD1A5',
+  /** Deliberately dim indigo – only the dot and the curve use it. */
+  humidity: '#8B86D6',
+  /** Red = heating, green = idle, grey = off (colour-coded HVAC flame). */
   heating: '#ef4444',
   idle: '#34d399',
   off: '#64748b',
@@ -203,8 +178,10 @@ export const DEFAULT_COLORS = {
 
 /** Built-in reading sizes; both are deliberately large and independently tunable. */
 export const DEFAULT_READING_FONT_SIZE = {
+  /** Hero of the card (design token). */
   temperature: 42,
-  humidity: 28,
+  /** Secondary value (design token): large enough to read, too small to compete. */
+  humidity: 20,
 } as const;
 
 /** Range accepted for `*_font_size` (pixels). */
@@ -296,7 +273,6 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
   const climateEntity = asEntityId(config.climate_entity);
   const nameEntity = asEntityId(config.name_entity);
 
-  const bands = normalizeBands(config);
   const openStates = asStringList(config.window_open_states);
 
   const showWindow = asBoolean(config.show_window) ?? Boolean(windowEntity);
@@ -329,7 +305,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     nameEntity,
     icon: asString(config.icon) ?? 'mdi:home-thermometer-outline',
     height,
-    borderRadius: asNumber(config.border_radius, 0, 40, 18),
+    borderRadius: asNumber(config.border_radius, 0, 40, 26),
     theme,
     temperatureEntity,
     humidityEntity,
@@ -348,19 +324,12 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
         fontFamily: asFontFamily(config.humidity_font_family),
       },
     },
-    bands,
-    bandColors: {
-      cool: asColor(config.temperature_cool_color, DEFAULT_COLORS.cool),
-      comfort: asColor(config.temperature_comfort_color, DEFAULT_COLORS.comfort),
-      warm: asColor(config.temperature_warm_color, DEFAULT_COLORS.warm),
-      hot: asColor(config.temperature_hot_color, DEFAULT_COLORS.hot),
-    },
+    accentColor: asColor(
+      config.accent_color ?? config.temperature_comfort_color,
+      DEFAULT_COLORS.accent
+    ),
     humidity: {
       color: asColor(config.humidity_color, DEFAULT_COLORS.humidity),
-      lowThreshold: asNumber(config.humidity_low_threshold, 0, 100, 35),
-      highThreshold: asNumber(config.humidity_high_threshold, 0, 100, 65),
-      lowColor: asColor(config.humidity_low_color, DEFAULT_COLORS.humidityLow),
-      highColor: asColor(config.humidity_high_color, DEFAULT_COLORS.humidityHigh),
     },
     window: {
       enabled: showWindow && Boolean(windowEntity),
@@ -386,60 +355,18 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       showTemperature: showTemperatureChart && Boolean(temperatureEntity),
       showHumidity: showHumidityChart && Boolean(humidityEntity),
       hours: Math.round(asNumber(config.chart_hours, 1, 168, 6)),
-      height: Math.round(asNumber(config.chart_height, 30, 400, 84)),
+      height: Math.round(asNumber(config.chart_height, 30, 400, 112)),
       curve,
       gapMode,
       maxGapMinutes: Math.round(asNumber(config.chart_max_gap_minutes, 5, 720, 120)),
       gapStyle,
       humidityLineStyle,
-      showLegend: asBoolean(config.chart_show_legend) ?? false,
       showPoints: asBoolean(config.chart_show_points) ?? false,
-      showGrid: asBoolean(config.chart_show_grid) ?? true,
+      // The reference sheet reduces the axis to a hairline plus three labels;
+      // the dashed helper lines are opt-in now.
+      showGrid: asBoolean(config.chart_show_grid) ?? false,
     },
   };
-}
-
-function normalizeBands(config: RoomClimateCardConfig): TemperatureBandConfig {
-  const values = [
-    asNumber(config.temperature_cool_below, -50, 80, 19),
-    asNumber(config.temperature_warm_above, -50, 80, 25),
-    asNumber(config.temperature_hot_above, -50, 80, 28),
-  ].sort((a, b) => a - b);
-  return { cool: values[0], warm: values[1], hot: values[2] };
-}
-
-/** Temperature band for a value, expressed as a band key. */
-export type TemperatureBand = 'cool' | 'comfort' | 'warm' | 'hot';
-
-export function temperatureBand(value: number, bands: TemperatureBandConfig): TemperatureBand {
-  if (value < bands.cool) return 'cool';
-  if (value < bands.warm) return 'comfort';
-  if (value < bands.hot) return 'warm';
-  return 'hot';
-}
-
-export function temperatureBandColor(value: number, config: ResolvedConfig): string {
-  return config.bandColors[temperatureBand(value, config.bands)];
-}
-
-export type HumidityBand = 'low' | 'normal' | 'high';
-
-export function humidityBand(value: number, config: ResolvedConfig): HumidityBand {
-  const { lowThreshold, highThreshold } = config.humidity;
-  if (lowThreshold > 0 && value < lowThreshold) return 'low';
-  if (highThreshold > 0 && value > highThreshold) return 'high';
-  return 'normal';
-}
-
-export function humidityBandColor(value: number, config: ResolvedConfig): string {
-  switch (humidityBand(value, config)) {
-    case 'low':
-      return config.humidity.lowColor;
-    case 'high':
-      return config.humidity.highColor;
-    default:
-      return config.humidity.color;
-  }
 }
 
 /** All entity ids this configuration listens to. */
@@ -466,15 +393,20 @@ export function hasStatusRow(config: ResolvedConfig): boolean {
   return config.thermostat.enabled;
 }
 
-/** Default card height used for `getCardSize()` / grid options. */
+/**
+ * Default card height used for `getCardSize()` / grid options.
+ *
+ * Mirrors the 4 px rhythm of the stylesheet: 20 px inset top and bottom, title
+ * row, caption row, hero, heating row, chart slot.
+ */
 export function preferredCardHeight(config: ResolvedConfig): number {
   if (config.height) return config.height;
-  const chartHeight = hasChart(config) ? config.chart.height + 26 : 0;
-  // Badge height (30 px) plus its top margin.
-  const statusRow = hasStatusRow(config) ? 38 : 0;
-  // The readings dominate the header; larger fonts should not shrink the card.
-  const readings = Math.max(config.typography.temperature.fontSize, config.typography.humidity.fontSize);
-  return 62 + Math.round(readings * 0.98) + chartHeight + statusRow;
+  const readings = config.typography.temperature.fontSize;
+  const chartHeight = hasChart(config) ? config.chart.height : 0;
+  const statusRow = hasStatusRow(config) ? 20 : 0;
+  const header = 28;
+  const labels = 16;
+  return 20 + header + 12 + labels + 4 + readings + 8 + statusRow + 12 + chartHeight + 20;
 }
 
 export function resolveName(config: ResolvedConfig, hass?: HomeAssistant): string {

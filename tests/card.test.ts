@@ -91,26 +91,66 @@ describe('room climate card', () => {
     await card.updateComplete;
 
     expect(text(card, '.name')).toBe('Wohnzimmer');
-    expect(text(card, '.temperature .value')).toBe('21,8');
-    expect(text(card, '.temperature .unit')).toBe('°C');
-    expect(text(card, '.humidity-value')).toBe('50,4');
-    expect(text(card, '.humidity-unit')).toBe('%');
+    expect(text(card, '.reading.temperature .reading-value')).toBe('21,8');
+    expect(text(card, '.reading.temperature .reading-unit')).toBe('°C');
+    expect(text(card, '.reading.humidity .reading-value')).toBe('50,4');
+    expect(text(card, '.reading.humidity .reading-unit')).toBe('%');
   });
 
   it('formats numbers for english locales', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates(), language: 'en' }));
     await card.updateComplete;
-    expect(text(card, '.temperature .value')).toBe('21.8');
+    expect(text(card, '.reading.temperature .reading-value')).toBe('21.8');
   });
 
-  it('colours the temperature by band', async () => {
+  it('declares each series with its colour dot directly above the value', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+
+    const labels = qa(card, '.reading-labels .series-label');
+    expect(labels.map((label) => label.textContent?.trim())).toEqual([
+      'Temperatur',
+      'Luftfeuchte',
+    ]);
+    const dots = qa(card, '.series-dot') as HTMLElement[];
+    expect(dots).toHaveLength(2);
+    // One accent for the hero, one subdued indigo for the humidity.
+    expect(dots[0].style.background).toBe('rgb(79, 209, 165)');
+    expect(dots[1].style.background).toBe('rgb(139, 134, 214)');
+    // The caption row sits above the values, not below the chart.
+    const labelsRow = q(card, '.reading-labels')!;
+    const valuesRow = q(card, '.reading-values')!;
+    expect(labelsRow.compareDocumentPosition(valuesRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // No legend anywhere: the chart is plain.
+    expect(q(card, '.legend')).toBeNull();
+  });
+
+  it('uses the accent only for the primary value and the humidity colour only for its series', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const container = q(card, '.card') as HTMLElement;
+    expect(container.style.getPropertyValue('--rcc-accent').trim()).toBe('#4FD1A5');
+    expect(container.style.getPropertyValue('--rcc-secondary').trim()).toBe('#8B86D6');
+
+    // Neither reading is tinted: the values stay neutral, the dots carry colour.
+    const temperature = q(card, '.reading.temperature .reading-value') as HTMLElement;
+    const humidity = q(card, '.reading.humidity .reading-value') as HTMLElement;
+    expect(temperature.style.color).toBe('');
+    expect(humidity.style.color).toBe('');
+  });
+
+  it('lets the colours be changed from the configuration', async () => {
     const card = mount(
-      { ...fullConfig, temperature_cool_below: 30, temperature_warm_above: 31, temperature_hot_above: 32 },
+      { ...fullConfig, accent_color: '#ff8800', humidity_color: '#0088ff' },
       createHass({ states: baseStates() })
     );
     await card.updateComplete;
-    const value = q(card, '.temperature .value') as HTMLElement;
-    expect(value.style.color).toBe('rgb(56, 189, 248)');
+    const container = q(card, '.card') as HTMLElement;
+    expect(container.style.getPropertyValue('--rcc-accent').trim()).toBe('#ff8800');
+    expect(container.style.getPropertyValue('--rcc-secondary').trim()).toBe('#0088ff');
+    const dots = qa(card, '.series-dot') as HTMLElement[];
+    expect(dots[0].style.background).toBe('rgb(255, 136, 0)');
+    expect(dots[1].style.background).toBe('rgb(0, 136, 255)');
   });
 
   it('handles unavailable sensors without crashing', async () => {
@@ -126,59 +166,46 @@ describe('room climate card', () => {
     const card = mount(fullConfig, hass);
     await card.updateComplete;
 
-    expect(text(card, '.temperature .value')).toBe('–');
-    expect(text(card, '.humidity-value')).toBe('–');
-    expect(q(card, '.temperature')?.getAttribute('aria-label')).toContain('Nicht verfügbar');
+    expect(text(card, '.reading.temperature .reading-value')).toBe('–');
+    expect(text(card, '.reading.humidity .reading-value')).toBe('–');
+    expect(q(card, '.reading.temperature')?.getAttribute('aria-label')).toContain('Nicht verfügbar');
     expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
-    const icon = q(card, '.hvac-icon');
-    expect(icon?.getAttribute('aria-label')).toBe('Nicht verfügbar');
-    expect(icon?.classList.contains('is-unknown')).toBe(true);
-    expect(q(card, '.setpoint')).toBeNull();
+    expect(q(card, '.climate-row')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
+    expect(q(card, '.flame')?.classList.contains('status-unavailable')).toBe(true);
+    expect(q(card, '.climate-setpoint')).toBeNull();
   });
 
   it('shows the window badge only when enabled and reflects the state', async () => {
     const hass = createHass({ states: baseStates() });
-    const card = mount(fullConfig, hass);
-    await card.updateComplete;
-    const badge = q(card, '.badge.window');
-    expect(badge).not.toBeNull();
-    expect(badge?.classList.contains('is-open')).toBe(false);
-    expect(badge?.getAttribute('aria-label')).toBe('Fenster geschlossen');
+    const closed = mount(fullConfig, hass);
+    await closed.updateComplete;
+    expect(q(closed, '.badge.window')).not.toBeNull();
+    expect(qa(closed, '.badge.window.is-open')).toHaveLength(0);
 
-    card.hass = createHass({
-      states: baseStates().map((state) =>
-        state.entity_id === 'binary_sensor.window' ? entity('binary_sensor.window', { state: 'on' }) : state
-      ),
-    });
-    await card.updateComplete;
-    expect(q(card, '.badge.window')?.classList.contains('is-open')).toBe(true);
-    expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Fenster offen');
+    const open = mount(
+      { ...fullConfig },
+      createHass({
+        states: baseStates().map((state) =>
+          state.entity_id === 'binary_sensor.window' ? entity('binary_sensor.window', { state: 'on' }) : state
+        ),
+      })
+    );
+    await open.updateComplete;
+    expect(qa(open, '.badge.window.is-open')).toHaveLength(1);
   });
 
   it('removes the window badge completely when disabled', async () => {
     const card = mount({ ...fullConfig, show_window: false }, createHass({ states: baseStates() }));
     await card.updateComplete;
     expect(q(card, '.badge.window')).toBeNull();
-    expect(q(card, '.badges')?.children.length).toBeGreaterThanOrEqual(0);
   });
 
   it('shows motion state and the quiet duration', async () => {
-    const hass = createHass({ states: baseStates() });
-    const card = mount(fullConfig, hass);
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
-    expect(q(card, '.badge.motion')?.classList.contains('is-active')).toBe(false);
+    expect(qa(card, '.badge.motion.is-idle')).toHaveLength(1);
     expect(text(card, '.subtle')).toContain('Ruhe seit');
-    expect(text(card, '.subtle')).toContain('12 Min.');
-
-    card.hass = createHass({
-      states: baseStates().map((state) =>
-        state.entity_id === 'binary_sensor.motion' ? entity('binary_sensor.motion', { state: 'on' }) : state
-      ),
-    });
-    await card.updateComplete;
-    expect(q(card, '.badge.motion')?.classList.contains('is-active')).toBe(true);
-    expect(q(card, '.badge.motion')?.getAttribute('aria-label')).toBe('Bewegung erkannt');
-    expect(text(card, '.subtle')).toBe('');
+    expect(text(card, '.subtle')).toContain('12');
   });
 
   it('hides the motion badge when disabled', async () => {
@@ -187,32 +214,33 @@ describe('room climate card', () => {
     expect(q(card, '.badge.motion')).toBeNull();
   });
 
-  it('shows the setpoint above the current temperature', async () => {
+  it('puts the heating row below the readings with flame, state and setpoint', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
-    const row = q(card, '.setpoint-row');
-    const metrics = q(card, '.metrics');
+    const row = q(card, '.climate-row');
+    const readings = q(card, '.readings');
     expect(row).not.toBeNull();
-    expect(metrics).not.toBeNull();
-    // The setpoint row must come before the metrics in document order.
-    expect(row!.compareDocumentPosition(metrics!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(text(card, '.setpoint')).toContain('Soll');
-    expect(text(card, '.setpoint-value')).toBe('22,0');
-    expect(text(card, '.setpoint-unit')).toBe('°C');
-    expect(text(card, '.temperature .value')).toBe('21,8');
+    // The row follows the values …
+    expect(readings!.compareDocumentPosition(row!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // … and precedes the chart.
+    const chart = q(card, '.chart-slot') ?? q(card, 'room-climate-chart');
+    if (chart) {
+      expect(row!.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(text(card, '.climate-state')).toBe('Heizt');
+    expect(text(card, '.climate-setpoint')).toBe('Soll 22,0 °C');
+    expect(q(card, '.climate-sep')?.textContent?.trim()).toBe('·');
+    expect(q(card, '.flame svg')).not.toBeNull();
   });
 
-  it('conveys the heating state only through the icon colour', async () => {
+  it('conveys the heating state through flame colour and wording', async () => {
     const heating = mount(fullConfig, createHass({ states: baseStates() }));
     await heating.updateComplete;
-    const heatingIcon = q(heating, '.hvac-icon') as HTMLElement;
-    expect(heatingIcon.classList.contains('is-heating')).toBe(true);
-    expect(heatingIcon.style.getPropertyValue('--badge-color')).toBe('#ef4444');
-    expect(heatingIcon.getAttribute('aria-label')).toBe('Heizt');
-    expect(heatingIcon.querySelector('svg')).not.toBeNull();
-    // No textual status label next to the setpoint any more.
-    expect(text(heating, '.setpoint-row')).not.toContain('Heizt');
-    expect(q(heating, '.pill')).toBeNull();
+    const flame = q(heating, '.flame') as HTMLElement;
+    expect(flame.classList.contains('status-heating')).toBe(true);
+    expect(flame.style.color).toBe('rgb(239, 68, 68)');
+    expect(flame.getAttribute('aria-hidden')).toBe('true');
+    expect(text(heating, '.climate-state')).toBe('Heizt');
 
     const idle = mount(
       { ...fullConfig, name: 'Küche' },
@@ -227,10 +255,11 @@ describe('room climate card', () => {
       })
     );
     await idle.updateComplete;
-    const idleIcon = q(idle, '.hvac-icon') as HTMLElement;
-    expect(idleIcon.classList.contains('is-idle')).toBe(true);
-    expect(idleIcon.style.getPropertyValue('--badge-color')).toBe('#34d399');
-    expect(idleIcon.getAttribute('aria-label')).toBe('Ruht');
+    const idleFlame = q(idle, '.flame') as HTMLElement;
+    expect(idleFlame.classList.contains('status-idle')).toBe(true);
+    expect(idleFlame.style.color).toBe('rgb(52, 211, 153)');
+    // Idle reads as "ready", not as "off" and not as "heating".
+    expect(text(idle, '.climate-state')).toBe('Bereit');
 
     const off = mount(
       { ...fullConfig, name: 'Bad' },
@@ -242,14 +271,12 @@ describe('room climate card', () => {
       })
     );
     await off.updateComplete;
-    const offIcon = q(off, '.hvac-icon') as HTMLElement;
-    expect(offIcon.classList.contains('is-off')).toBe(true);
-    expect(offIcon.style.getPropertyValue('--badge-color')).toBe('#64748b');
-    expect(offIcon.getAttribute('aria-label')).toBe('Aus');
-    expect(text(off, '.setpoint-value')).toBe('18,0');
+    expect((q(off, '.flame') as HTMLElement).classList.contains('status-off')).toBe(true);
+    expect(text(off, '.climate-state')).toBe('Aus');
+    expect(text(off, '.climate-setpoint')).toBe('Soll 18,0 °C');
   });
 
-  it('uses custom icon colours from the configuration', async () => {
+  it('uses custom flame colours from the configuration', async () => {
     const card = mount(
       {
         ...fullConfig,
@@ -260,9 +287,7 @@ describe('room climate card', () => {
       createHass({ states: baseStates() })
     );
     await card.updateComplete;
-    expect(
-      (q(card, '.hvac-icon') as HTMLElement).style.getPropertyValue('--badge-color')
-    ).toBe('#ff0000');
+    expect((q(card, '.flame') as HTMLElement).style.color).toBe('rgb(255, 0, 0)');
   });
 
   it('does not claim heating when hvac_action is missing', async () => {
@@ -276,80 +301,11 @@ describe('room climate card', () => {
       })
     );
     await card.updateComplete;
-    const icon = q(card, '.hvac-icon') as HTMLElement;
-    expect(icon.classList.contains('is-unknown')).toBe(true);
-    expect(icon.getAttribute('aria-label')).toBe('Status unbekannt');
-    expect(icon.style.getPropertyValue('--badge-color')).toContain('--rcc-neutral');
-    expect(text(card, '.setpoint-row')).not.toContain('Heizt');
-  });
-
-  it('renders setpoint and heating icon as badges like window and motion', async () => {
-    const card = mount(fullConfig, createHass({ states: baseStates() }));
-    await card.updateComplete;
-
-    const headerBadges = qa(card, '.badges .badge');
-    expect(headerBadges.length).toBe(2);
-
-    const hvac = q(card, '.hvac-icon') as HTMLElement;
-    const setpoint = q(card, '.setpoint') as HTMLElement;
-    // Same visual language: badge surface, ring and background.
-    expect(hvac.classList.contains('badge')).toBe(true);
-    expect(setpoint.classList.contains('badge')).toBe(true);
-    expect(hvac.style.getPropertyValue('--badge-bg')).not.toBe('');
-    expect(hvac.style.getPropertyValue('--badge-border')).not.toBe('');
-    // The setpoint badge groups label, value and unit.
-    expect(setpoint.querySelector('.setpoint-label')?.textContent?.trim()).toBe('Soll');
-    expect(setpoint.querySelector('.setpoint-value')?.textContent?.trim()).toBe('22,0');
-    expect(setpoint.querySelector('.setpoint-unit')?.textContent?.trim()).toBe('°C');
-    // The heating state is still carried by the colour only.
-    expect(text(card, '.setpoint-row')).not.toContain('Heizt');
-  });
-
-  it('centres setpoint value and unit vertically inside the badge', async () => {
-    const card = mount(fullConfig, createHass({ states: baseStates() }));
-    await card.updateComplete;
-
-    const styleText = Array.from(
-      (
-        card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
-      ).elementStyles ?? []
-    )
-      .map((sheet) => sheet.cssText ?? '')
-      .join('\n');
-
-    // The badge itself must centre its content; baseline alignment pushed the
-    // value to the top edge of the 30 px box.
-    expect(styleText).toMatch(/\.setpoint\s*\{[^}]*align-items:\s*center/);
-    expect(styleText).not.toMatch(/\.setpoint\s*\{[^}]*align-items:\s*baseline/);
-
-    // Value and unit sit in their own group and share a baseline with each other.
-    const reading = q(card, '.setpoint-reading');
-    expect(reading).not.toBeNull();
-    expect(reading!.querySelector('.setpoint-value')?.textContent?.trim()).toBe('22,0');
-    expect(reading!.querySelector('.setpoint-unit')?.textContent?.trim()).toBe('°C');
-    // Value and unit are centred on their own optical middle; a shared baseline
-    // pushes the small `°C` about 2 px lower than the number.
-    expect(styleText).toMatch(/\.setpoint-reading\s*\{[^}]*align-items:\s*center/);
-    expect(styleText).not.toMatch(/\.setpoint-reading\s*\{[^}]*align-items:\s*baseline/);
-    // Both carry an explicit line height so nothing is clipped or shifted.
-    expect(styleText).toMatch(/\.setpoint-value\s*\{[^}]*line-height:\s*1/);
-    expect(styleText).toMatch(/\.setpoint-unit\s*\{[^}]*line-height:\s*1/);
-  });
-
-  it('keeps the badge look for the unknown state', async () => {
-    const card = mount(
-      fullConfig,
-      createHass({
-        states: [
-          ...baseStates(),
-          entity('climate.thermostat', { state: 'heat', attributes: { temperature: 21 } }),
-        ],
-      })
-    );
-    await card.updateComplete;
-    const hvac = q(card, '.hvac-icon') as HTMLElement;
-    expect(hvac.classList.contains('badge')).toBe(true);
-    expect(hvac.classList.contains('is-unknown')).toBe(true);
+    const flame = q(card, '.flame') as HTMLElement;
+    expect(flame.classList.contains('status-unknown')).toBe(true);
+    expect(text(card, '.climate-state')).toBe('Status unbekannt');
+    // The setpoint is still known and stays visible.
+    expect(text(card, '.climate-setpoint')).toBe('Soll 21,0 °C');
   });
 
   it('respects thermostat sub-options', async () => {
@@ -358,38 +314,38 @@ describe('room climate card', () => {
       createHass({ states: baseStates() })
     );
     await both.updateComplete;
-    expect(q(both, '.setpoint-row')).toBeNull();
+    expect(q(both, '.climate-row')).toBeNull();
 
-    const iconOnly = mount(
+    const stateOnly = mount(
       { ...fullConfig, show_setpoint: false },
       createHass({ states: baseStates() })
     );
-    await iconOnly.updateComplete;
-    expect(q(iconOnly, '.hvac-icon')).not.toBeNull();
-    expect(q(iconOnly, '.setpoint')).toBeNull();
+    await stateOnly.updateComplete;
+    expect(q(stateOnly, '.flame')).not.toBeNull();
+    expect(q(stateOnly, '.climate-setpoint')).toBeNull();
 
     const setpointOnly = mount(
       { ...fullConfig, show_hvac_status: false },
       createHass({ states: baseStates() })
     );
     await setpointOnly.updateComplete;
-    expect(q(setpointOnly, '.hvac-icon')).toBeNull();
-    expect(text(setpointOnly, '.setpoint-value')).toBe('22,0');
+    expect(q(setpointOnly, '.flame')).toBeNull();
+    expect(text(setpointOnly, '.climate-setpoint')).toBe('Soll 22,0 °C');
   });
 
-  it('omits the thermostat row when disabled', async () => {
+  it('omits the whole heating row when the thermostat is disabled', async () => {
     const card = mount({ ...fullConfig, show_thermostat: false }, createHass({ states: baseStates() }));
     await card.updateComplete;
-    expect(q(card, '.setpoint-row')).toBeNull();
-    expect(q(card, '.hvac-icon')).toBeNull();
+    expect(q(card, '.climate-row')).toBeNull();
+    expect(q(card, '.flame')).toBeNull();
   });
 
-  it('sizes both readings from CSS variables and keeps humidity smaller by default', async () => {
+  it('sizes both readings from CSS variables and keeps humidity at half size', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
     const container = q(card, '.card') as HTMLElement;
     expect(container.style.getPropertyValue('--rcc-temp-size').trim()).toBe('42px');
-    expect(container.style.getPropertyValue('--rcc-hum-size').trim()).toBe('28px');
+    expect(container.style.getPropertyValue('--rcc-hum-size').trim()).toBe('20px');
     // No custom family configured -> the element keeps inheriting the theme font.
     expect(container.style.getPropertyValue('--rcc-temp-font')).toBe('');
     expect(container.style.getPropertyValue('--rcc-hum-font')).toBe('');
@@ -401,12 +357,17 @@ describe('room climate card', () => {
     )
       .map((sheet) => sheet.cssText ?? '')
       .join('\n');
-    expect(styleText).toMatch(/\.temperature\s*\{[^}]*font-size:\s*var\(--rcc-temp-size/);
-    expect(styleText).toMatch(/\.humidity\s*\{[^}]*font-size:\s*var\(--rcc-hum-size/);
-    expect(styleText).toMatch(
-      /\.density-xs \.temperature\s*\{[^}]*calc\(var\(--rcc-temp-size[^}]*\) \* 0\.6\)/
-    );
-    expect(text(card, '.humidity-value')).toBe('50,4');
+    expect(styleText).toMatch(/\.reading\.temperature\s*\{[^}]*font-size:\s*var\(--rcc-temp-size/);
+    expect(styleText).toMatch(/\.reading\.humidity\s*\{[^}]*font-size:\s*var\(--rcc-hum-size/);
+    // Values share one baseline, so the hero and the secondary value line up.
+    expect(styleText).toMatch(/\.reading-values\s*\{[^}]*align-items:\s*baseline/);
+    // Tabular figures keep the number from jittering on every update.
+    expect(styleText).toMatch(/\.reading-number\s*\{[^}]*tabular-nums/);
+    expect(styleText).toMatch(/\.reading-number\s*\{[^}]*letter-spacing:\s*-0\.035em/);
+    // Labels in versals with 0.09 em tracking.
+    expect(styleText).toMatch(/\.series-label\s*\{[^}]*letter-spacing:\s*0\.09em/);
+    expect(styleText).toMatch(/\.series-label\s*\{[^}]*text-transform:\s*uppercase/);
+    expect(text(card, '.reading.humidity .reading-value')).toBe('50,4');
   });
 
   it('applies independent font sizes and families per reading', async () => {
@@ -428,6 +389,45 @@ describe('room climate card', () => {
     expect(container.style.getPropertyValue('--rcc-hum-font').trim()).toBe('Roboto Mono');
   });
 
+  it('keeps the whole card on one 4 px grid with a single 20 px inset', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const styleText = Array.from(
+      (
+        card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
+      ).elementStyles ?? []
+    )
+      .map((sheet) => sheet.cssText ?? '')
+      .join('\n');
+    // One inset for title, values and chart – no 13/16 px mix any more.
+    expect(styleText).toMatch(/\.card\s*\{[^}]*padding:\s*var\(--rcc-space-5\)/);
+    expect(styleText).toMatch(/--rcc-space-5:\s*20px/);
+    // Every gap and margin is a multiple of 4 px.
+    const lengths = Array.from(
+      styleText.matchAll(/(?:padding|margin|gap)(?:-top|-bottom|-left|-right)?:\s*([^;]+);/g)
+    ).map((match) => match[1]);
+    for (const value of lengths) {
+      for (const px of Array.from(value.matchAll(/(-?\d+)px/g)).map((m) => Number(m[1]))) {
+        expect(Math.abs(px % 4)).toBe(0);
+      }
+    }
+  });
+
+  it('draws depth with a hairline and a soft light gradient instead of a hard frame', async () => {
+    const card = mount({ ...fullConfig, theme: 'dark' }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const styleText = Array.from(
+      (
+        card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> }
+      ).elementStyles ?? []
+    )
+      .map((sheet) => sheet.cssText ?? '')
+      .join('\n');
+    expect(styleText).toContain('#0e1013');
+    expect(styleText).toContain('rgba(255, 255, 255, 0.07)');
+    expect(styleText).toMatch(/--rcc-radius:\s*26px/);
+  });
+
   it('applies a fixed height and density classes', async () => {
     const card = mount({ ...fullConfig, height: 200 }, createHass({ states: baseStates() }));
     await card.updateComplete;
@@ -438,7 +438,7 @@ describe('room climate card', () => {
 
     resizeTo(card, 320, 150);
     await card.updateComplete;
-    expect((q(card, '.card') as HTMLElement).classList.contains('density-xs')).toBe(true);
+    expect(container.classList.contains('density-xs')).toBe(true);
   });
 
   it('uses automatic height by default', async () => {
@@ -447,13 +447,55 @@ describe('room climate card', () => {
     const container = q(card, '.card') as HTMLElement;
     expect(container.classList.contains('auto-height')).toBe(true);
     expect(container.style.getPropertyValue('--rcc-height')).toBe('');
-    expect(container.style.getPropertyValue('--rcc-chart-height')).toBe('84px');
+    // The reference sheet uses a 112 px chart.
+    expect(container.style.getPropertyValue('--rcc-chart-height')).toBe('112px');
   });
 
   it('supports theme overrides', async () => {
     const card = mount({ ...fullConfig, theme: 'light' }, createHass({ states: baseStates() }));
     await card.updateComplete;
     expect(q(card, '.card')?.classList.contains('theme-light')).toBe(true);
+  });
+
+  it('toggles a series by clicking its value', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+
+    const chart = () => q(card, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] };
+    const temperature = q(card, '.reading.temperature') as HTMLButtonElement;
+    const humidity = q(card, '.reading.humidity') as HTMLButtonElement;
+
+    // Both series are visible and announced as pressed.
+    expect(temperature.tagName).toBe('BUTTON');
+    expect(temperature.getAttribute('aria-pressed')).toBe('true');
+    expect(chart().hiddenSeries).toEqual([]);
+
+    temperature.click();
+    await card.updateComplete;
+    expect(temperature.getAttribute('aria-pressed')).toBe('false');
+    expect(temperature.classList.contains('is-hidden')).toBe(true);
+    expect(chart().hiddenSeries).toEqual(['temperature']);
+    // The caption dot of that series dims with it.
+    expect(q(card, '.reading-labels .series-label')?.classList.contains('is-hidden')).toBe(true);
+
+    humidity.click();
+    await card.updateComplete;
+    expect(chart().hiddenSeries).toEqual(['temperature', 'humidity']);
+
+    temperature.click();
+    await card.updateComplete;
+    expect(chart().hiddenSeries).toEqual(['humidity']);
+    expect(temperature.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('offers no toggle when the series is not drawn in the chart', async () => {
+    const card = mount(
+      { ...fullConfig, show_temperature_chart: false, show_humidity_chart: false },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    expect(q(card, 'button.reading')).toBeNull();
+    expect(q(card, '.reading.temperature')?.tagName).toBe('SPAN');
   });
 
   it('loads real history through the websocket API', async () => {
@@ -570,7 +612,7 @@ describe('room climate card', () => {
     card.hass = createHass({ states: [entity('sensor.temp', { state: 'broken' })] });
     card.setConfig({ type: 'custom:room-climate-card', temperature_entity: 'sensor.temp' });
     await card.updateComplete;
-    expect(text(card, '.temperature .value')).toBe('–');
+    expect(text(card, '.reading.temperature .reading-value')).toBe('–');
   });
 
   it('only re-renders when a referenced entity changes', async () => {
@@ -640,7 +682,8 @@ describe('room climate card', () => {
     await card.updateComplete;
     const name = q(card, '.name') as HTMLElement;
     expect(name.getAttribute('title')).toBe('Wohnzimmer mit sehr langem Namen und Erker');
-    // window + motion in the header, heating mode + setpoint in the status row
-    expect(qa(card, '.badge').length).toBe(4);
+    // Only window + motion are badges now; the heating row is plain text.
+    expect(qa(card, '.badge').length).toBe(2);
+    expect(q(card, '.climate-row')).not.toBeNull();
   });
 });

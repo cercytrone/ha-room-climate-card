@@ -4,6 +4,54 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.0.0] – 2026-10-30
+
+Komplettes Redesign der Kartenoptik. Die Karte ist ruhiger, strenger gerastert und zeigt
+weniger gleichzeitig. **Breaking:** mehrere Farb- und Grenzwert-Optionen entfallen.
+
+### Geändert
+
+- **Eine Akzentfarbe statt vier Bandfarben.** Mint (`#4FD1A5`) ist der einzige Signalton und
+  markiert nur die Primärgröße: Punkt am Messwert, Temperaturkurve, Soll-Referenzlinie. Die
+  Luftfeuchte bekommt ein zurückgenommenes Indigo (`#8B86D6`), das ausschließlich in Punkt und
+  Kurve auftaucht. Beide Farben bleiben im visuellen Editor anpassbar (`accent_color`,
+  `humidity_color`); `temperature_comfort_color` wirkt als veralteter Alias weiter.
+- **Nur ein Wert ist groß.** Die Temperatur ist der Held (42 px, neutrales Weiß, −0,035 em
+  Tracking), die Luftfeuchte folgt rechtsbündig auf derselben Grundlinie bei 20 px. Beide
+  Größen bleiben im Editor getrennt einstellbar.
+- **Legendenzeile ersatzlos gestrichen.** Der farbige Punkt wandert direkt an den Messwert:
+  über der Zahl steht die Deklaration („TEMPERATUR“, „LUFTFEUCHTE“) mit ihrem Punkt. Ein Klick
+  auf den Wert blendet die zugehörige Serie aus und wieder ein (`aria-pressed`).
+- **Heizzeile statt Badges.** Unter dem Messwert steht eine Zeile mit Flamme, aktuellem Modus
+  („Heizt“ / „Bereit“ / „Aus“) und Solltemperatur. `hvac_action: idle` heißt jetzt „Bereit“
+  statt „Ruht“.
+- **Ein Raster für alles.** 20 px Innenabstand rundum, alle Abstände in 4-px-Schritten, eine
+  gemeinsame optische Kante für Titel, Werte und Verlauf. Der Titel sitzt nicht mehr weiter
+  links als die Werte.
+- **Kurve entrauscht.** Gleitender Mittelwert (`movingAverage`, Fenster 3–9 Samples, zentriert)
+  plus monotone Glättung, 1,9 px Linie ohne Leuchten, ein einziger dezenter Flächenverlauf.
+  Die Luftfeuchte bekommt ein eigenes Band im oberen Drittel und kreuzt die Temperaturkurve
+  nicht mehr; ihre Fläche entfällt.
+- **Sollwert in der Kurve.** Eine dezent gestrichelte Referenzlinie mit Mini-Label „SOLL“
+  zeigt, wie weit der Raum vom Ziel entfernt ist; der Zielwert fließt in die Skalierung ein.
+- **Achse auf das Nötige gekürzt.** Eine Haarlinie als Basis, drei Labels in 10,5 px bei 32 %
+  Deckkraft, sprechend statt kryptisch („Sa 05:40 · So 05:40 · Jetzt“). Die gestrichelten
+  Hilfslinien sind jetzt standardmäßig **aus** (`chart_show_grid: true` schaltet sie ein).
+- **Tiefe statt Rahmen.** 26 px Radius, 1 px Haarlinie bei 7 % Weiß, kaum sichtbarer
+  Lichtverlauf von oben links, Fläche `#0E1013` (OLED-freundlich, kein Reinschwarz).
+- **Zahlen, die nicht zappeln.** Tabellenziffern (`tnum`), negatives Tracking für große Zahlen,
+  Einheiten als eigenständige kleinere Sekundärschrift, Labels in Versalien mit 0,09 em
+  Laufweite.
+- Standard-Chart-Höhe 84 → 112 px, Standard-Eckenradius 18 → 26 px.
+
+### Entfernt
+
+- `temperature_cool_below`, `temperature_warm_above`, `temperature_hot_above`,
+  `temperature_cool_color`, `temperature_warm_color`, `temperature_hot_color`
+- `humidity_low_threshold`, `humidity_high_threshold`, `humidity_low_color`,
+  `humidity_high_color`
+- `chart_show_legend` (es gibt keine Legende mehr)
+
 ## [1.3.0] – 2026-10-29
 
 ### Geändert

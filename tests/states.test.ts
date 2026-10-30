@@ -137,7 +137,8 @@ describe('readThermostat', () => {
   it('reports idle when hvac_action says idle', () => {
     const result = reading('heat', { hvac_action: 'idle', temperature: 21.5 });
     expect(result.status).toBe('idle');
-    expect(result.label).toBe('Ruht');
+    // Idle reads as "ready" – not as "off" and not as "heating".
+    expect(result.label).toBe('Bereit');
     expect(result.colorKey).toBe('idle');
   });
 
