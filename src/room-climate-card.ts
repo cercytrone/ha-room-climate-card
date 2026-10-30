@@ -491,8 +491,10 @@ export class RoomClimateCard extends LitElement {
     const showTemperature = Boolean(config.temperatureEntity);
     const showHumidity = Boolean(config.humidityEntity);
 
-    return html`<div class="readings">
-      <div class="reading-labels" aria-hidden="true">
+    const showLabels = config.showSeriesLabels;
+    return html`<div class="readings ${showLabels ? '' : 'no-labels'}">
+      ${showLabels
+        ? html`<div class="reading-labels" aria-hidden="true">
         ${showTemperature
           ? html`<span
               class="series-label ${this._hiddenSeries.includes('temperature') ? 'is-hidden' : ''}"
@@ -507,7 +509,8 @@ export class RoomClimateCard extends LitElement {
               >${t.t('humidity')}</span
             >`
           : nothing}
-      </div>
+        </div>`
+        : nothing}
       <div class="reading-values">
         ${showTemperature
           ? this.renderReading({
@@ -899,8 +902,8 @@ export class RoomClimateCard extends LitElement {
       padding: 0;
     }
     .badge .icon {
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
     }
 
     /* ----------------------------------------------------------- readings */
@@ -910,6 +913,10 @@ export class RoomClimateCard extends LitElement {
       gap: var(--rcc-space-1);
       margin-top: var(--rcc-space-3);
       min-width: 0;
+    }
+    .readings.no-labels {
+      /* Without the caption row the values carry their own top gap. */
+      margin-top: var(--rcc-space-2);
     }
     .reading-labels {
       display: flex;
@@ -1151,8 +1158,8 @@ export class RoomClimateCard extends LitElement {
     }
     .density-xs .badge .icon,
     .density-xs .flame .icon {
-      width: 13px;
-      height: 13px;
+      width: 12px;
+      height: 12px;
     }
     .density-xs .subtle {
       display: none;

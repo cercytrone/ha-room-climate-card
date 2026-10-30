@@ -51,7 +51,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: Flamme (rot = heizt, grün = bereit, grau = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Gleitender Mittelwert plus monotone Glättung, 1,9 px Linie ohne Leuchten, ein einziger dezenter Flächenverlauf, Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Gleitender Mittelwert plus monotone Glättung, 1,9 px Linie ohne Leuchten, ein dezenter Flächenverlauf, Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.0.1`.
+  `ROOM-CLIMATE-CARD v2.1.0`.
 
 ---
 
@@ -159,6 +159,7 @@ voneinander** gestalten – Größe und Schriftart jeweils getrennt:
 | `temperature_font_family` | string | Theme | CSS-Schriftart der Temperatur, z. B. `Inter` oder `"Roboto Mono", monospace`. |
 | `humidity_font_size` | number (px) | `20` | Schriftgröße der Luftfeuchte (14–96). |
 | `humidity_font_family` | string | Theme | CSS-Schriftart der Luftfeuchte. |
+| `show_series_labels` | boolean | `true` | Beschriftungszeile über den Werten („TEMPERATUR“ / „LUFTFEUCHTE“) mit den Farbpunkten. Aus = nur die Werte, ohne Lücke. |
 
 - Einheiten (`°C`, `%`) und das Tropfen-Icon skalieren automatisch mit ihrem eigenen Messwert.
 - Bei sehr kleinen Kartenhöhen (`density-sm`/`density-xs`) werden beide Größen anteilig
@@ -204,9 +205,10 @@ mehr.
 | --- | --- | --- | --- |
 | `show_thermostat` | boolean | automatisch | Thermostatzeile anzeigen. |
 | `climate_entity` | entity | – | Climate-Entität. |
-| `show_setpoint` | boolean | `true` | Solltemperatur in der Heizzeile unter dem Messwert anzeigen. |
-| `show_hvac_status` | boolean | `true` | Flamme vor dem Statuswort anzeigen (Farbe = Zustand). |
-| `show_hvac_mode` | boolean | `false` | HVAC-Modus zusätzlich als Chip in derselben Zeile anzeigen. |
+| `show_climate_row` | boolean | `true` | Die gesamte Statuszeile unter dem Messwert (Flamme, Statuswort, Solltemperatur) anzeigen. Aus = die Zeile verschwindet samt Abstand. |
+| `show_setpoint` | boolean | `true` | Solltemperatur in der Statuszeile anzeigen. |
+| `show_hvac_status` | boolean | `true` | Flamme samt Statuswort anzeigen (Farbe = Zustand). |
+| `show_hvac_mode` | boolean | `false` | Statt des Statusworts den HVAC-Modus („Automatik“) in derselben Zeile anzeigen. |
 | `heating_color` | color | `#ef4444` (rot) | Icon-Farbe, wenn die Heizung läuft. |
 | `heating_idle_color` | color | `#34d399` (grün) | Icon-Farbe, wenn die Heizung aktiv, aber ohne Heizanforderung ist. |
 | `heating_off_color` | color | `#64748b` (grau) | Icon-Farbe bei ausgeschalteter Heizung. |
@@ -241,11 +243,11 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | --- | --- |
 | **Allgemein** | Raumname, Name aus Entität, Icon, automatische Höhe, Kartenhöhe, Eckenradius, Darstellung |
 | **Sensoren** | Temperatursensor, Luftfeuchtesensor, Dezimalstellen |
-| **Messwerte (Schrift)** | Schriftgröße und Schriftart für Temperatur und Luftfeuchte – jeweils getrennt |
+| **Messwerte (Schrift)** | Schriftgröße und Schriftart für Temperatur und Luftfeuchte – jeweils getrennt; Beschriftungszeile („TEMPERATUR“ / „LUFTFEUCHTE“) ein-/ausschaltbar |
 | **Farben & Grenzwerte** | Temperaturgrenzen (kühl/warm/heiß), vier Temperaturfarben, Feuchtefarbe, Feuchte-Grenzwerte und -Farben |
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
-| **Thermostat** | Ein/Aus, Climate-Entität, Solltemperatur, Heizstatus-Flamme, HVAC-Modus, drei Flammenfarben (rot/grün/grau) |
+| **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (rot/grün/grau) |
 | **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenverlauf, Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
@@ -442,7 +444,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 229 Tests in 11 Dateien aus (Stand 2.0.1):
+`npm test` führt 236 Tests in 11 Dateien aus (Stand 2.1.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

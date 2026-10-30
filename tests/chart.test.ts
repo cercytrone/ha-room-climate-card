@@ -117,6 +117,23 @@ describe('climate chart', () => {
     expect(root.querySelectorAll('.baseline')).toHaveLength(1);
   });
 
+  it('fills the temperature area with a visible but restrained gradient', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]), accentColor: '#4FD1A5' });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const fill = chart.shadowRoot!.querySelector('[id$="-temp-fill"]')!;
+    const stops = Array.from(fill.querySelectorAll('stop')).map((stop) =>
+      Number(stop.getAttribute('stop-opacity'))
+    );
+    // Stronger than the first 2.0 draft (0.16 → 0.22 at the top) but still far
+    // from a solid block of colour.
+    expect(stops[0]).toBeCloseTo(0.22, 2);
+    expect(stops[stops.length - 1]).toBe(0);
+    for (let i = 1; i < stops.length; i++) {
+      expect(stops[i]).toBeLessThanOrEqual(stops[i - 1]);
+    }
+  });
+
   it('colours the temperature curve with the accent and the humidity with the secondary', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22]),

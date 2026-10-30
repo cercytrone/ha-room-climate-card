@@ -32,10 +32,12 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   temperature_font_size?: number;
   /** CSS font family for the temperature value; empty = theme font. */
   temperature_font_family?: string;
-  /** Font size of the humidity value in pixels (default 28). */
+  /** Font size of the humidity value in pixels (default 20). */
   humidity_font_size?: number;
   /** CSS font family for the humidity value; empty = theme font. */
   humidity_font_family?: string;
+  /** Caption row above the values ("TEMPERATUR" / "LUFTFEUCHTE"). Default on. */
+  show_series_labels?: boolean;
 
   // Series colours (one accent + one subdued secondary)
   /** Accent of the primary value: its dot and the temperature curve. */
@@ -61,6 +63,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   // Thermostat
   show_thermostat?: boolean;
   climate_entity?: string;
+  /** Whole heating/status row below the readings. Default on. */
+  show_climate_row?: boolean;
   show_setpoint?: boolean;
   show_hvac_status?: boolean;
   show_hvac_mode?: boolean;
@@ -98,6 +102,8 @@ export interface ResolvedMotionConfig {
 export interface ResolvedThermostatConfig {
   enabled: boolean;
   entity?: string;
+  /** The whole row (flame, state, setpoint) can be switched off as one. */
+  showRow: boolean;
   showSetpoint: boolean;
   showStatus: boolean;
   showMode: boolean;
@@ -153,6 +159,8 @@ export interface ResolvedConfig {
   temperatureDecimals: number;
   humidityDecimals: number;
   typography: TypographyConfig;
+  /** Caption row above the readings; hiding it keeps the values in place. */
+  showSeriesLabels: boolean;
   /** Single accent: dot of the primary value and the temperature curve. */
   accentColor: string;
   humidity: HumidityConfig;
@@ -324,6 +332,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
         fontFamily: asFontFamily(config.humidity_font_family),
       },
     },
+    showSeriesLabels: asBoolean(config.show_series_labels) ?? true,
     accentColor: asColor(
       config.accent_color ?? config.temperature_comfort_color,
       DEFAULT_COLORS.accent
@@ -344,6 +353,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     thermostat: {
       enabled: showThermostat && Boolean(climateEntity),
       entity: climateEntity,
+      showRow: asBoolean(config.show_climate_row) ?? true,
       showSetpoint: asBoolean(config.show_setpoint) ?? true,
       showStatus: asBoolean(config.show_hvac_status) ?? true,
       showMode: asBoolean(config.show_hvac_mode) ?? false,
@@ -390,7 +400,7 @@ export function hasChart(config: ResolvedConfig): boolean {
 }
 
 export function hasStatusRow(config: ResolvedConfig): boolean {
-  return config.thermostat.enabled;
+  return config.thermostat.enabled && config.thermostat.showRow;
 }
 
 /**
@@ -405,8 +415,9 @@ export function preferredCardHeight(config: ResolvedConfig): number {
   const chartHeight = hasChart(config) ? config.chart.height : 0;
   const statusRow = hasStatusRow(config) ? 20 : 0;
   const header = 28;
-  const labels = 16;
-  return 20 + header + 12 + labels + 4 + readings + 8 + statusRow + 12 + chartHeight + 20;
+  // Caption row plus its 4 px gap disappears completely when switched off.
+  const labels = config.showSeriesLabels ? 20 : 0;
+  return 20 + header + 12 + labels + readings + 8 + statusRow + 12 + chartHeight + 20;
 }
 
 export function resolveName(config: ResolvedConfig, hass?: HomeAssistant): string {

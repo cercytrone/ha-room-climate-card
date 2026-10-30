@@ -4,6 +4,26 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.1.0] – 2026-10-30
+
+### Hinzugefügt
+
+- **Beschriftungszeile abschaltbar:** `show_series_labels: false` blendet „TEMPERATUR“ /
+  „LUFTFEUCHTE“ samt Farbpunkten aus. Die Werte bleiben an ihrem Platz (kein Sprung), nur der
+  obere Abstand wird um 4 px reduziert. Im visuellen Editor unter **Messwerte (Schrift)**.
+- **Statuszeile abschaltbar:** `show_climate_row: false` entfernt die komplette Zeile
+  (Flamme, Statuswort, Solltemperatur) inklusive ihres Abstands. Die drei Unteroptionen
+  (`show_setpoint`, `show_hvac_status`, `show_hvac_mode`) sind im Editor deaktiviert, solange
+  die Zeile aus ist. Auch die Kartenhöhe reserviert dann keinen Platz mehr.
+
+### Geändert
+
+- **Fenster- und Bewegungsicon minimal kleiner:** 15 px statt 16 px (Dichte `xs`: 12 statt
+  13 px). Die Badge-Kachel bleibt 28 px groß, das Tap-Ziel ändert sich also nicht.
+- **Kräftigerer Temperaturverlauf:** Der Flächenverlauf startet bei 22 % statt 16 % Deckkraft
+  (Mitte 8 % statt 5 %, unten weiterhin transparent) – sichtbarer, aber weiterhin eine ruhige
+  Fläche und kein Farbblock.
+
 ## [2.0.1] – 2026-10-30
 
 ### Geändert
