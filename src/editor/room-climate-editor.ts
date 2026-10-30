@@ -42,6 +42,7 @@ interface EditorText {
   humiditySize: string;
   humidityFont: string;
   readingSizeHelper: string;
+  showSeriesLabels: string;
   readingFontHelper: string;
   accentColor: string;
   secondaryColor: string;
@@ -55,6 +56,7 @@ interface EditorText {
   motionLastChanged: string;
   showThermostat: string;
   climateEntity: string;
+  showClimateRow: string;
   showSetpoint: string;
   showHvacStatus: string;
   showHvacMode: string;
@@ -120,6 +122,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityFont: 'Schriftart Luftfeuchte',
     readingSizeHelper:
       'Wirkt nur auf diesen Messwert. Bei sehr kleinen Kartenhöhen wird die Größe automatisch mitskaliert.',
+    showSeriesLabels: 'Beschriftung über den Werten (TEMPERATUR / LUFTFEUCHTE) anzeigen',
     readingFontHelper:
       'Leer lassen für die Schrift des Home-Assistant-Themes. Beispiele: Inter, „Roboto, sans-serif“, var(--ha-font-family-body).',
     accentColor: 'Akzentfarbe (Temperatur)',
@@ -135,8 +138,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     motionLastChanged: 'Ruhe-Dauer anzeigen',
     showThermostat: 'Thermostat anzeigen',
     climateEntity: 'Thermostat-Entität',
-    showSetpoint: 'Solltemperatur anzeigen (über Istwert)',
-    showHvacStatus: 'Heizstatus-Icon anzeigen',
+    showClimateRow: 'Statuszeile unter dem Messwert (Heizstatus & Solltemperatur) anzeigen',
+    showSetpoint: 'Solltemperatur in der Statuszeile anzeigen',
+    showHvacStatus: 'Heizstatus (Flamme + Statuswort) anzeigen',
     showHvacMode: 'Betriebsmodus anzeigen',
     heatingColor: 'Icon-Farbe Heizen (z. B. Rot)',
     idleColor: 'Icon-Farbe Ruhe (z. B. Grün)',
@@ -200,6 +204,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityFont: 'Humidity font family',
     readingSizeHelper:
       'Applies to this reading only. Very small card heights scale the size down automatically.',
+    showSeriesLabels: 'Show captions above the values (TEMPERATURE / HUMIDITY)',
     readingFontHelper:
       'Leave empty to use the Home Assistant theme font. Examples: Inter, "Roboto, sans-serif", var(--ha-font-family-body).',
     accentColor: 'Accent colour (temperature)',
@@ -215,8 +220,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     motionLastChanged: 'Show quiet duration',
     showThermostat: 'Show thermostat',
     climateEntity: 'Climate entity',
-    showSetpoint: 'Show target temperature (above current)',
-    showHvacStatus: 'Show heating status icon',
+    showClimateRow: 'Show the status row (heating state & target temperature)',
+    showSetpoint: 'Show target temperature in the status row',
+    showHvacStatus: 'Show heating state (flame + wording)',
     showHvacMode: 'Show HVAC mode',
     heatingColor: 'Heating icon colour (e.g. red)',
     idleColor: 'Idle icon colour (e.g. green)',
@@ -706,6 +712,11 @@ export class RoomClimateCardEditor extends LitElement {
    */
   private renderTypography(t: EditorText): TemplateResult {
     return html`<div class="hint">${t.readingSizeHelper}</div>
+      ${this.renderSwitch({
+        key: 'show_series_labels',
+        label: t.showSeriesLabels,
+        value: this.rawBoolean('show_series_labels') ?? true,
+      })}
       ${this.renderNumber({
         key: 'temperature_font_size',
         label: t.temperatureSize,
@@ -737,6 +748,11 @@ export class RoomClimateCardEditor extends LitElement {
   }
 
   /** Two colours, one job each: accent for the hero, secondary for humidity. */
+  /** The row switch disables everything that only lives inside that row. */
+  private get rowVisible(): boolean {
+    return this.rawBoolean('show_climate_row') ?? true;
+  }
+
   private renderColors(t: EditorText): TemplateResult {
     return html`<div class="hint">${t.colorsHelper}</div>
       ${this.renderColor({
@@ -838,22 +854,28 @@ export class RoomClimateCardEditor extends LitElement {
         warning: enabled && !asEntityId(this._config.climate_entity) ? t.missingEntity : undefined,
       })}
       ${this.renderSwitch({
+        key: 'show_climate_row',
+        label: t.showClimateRow,
+        value: this.rawBoolean('show_climate_row') ?? true,
+        disabled: !enabled,
+      })}
+      ${this.renderSwitch({
         key: 'show_setpoint',
         label: t.showSetpoint,
         value: this.rawBoolean('show_setpoint') ?? true,
-        disabled: !enabled,
+        disabled: !enabled || !this.rowVisible,
       })}
       ${this.renderSwitch({
         key: 'show_hvac_status',
         label: t.showHvacStatus,
         value: this.rawBoolean('show_hvac_status') ?? true,
-        disabled: !enabled,
+        disabled: !enabled || !this.rowVisible,
       })}
       ${this.renderSwitch({
         key: 'show_hvac_mode',
         label: t.showHvacMode,
         value: this.rawBoolean('show_hvac_mode') ?? false,
-        disabled: !enabled,
+        disabled: !enabled || !this.rowVisible,
       })}
       ${this.renderColor({
         key: 'heating_color',

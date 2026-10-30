@@ -176,8 +176,8 @@ function badge(x: number, y: number, color: string, active: boolean, body: strin
     <rect x="0" y="0" width="28" height="28" rx="10" fill="${
       active ? `${color}24` : 'rgba(148,163,184,0.10)'
     }" stroke="${active ? `${color}59` : COLORS.hairline}" stroke-width="1" />
-    <g transform="translate(6,6)" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <g transform="scale(0.68)">${body}</g>
+    <g transform="translate(6.5,6.5)" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <g transform="scale(0.625)">${body}</g>
     </g>
   </g>`;
 }
@@ -502,8 +502,8 @@ function renderCard(options: CardOptions): string {
         <stop offset="0.55" stop-color="#ffffff" stop-opacity="0" />
       </radialGradient>
       <linearGradient id="${options.cardId}-area" gradientUnits="userSpaceOnUse" x1="0" y1="${temperatureBandTop}" x2="0" y2="${chartBottom}">
-        <stop offset="0" stop-color="${COLORS.accent}" stop-opacity="0.16" />
-        <stop offset="0.55" stop-color="${COLORS.accent}" stop-opacity="0.05" />
+        <stop offset="0" stop-color="${COLORS.accent}" stop-opacity="0.22" />
+        <stop offset="0.55" stop-color="${COLORS.accent}" stop-opacity="0.08" />
         <stop offset="1" stop-color="${COLORS.accent}" stop-opacity="0" />
       </linearGradient>
     </defs>

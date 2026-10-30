@@ -586,8 +586,8 @@ export class RoomClimateChart extends LitElement {
           <stop offset="1" stop-color=${this.accentColor} stop-opacity="1" />
         </linearGradient>
         <linearGradient id=${`${this.uid}-temp-fill`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color=${this.accentColor} stop-opacity="0.16" />
-          <stop offset="0.55" stop-color=${this.accentColor} stop-opacity="0.05" />
+          <stop offset="0" stop-color=${this.accentColor} stop-opacity="0.22" />
+          <stop offset="0.55" stop-color=${this.accentColor} stop-opacity="0.08" />
           <stop offset="1" stop-color=${this.accentColor} stop-opacity="0" />
         </linearGradient>
       </defs>

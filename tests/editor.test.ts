@@ -165,7 +165,10 @@ describe('room climate card editor', () => {
     await editor.updateComplete;
     openAll(editor);
     expect(selectorByLabel(editor, 'Icon-Farbe Heizen (z. B. Rot)').disabled).toBe(true);
-    expect(selectorByLabel(editor, 'Solltemperatur anzeigen (über Istwert)').disabled).toBe(true);
+    expect(
+      selectorByLabel(editor, 'Statuszeile unter dem Messwert (Heizstatus & Solltemperatur) anzeigen')
+        .disabled
+    ).toBe(true);
   });
 
   it('offers independent font size and family for temperature and humidity', async () => {
@@ -211,6 +214,42 @@ describe('room climate card editor', () => {
     openAll(editor);
     // The legend row was removed; the colour dot sits next to the value.
     expect(() => selectorByLabel(editor, 'Legende')).toThrow();
+  });
+
+  it('can switch off the caption row and the whole status row', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+
+    const labels = selectorByLabel(
+      editor,
+      'Beschriftung über den Werten (TEMPERATUR / LUFTFEUCHTE) anzeigen'
+    );
+    expect(labels.value).toBe(true);
+    labels.emit(false);
+    await editor.updateComplete;
+    expect(editor.config.show_series_labels).toBe(false);
+
+    openAll(editor);
+    const row = selectorByLabel(
+      editor,
+      'Statuszeile unter dem Messwert (Heizstatus & Solltemperatur) anzeigen'
+    );
+    expect(row.value).toBe(true);
+    row.emit(false);
+    await editor.updateComplete;
+    expect(editor.config.show_climate_row).toBe(false);
+  });
+
+  it('disables the row sub-options when the status row is switched off', async () => {
+    const editor = await mountEditor({ ...baseConfig, show_climate_row: false });
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Solltemperatur in der Statuszeile anzeigen').disabled).toBe(
+      true
+    );
+    expect(selectorByLabel(editor, 'Heizstatus (Flamme + Statuswort) anzeigen').disabled).toBe(
+      true
+    );
+    expect(selectorByLabel(editor, 'Betriebsmodus anzeigen').disabled).toBe(true);
   });
 
   it('disables chart options when no chart series is enabled', async () => {

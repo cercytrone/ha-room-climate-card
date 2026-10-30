@@ -384,6 +384,38 @@ describe('room climate card', () => {
     expect(q(card, '.flame')).toBeNull();
   });
 
+  it('hides the caption row on request without moving the values', async () => {
+    const card = mount({ ...fullConfig, show_series_labels: false }, createHass({ states: baseStates() }));
+    await card.updateComplete;
+
+    expect(q(card, '.reading-labels')).toBeNull();
+    expect(qa(card, '.series-label')).toHaveLength(0);
+    expect(q(card, '.readings')?.classList.contains('no-labels')).toBe(true);
+    // The readings themselves stay exactly where they are.
+    expect(text(card, '.reading.temperature .reading-value')).toBe('21,8');
+    expect(text(card, '.reading.humidity .reading-value')).toBe('50,4');
+  });
+
+  it('shows the caption row by default', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.reading-labels')).not.toBeNull();
+    expect(q(card, '.readings')?.classList.contains('no-labels')).toBe(false);
+  });
+
+  it('switches off the whole heating row at once', async () => {
+    const card = mount(
+      { ...fullConfig, show_climate_row: false },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    // No flame, no wording, no setpoint – and no leftover gap.
+    expect(q(card, '.climate-row')).toBeNull();
+    expect(q(card, '.flame')).toBeNull();
+    expect(q(card, '.climate-state')).toBeNull();
+    expect(q(card, '.climate-setpoint')).toBeNull();
+  });
+
   it('sizes both readings from CSS variables and keeps humidity at half size', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
@@ -434,6 +466,20 @@ describe('room climate card', () => {
     expect(container.style.getPropertyValue('--rcc-hum-size').trim()).toBe('33px');
     expect(container.style.getPropertyValue('--rcc-temp-font').trim()).toBe('Inter, sans-serif');
     expect(container.style.getPropertyValue('--rcc-hum-font').trim()).toBe('Roboto Mono');
+  });
+
+  it('uses slightly smaller icons inside the unchanged badge box', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const styleText = stylesOf(card);
+    // 15 px glyphs in a 28 px tile: the tap target stays, the badge calms down.
+    expect(styleText).toMatch(/\.badge \.icon\s*\{[^}]*width:\s*15px/);
+    expect(styleText).toMatch(/\.badge \.icon\s*\{[^}]*height:\s*15px/);
+    expect(styleText).toMatch(/\.badge\s*\{[^}]*height:\s*28px/);
+    expect(styleText).toMatch(/\.density-xs \.badge \.icon[^{]*\{[^}]*width:\s*12px/);
+    // The window and motion badges actually contain those icons.
+    expect(q(card, '.badge.window .icon')).not.toBeNull();
+    expect(q(card, '.badge.motion .icon')).not.toBeNull();
   });
 
   it('keeps the whole card on one 4 px grid with a single 20 px inset', async () => {
