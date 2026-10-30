@@ -164,7 +164,7 @@ describe('room climate card editor', () => {
     selectorByLabel(editor, 'Thermostat anzeigen').emit(false);
     await editor.updateComplete;
     openAll(editor);
-    expect(selectorByLabel(editor, 'Icon-Farbe Heizen (z. B. Rot)').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Icon-Farbe Heizen (nur bei aktiver Heizanforderung)').disabled).toBe(true);
     expect(
       selectorByLabel(editor, 'Statuszeile unter dem Messwert (Heizstatus & Solltemperatur) anzeigen')
         .disabled
@@ -411,6 +411,22 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Linienart Luftfeuchte').disabled).toBe(true);
   });
 
+  it('shows the damped flame swatches without writing them into the config', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    // Theme tokens cannot be shown in a colour picker, so the editor previews
+    // concrete colours while the config stays untouched.
+    expect(selectorByLabel(editor, 'Icon-Farbe Heizen (nur bei aktiver Heizanforderung)').value)
+      .toEqual([209, 106, 98]);
+    expect(selectorByLabel(editor, 'Icon-Farbe Ruhe/Warten (Standard: Grün des Verlaufs)').value)
+      .toEqual([79, 209, 165]);
+    expect(selectorByLabel(editor, 'Icon-Farbe aus/unterbrochen (Standard: Farbe des Soll-Werts)').value)
+      .toEqual([148, 163, 184]);
+    expect(editor.config.heating_color).toBeUndefined();
+    expect(editor.config.heating_idle_color).toBeUndefined();
+    expect(editor.config.heating_off_color).toBeUndefined();
+  });
+
   it('converts colour selector values to hex strings', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);
@@ -418,7 +434,7 @@ describe('room climate card editor', () => {
     editor.addEventListener('config-changed', (event) => {
       emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
     });
-    selectorByLabel(editor, 'Icon-Farbe Heizen (z. B. Rot)').emit([255, 128, 0]);
+    selectorByLabel(editor, 'Icon-Farbe Heizen (nur bei aktiver Heizanforderung)').emit([255, 128, 0]);
     expect(emitted?.heating_color).toBe('#ff8000');
   });
 

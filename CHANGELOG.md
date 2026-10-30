@@ -4,6 +4,27 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.1.1] – 2026-10-30
+
+### Geändert
+
+- **Gedämpfte Flamme, Rot nur beim echten Heizen.** Die Flamme ist jetzt das einzige farbige
+  Element der Zeile, also färbt sie leiser:
+  - **Heizen** (`hvac_action: heating`): gedämpftes Rot `#d16a62` statt des grellen `#ef4444`.
+  - **Bereit / Warten** (`hvac_action: idle`): das Grün des Verlaufs, also die Akzentfarbe
+    (standardmäßig `#4FD1A5`). Ändert man `accent_color`, wandert das Grün automatisch mit;
+    `heating_idle_color` überschreibt es weiterhin.
+  - **Aus / nicht verfügbar / Status unbekannt**: exakt die Farbe des Soll-Werts
+    (`--rcc-muted`), also dieselbe gedämpfte Textfarbe wie das Wort daneben.
+  - **Kühlen, Lüften, Trocknen**: Grün des Verlaufs – Rot bleibt ausschließlich einer echten
+    Heizanforderung vorbehalten.
+- Die zusätzliche Abdunklung (Opacity 0,5) für unbekannte Zustände entfällt, weil die Farbe
+  schon gedämpft ist – das winzige Icon war sonst im dunklen Theme kaum noch zu sehen.
+- Die Farbwähler im Editor zeigen konkrete Vorschaufarben (Rot/Grün/Grau) und schreiben erst
+  beim Anfassen einen Wert in die Konfiguration; unberührt bleiben die Theme-Token aktiv.
+- Editor-Beschriftungen benennen die Zustände jetzt genauer („nur bei aktiver
+  Heizanforderung“, „Standard: Grün des Verlaufs“, „Standard: Farbe des Soll-Werts“).
+
 ## [2.1.0] – 2026-10-30
 
 ### Hinzugefügt

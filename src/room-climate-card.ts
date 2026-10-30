@@ -1054,10 +1054,14 @@ export class RoomClimateCard extends LitElement {
       width: 14px;
       height: 14px;
     }
+    /*
+     * Unknown / unavailable already use the muted text tone; dimming them a
+     * second time made the tiny glyph disappear in the dark theme.
+     */
     .flame.status-unknown,
     .flame.status-unavailable,
     .flame.status-missing {
-      opacity: 0.5;
+      opacity: 0.9;
     }
     /*
      * State and target share one colour: the row is a single piece of context,
