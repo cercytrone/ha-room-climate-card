@@ -64,10 +64,13 @@ const COLORS = {
   tertiary: 'rgba(255,255,255,0.32)',
   accent: '#4FD1A5',
   secondary: '#8B86D6',
-  heating: '#ef4444',
-  idle: '#34d399',
-  off: '#64748b',
-  unknown: '#94a3b8',
+  // Damped red – the flame only turns red while heating is actually demanded.
+  heating: '#d16a62',
+  // Idle = the chart's green (accent), so no new hue enters the card.
+  idle: '#4FD1A5',
+  // Off / unknown = the muted tone of the „Soll“ wording.
+  off: 'rgba(255,255,255,0.50)',
+  unknown: 'rgba(255,255,255,0.50)',
   windowOpen: '#fbbf24',
   motion: '#4FD1A5',
 };

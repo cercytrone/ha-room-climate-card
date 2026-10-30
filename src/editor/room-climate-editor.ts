@@ -89,6 +89,19 @@ interface EditorText {
   generalHelper: string;
 }
 
+/**
+ * Literal swatches for the colour pickers. The runtime defaults of the flame are
+ * theme tokens (`var(--rcc-accent)`, `var(--rcc-muted)`), which a colour picker
+ * cannot display – so the editor shows the closest concrete colour instead. As
+ * long as the user does not touch the picker, no value is written to the config
+ * and the theme token stays in charge.
+ */
+const FLAME_SWATCH = {
+  heating: '#d16a62',
+  idle: '#4FD1A5',
+  off: '#94a3b8',
+} as const;
+
 const TEXT: Record<'de' | 'en', EditorText> = {
   de: {
     general: 'Allgemein',
@@ -142,9 +155,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     showSetpoint: 'Solltemperatur in der Statuszeile anzeigen',
     showHvacStatus: 'Heizstatus (Flamme + Statuswort) anzeigen',
     showHvacMode: 'Betriebsmodus anzeigen',
-    heatingColor: 'Icon-Farbe Heizen (z. B. Rot)',
-    idleColor: 'Icon-Farbe Ruhe (z. B. Grün)',
-    offColor: 'Icon-Farbe ausgeschaltet (z. B. Grau)',
+    heatingColor: 'Icon-Farbe Heizen (nur bei aktiver Heizanforderung)',
+    idleColor: 'Icon-Farbe Ruhe/Warten (Standard: Grün des Verlaufs)',
+    offColor: 'Icon-Farbe aus/unterbrochen (Standard: Farbe des Soll-Werts)',
     showTemperatureChart: 'Temperaturverlauf anzeigen',
     showHumidityChart: 'Luftfeuchteverlauf anzeigen',
     hours: 'Zeitraum',
@@ -224,9 +237,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     showSetpoint: 'Show target temperature in the status row',
     showHvacStatus: 'Show heating state (flame + wording)',
     showHvacMode: 'Show HVAC mode',
-    heatingColor: 'Heating icon colour (e.g. red)',
-    idleColor: 'Idle icon colour (e.g. green)',
-    offColor: 'Off icon colour (e.g. grey)',
+    heatingColor: 'Heating icon colour (active heating demand only)',
+    idleColor: 'Idle/waiting icon colour (default: the chart green)',
+    offColor: 'Off/unavailable icon colour (default: the target value colour)',
     showTemperatureChart: 'Show temperature history',
     showHumidityChart: 'Show humidity history',
     hours: 'Period',
@@ -880,19 +893,19 @@ export class RoomClimateCardEditor extends LitElement {
       ${this.renderColor({
         key: 'heating_color',
         label: t.heatingColor,
-        fallback: DEFAULT_COLORS.heating,
+        fallback: FLAME_SWATCH.heating,
         disabled: !enabled,
       })}
       ${this.renderColor({
         key: 'heating_idle_color',
         label: t.idleColor,
-        fallback: DEFAULT_COLORS.idle,
+        fallback: FLAME_SWATCH.idle,
         disabled: !enabled,
       })}
       ${this.renderColor({
         key: 'heating_off_color',
         label: t.offColor,
-        fallback: DEFAULT_COLORS.off,
+        fallback: FLAME_SWATCH.off,
         disabled: !enabled,
       })}`;
   }

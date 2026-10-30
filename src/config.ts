@@ -178,10 +178,19 @@ export const DEFAULT_COLORS = {
   accent: '#4FD1A5',
   /** Deliberately dim indigo – only the dot and the curve use it. */
   humidity: '#8B86D6',
-  /** Red = heating, green = idle, grey = off (colour-coded HVAC flame). */
-  heating: '#ef4444',
-  idle: '#34d399',
-  off: '#64748b',
+  /**
+   * Heating = damped red. The flame is the only coloured element left in the
+   * status row, so it whispers instead of shouting – and it only turns red while
+   * the thermostat is actually heating.
+   */
+  heating: '#d16a62',
+  /**
+   * Off / inactive = exactly the muted tone of the „Soll“ wording next to it, so
+   * the row reads as one quiet line.
+   */
+  off: 'var(--rcc-muted)',
+  // There is deliberately no idle entry: waiting borrows `accent`, i.e. the green
+  // of the chart, so the flame never introduces a hue the card does not use.
 } as const;
 
 /** Built-in reading sizes; both are deliberately large and independently tunable. */
@@ -307,6 +316,11 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
   const humidityLineStyle: HumidityLineStyle =
     config.chart_humidity_line_style === 'dotted' ? 'dotted' : 'solid';
 
+  const accentColor = asColor(
+    config.accent_color ?? config.temperature_comfort_color,
+    DEFAULT_COLORS.accent
+  );
+
   return {
     raw: config,
     name: asString(config.name),
@@ -333,10 +347,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       },
     },
     showSeriesLabels: asBoolean(config.show_series_labels) ?? true,
-    accentColor: asColor(
-      config.accent_color ?? config.temperature_comfort_color,
-      DEFAULT_COLORS.accent
-    ),
+    accentColor,
     humidity: {
       color: asColor(config.humidity_color, DEFAULT_COLORS.humidity),
     },
@@ -358,7 +369,8 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       showStatus: asBoolean(config.show_hvac_status) ?? true,
       showMode: asBoolean(config.show_hvac_mode) ?? false,
       heatingColor: asColor(config.heating_color, DEFAULT_COLORS.heating),
-      idleColor: asColor(config.heating_idle_color, DEFAULT_COLORS.idle),
+      // Waiting is not a state of its own: the flame borrows the chart green.
+      idleColor: asColor(config.heating_idle_color, accentColor),
       offColor: asColor(config.heating_off_color, DEFAULT_COLORS.off),
     },
     chart: {

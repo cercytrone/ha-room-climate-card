@@ -3,7 +3,7 @@ import '../src/main';
 import type { RoomClimateCard } from '../src/room-climate-card';
 import type { RoomClimateCardConfig } from '../src/config';
 import type { HomeAssistant } from '../src/types';
-import { createHass, entity, flush, resizeTo } from './helpers';
+import { createHass, entity, flush, resizeTo, type EntityInit } from './helpers';
 
 const now = Date.now();
 
@@ -247,7 +247,8 @@ describe('room climate card', () => {
     await heating.updateComplete;
     const flame = q(heating, '.flame') as HTMLElement;
     expect(flame.classList.contains('status-heating')).toBe(true);
-    expect(flame.style.color).toBe('rgb(239, 68, 68)');
+    // Damped red, not the old #ef4444 – the flame is the only colour left in the row.
+    expect(flame.style.color).toBe('rgb(209, 106, 98)');
     expect(flame.getAttribute('aria-hidden')).toBe('true');
     expect(text(heating, '.climate-state')).toBe('Heizt');
 
@@ -266,7 +267,8 @@ describe('room climate card', () => {
     await idle.updateComplete;
     const idleFlame = q(idle, '.flame') as HTMLElement;
     expect(idleFlame.classList.contains('status-idle')).toBe(true);
-    expect(idleFlame.style.color).toBe('rgb(52, 211, 153)');
+    // Waiting borrows the chart green (accent), it does not invent a new green.
+    expect(idleFlame.style.color).toBe('rgb(79, 209, 165)');
     // Idle reads as "ready", not as "off" and not as "heating".
     expect(text(idle, '.climate-state')).toBe('Bereit');
 
@@ -280,9 +282,54 @@ describe('room climate card', () => {
       })
     );
     await off.updateComplete;
-    expect((q(off, '.flame') as HTMLElement).classList.contains('status-off')).toBe(true);
+    const offFlame = q(off, '.flame') as HTMLElement;
+    expect(offFlame.classList.contains('status-off')).toBe(true);
+    // Off shares the muted tone of the „Soll“ wording: one quiet line, no colour.
+    expect(offFlame.style.color).toBe('var(--rcc-muted)');
     expect(text(off, '.climate-state')).toBe('Aus');
     expect(text(off, '.climate-setpoint')).toBe('Soll 18,0 °C');
+  });
+
+  it('never paints the flame red without an actual heating demand', async () => {
+    const cases: Array<[string, EntityInit]> = [
+      ['idle', { state: 'heat', attributes: { temperature: 21, hvac_action: 'idle' } }],
+      ['cooling', { state: 'cool', attributes: { temperature: 21, hvac_action: 'cooling' } }],
+      ['fan', { state: 'fan_only', attributes: { temperature: 21, hvac_action: 'fan' } }],
+      ['no action', { state: 'heat', attributes: { temperature: 21 } }],
+      ['off', { state: 'off', attributes: { temperature: 21 } }],
+    ];
+    for (const [label, state] of cases) {
+      const card = mount(
+        { ...fullConfig, name: label },
+        createHass({
+          states: [
+            ...baseStates().filter((entry) => entry.entity_id !== 'climate.thermostat'),
+            entity('climate.thermostat', state),
+          ],
+        })
+      );
+      await card.updateComplete;
+      const flame = q(card, '.flame') as HTMLElement;
+      expect(flame.classList.contains('status-heating')).toBe(false);
+      expect(flame.style.color).not.toBe('rgb(209, 106, 98)');
+    }
+  });
+
+  it('takes the waiting colour from a custom accent', async () => {
+    const card = mount(
+      { ...fullConfig, accent_color: '#123456' },
+      createHass({
+        states: [
+          ...baseStates().filter((entry) => entry.entity_id !== 'climate.thermostat'),
+          entity('climate.thermostat', {
+            state: 'heat',
+            attributes: { temperature: 21, hvac_action: 'idle' },
+          }),
+        ],
+      })
+    );
+    await card.updateComplete;
+    expect((q(card, '.flame') as HTMLElement).style.color).toBe('rgb(18, 52, 86)');
   });
 
   it('uses custom flame colours from the configuration', async () => {

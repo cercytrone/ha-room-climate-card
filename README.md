@@ -50,7 +50,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Luftfeuchte** | Folgt rechtsbündig auf **derselben Grundlinie**, halb so groß (20 px). Eigene Schriftgröße und -art im Editor. Über der Zeile steht die Deklaration mit farbigem Punkt; ein Klick auf den Wert blendet die zugehörige Kurve ein und aus. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
-| **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: Flamme (rot = heizt, grün = bereit, grau = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
+| **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
 | **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Gleitender Mittelwert plus monotone Glättung, 1,9 px Linie ohne Leuchten, ein dezenter Flächenverlauf, Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.1.0`.
+  `ROOM-CLIMATE-CARD v2.1.1`.
 
 ---
 
@@ -209,9 +209,9 @@ mehr.
 | `show_setpoint` | boolean | `true` | Solltemperatur in der Statuszeile anzeigen. |
 | `show_hvac_status` | boolean | `true` | Flamme samt Statuswort anzeigen (Farbe = Zustand). |
 | `show_hvac_mode` | boolean | `false` | Statt des Statusworts den HVAC-Modus („Automatik“) in derselben Zeile anzeigen. |
-| `heating_color` | color | `#ef4444` (rot) | Icon-Farbe, wenn die Heizung läuft. |
-| `heating_idle_color` | color | `#34d399` (grün) | Icon-Farbe, wenn die Heizung aktiv, aber ohne Heizanforderung ist. |
-| `heating_off_color` | color | `#64748b` (grau) | Icon-Farbe bei ausgeschalteter Heizung. |
+| `heating_color` | color | `#d16a62` (gedämpftes Rot) | Flammenfarbe – **nur** solange tatsächlich geheizt wird (`hvac_action: heating`). |
+| `heating_idle_color` | color | Akzentfarbe (`#4FD1A5`) | Flammenfarbe beim Warten/Bereitstehen – standardmäßig exakt das Grün des Verlaufs. |
+| `heating_off_color` | color | Farbe des Soll-Werts (`--rcc-muted`) | Flammenfarbe bei ausgeschaltetem oder nicht verfügbarem Thermostat. |
 
 Das Status-Icon ersetzt eine zusätzliche Textzeile: Die Farbe trägt die Information, der
 Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
@@ -247,7 +247,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Farben & Grenzwerte** | Temperaturgrenzen (kühl/warm/heiß), vier Temperaturfarben, Feuchtefarbe, Feuchte-Grenzwerte und -Farben |
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
-| **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (rot/grün/grau) |
+| **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
 | **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Zeitraum, Chart-Höhe, Kurvenverlauf, Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
@@ -356,18 +356,21 @@ Die Heizzeile steht unter dem Messwert und ist bewusst reiner Text: Flamme, Stat
 Solltemperatur auf einer Linie („🔥 Heizt · Soll 22,0 °C“). Keine Badges, keine Grundlinien-
 Tricks – eine Zeile, eine Schriftgröße, alles auf dem 4-px-Raster.
 
-Der Status steckt ausschließlich in der Farbe des Flammen-Icons:
+Die Flamme ist das einzige farbige Element der Zeile – und deshalb bewusst gedämpft: kein
+Signalrot, sondern ein zurückgenommenes Rot, das Grün des Verlaufs und die Textfarbe des
+Soll-Werts. Nur der Zustand färbt, alles andere bleibt in der ruhigen Palette:
 
-| Icon | Bedeutung | Bedingung |
-| --- | --- | --- |
-| Flamme **rot** | Heizt | `hvac_action == heating` |
-| Flamme **grün** | **Bereit** (aktiv, keine Heizanforderung) | `hvac_action == idle` |
-| Flamme **grau, gefüllt** | Aus | HVAC-Modus `off` oder `hvac_action == off` |
-| Schneeflocke / Ventilator / Tropfen | Kühlt / Lüftet / Trocknet | entsprechender `hvac_action`, neutrale Farbe |
-| Flamme **gedämpft** | Status unbekannt | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` |
+| Icon | Bedeutung | Bedingung | Farbe |
+| --- | --- | --- | --- |
+| Flamme | Heizt | `hvac_action == heating` | gedämpftes Rot `#d16a62` |
+| Flamme | **Bereit** (aktiv, keine Heizanforderung) | `hvac_action == idle` | Grün des Verlaufs (Akzent) |
+| Flamme | Aus | HVAC-Modus `off` oder `hvac_action == off` | Farbe des Soll-Werts (`--rcc-muted`) |
+| Schneeflocke / Ventilator / Tropfen | Kühlt / Lüftet / Trocknet | entsprechender `hvac_action` | Grün des Verlaufs – **nie** Rot |
+| Flamme | Status unbekannt | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` | Farbe des Soll-Werts (`--rcc-muted`) |
 
 Ein eingeschaltetes Thermostat gilt bewusst **nicht** als „Heizt“. Fehlt `hvac_action`, bleibt
-die Flamme gedämpft und es steht „Status unbekannt“ da, statt einen Zustand zu erfinden.
+die Flamme neutral und es steht „Status unbekannt“ da, statt einen Zustand zu erfinden.
+Kühlen, Lüften und Trocknen sind ebenfalls kein Heizen und tragen deshalb nie Rot.
 
 Beispiel:
 
@@ -376,9 +379,9 @@ type: custom:room-climate-card
 climate_entity: climate.wohnzimmer
 show_setpoint: true
 show_hvac_status: true
-heating_color: '#ef4444'        # rot, wenn geheizt wird
-heating_idle_color: '#34d399'   # grün, wenn das Thermostat nur bereitsteht
-heating_off_color: '#64748b'    # grau, wenn ausgeschaltet ist
+heating_color: '#d16a62'        # gedämpftes Rot, nur wenn wirklich geheizt wird
+heating_idle_color: '#4FD1A5'   # Grün des Verlaufs, wenn das Thermostat nur bereitsteht
+heating_off_color: '#94a3b8'    # Farbe des Soll-Werts, wenn ausgeschaltet ist
 ```
 
 ---
@@ -444,7 +447,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 236 Tests in 11 Dateien aus (Stand 2.1.0):
+`npm test` führt 242 Tests in 11 Dateien aus (Stand 2.1.1):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

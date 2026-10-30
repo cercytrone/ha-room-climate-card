@@ -189,6 +189,37 @@ describe('readThermostat', () => {
     expect(thermostatStatusColor(off, config)).toBe('#0000ff');
   });
 
+  it('keeps red for a real heating demand and nothing else', () => {
+    const config = normalizeConfig(base);
+    const red = '#d16a62';
+    const mint = '#4FD1A5';
+
+    expect(thermostatStatusColor(reading('heat', { hvac_action: 'heating' }), config)).toBe(red);
+    // Idle and every other action borrow the chart green – never red.
+    expect(thermostatStatusColor(reading('heat', { hvac_action: 'idle' }), config)).toBe(mint);
+    for (const action of ['cooling', 'fan', 'drying', 'preheating', 'defrosting']) {
+      const color = thermostatStatusColor(reading('heat', { hvac_action: action }), config);
+      expect(color).toBe(mint);
+      expect(color).not.toBe(red);
+    }
+    // A heating mode without an hvac_action is not proof of heating.
+    expect(thermostatStatusColor(reading('heat'), config)).toBe('var(--rcc-muted)');
+  });
+
+  it('inherits a custom accent for the waiting flame', () => {
+    const config = normalizeConfig({ ...base, accent_color: '#123456' });
+    expect(thermostatStatusColor(reading('heat', { hvac_action: 'idle' }), config)).toBe('#123456');
+    // An explicit idle colour still wins over the accent.
+    const custom = normalizeConfig({ ...base, heating_idle_color: '#abcdef' });
+    expect(thermostatStatusColor(reading('heat', { hvac_action: 'idle' }), custom)).toBe('#abcdef');
+  });
+
+  it('uses the muted text tone when the state is unknown or off', () => {
+    const config = normalizeConfig(base);
+    expect(thermostatStatusColor(reading('off'), config)).toBe('var(--rcc-muted)');
+    expect(thermostatStatusColor(reading('unavailable'), config)).toBe('var(--rcc-muted)');
+  });
+
   it('translates labels into english', () => {
     const en = createTranslator('en');
     const config = normalizeConfig(base);

@@ -166,6 +166,11 @@ export function readThermostat(
   return { ...base, status: 'unknown', label: t.t('statusUnknown'), colorKey: 'unknown' };
 }
 
+/**
+ * Colour of the HVAC glyph. Red is reserved for a running heating demand: every
+ * other state (idle, cooling, fan, unknown, unavailable) stays in the calm part
+ * of the palette. The flame never becomes the loud element of the row.
+ */
 export function thermostatStatusColor(
   reading: ThermostatReading,
   config: ResolvedConfig
@@ -178,7 +183,8 @@ export function thermostatStatusColor(
     case 'off':
       return config.thermostat.offColor;
     default:
-      return 'var(--rcc-neutral, #94a3b8)';
+      // Unknown / unavailable: same muted tone as the „Soll“ wording.
+      return 'var(--rcc-muted)';
   }
 }
 
