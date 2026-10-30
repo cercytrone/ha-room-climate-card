@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.0.1] – 2026-10-30
+
+### Geändert
+
+- **Heizstatus in der Farbe der Solltemperatur:** Das Statuswort („Heizt“, „Bereit“, „Aus“)
+  bzw. der HVAC-Modus („Automatik“) stand in voller Textfarbe und zog den Blick von der
+  Primärgröße ab. Statuswort und Sollwert teilen sich jetzt dieselbe gedämpfte Textfarbe – die
+  Zeile ist ein zusammenhängender Kontext, Farbe trägt nur die Flamme.
+- **Kleinere Serien-Labels:** „TEMPERATUR“ und „LUFTFEUCHTE“ über den Werten waren 10,5 px groß
+  und damit fast so präsent wie der Kontext. Sie stehen jetzt bei 9,5 px; die 0,09 em
+  Laufweite bleibt, damit die Versalien lesbar bleiben.
+
 ## [2.0.0] – 2026-10-30
 
 Komplettes Redesign der Kartenoptik. Die Karte ist ruhiger, strenger gerastert und zeigt

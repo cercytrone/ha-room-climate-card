@@ -919,11 +919,15 @@ export class RoomClimateCard extends LitElement {
       min-height: 16px;
     }
     /* Labels in versals with 0.09 em tracking – quiet, but unmistakable. */
+    /*
+     * Captions stay deliberately small: they declare the series, they are not
+     * content. Tracking compensates for the low size so the versals stay legible.
+     */
     .series-label {
       display: inline-flex;
       align-items: center;
       gap: var(--rcc-space-1);
-      font-size: 10.5px;
+      font-size: 9.5px;
       font-weight: 500;
       line-height: 16px;
       letter-spacing: 0.09em;
@@ -1048,8 +1052,12 @@ export class RoomClimateCard extends LitElement {
     .flame.status-missing {
       opacity: 0.5;
     }
+    /*
+     * State and target share one colour: the row is a single piece of context,
+     * only the flame carries the accent.
+     */
     .climate-state {
-      color: var(--rcc-text);
+      color: var(--rcc-muted);
       overflow: hidden;
       text-overflow: ellipsis;
     }
