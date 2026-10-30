@@ -65,6 +65,15 @@ function text(card: RoomClimateCard, selector: string): string {
   return q(card, selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
+function stylesOf(card: RoomClimateCard): string {
+  return Array.from(
+    (card.constructor as unknown as { elementStyles?: ArrayLike<{ cssText?: string }> })
+      .elementStyles ?? []
+  )
+    .map((sheet) => sheet.cssText ?? '')
+    .join('\n');
+}
+
 const fullConfig: RoomClimateCardConfig = {
   type: 'custom:room-climate-card',
   name: 'Wohnzimmer',
@@ -290,6 +299,41 @@ describe('room climate card', () => {
     expect((q(card, '.flame') as HTMLElement).style.color).toBe('rgb(255, 0, 0)');
   });
 
+  it('shows the heating state in the same colour as the setpoint', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+
+    const styleText = stylesOf(card);
+    // One colour for the whole context row; only the flame carries the accent.
+    expect(styleText).toMatch(/\.climate-state\s*\{[^}]*color:\s*var\(--rcc-muted\)/);
+    expect(styleText).toMatch(/\.climate-setpoint\s*\{[^}]*color:\s*var\(--rcc-muted\)/);
+    expect(styleText).not.toMatch(/\.climate-state\s*\{[^}]*color:\s*var\(--rcc-text\)/);
+
+    // The same holds for the rendered elements, whatever text they carry.
+    const state = q(card, '.climate-state') as HTMLElement;
+    const setpoint = q(card, '.climate-setpoint') as HTMLElement;
+    expect(state.style.color).toBe('');
+    expect(setpoint.style.color).toBe('');
+
+    // With `show_hvac_mode` the mode word ("Automatik") takes the same colour.
+    const modeCard = mount(
+      { ...fullConfig, name: 'Flur', show_hvac_mode: true },
+      createHass({
+        states: [
+          ...baseStates().filter((item) => item.entity_id !== 'climate.thermostat'),
+          entity('climate.thermostat', {
+            state: 'auto',
+            attributes: { temperature: 21, hvac_action: 'idle' },
+          }),
+        ],
+      })
+    );
+    await modeCard.updateComplete;
+    expect(text(modeCard, '.climate-state')).toBe('Automatik');
+    expect(text(modeCard, '.climate-setpoint')).toBe('Soll 21,0 °C');
+    expect(stylesOf(modeCard)).toMatch(/\.climate-state\s*\{[^}]*color:\s*var\(--rcc-muted\)/);
+  });
+
   it('does not claim heating when hvac_action is missing', async () => {
     const card = mount(
       fullConfig,
@@ -367,6 +411,9 @@ describe('room climate card', () => {
     // Labels in versals with 0.09 em tracking.
     expect(styleText).toMatch(/\.series-label\s*\{[^}]*letter-spacing:\s*0\.09em/);
     expect(styleText).toMatch(/\.series-label\s*\{[^}]*text-transform:\s*uppercase/);
+    // The caption is smaller than the secondary value – it declares, it does
+    // not compete. 9.5 px keeps the versals readable without pulling focus.
+    expect(styleText).toMatch(/\.series-label\s*\{[^}]*font-size:\s*9\.5px/);
     expect(text(card, '.reading.humidity .reading-value')).toBe('50,4');
   });
 

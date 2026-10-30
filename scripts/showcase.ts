@@ -76,7 +76,7 @@ const TYPE = {
   hero: 42,
   secondary: 20,
   title: 15,
-  label: 10.5,
+  label: 9.5,
   axis: 10.5,
   row: 12,
 };
@@ -141,8 +141,11 @@ interface CardOptions {
   window?: 'closed' | 'open' | 'unknown';
   motion?: 'active' | 'idle' | 'none';
   quiet?: string;
-  /** Heating mode text: "Heizt" | "Bereit" | "Aus". */
-  hvacState?: 'Heizt' | 'Bereit' | 'Aus' | 'Status unbekannt';
+  /**
+   * Text of the heating row: the action ("Heizt" | "Bereit" | "Aus" |
+   * "Status unbekannt") or, with `show_hvac_mode`, the mode ("Automatik" …).
+   */
+  hvacState?: 'Heizt' | 'Bereit' | 'Aus' | 'Status unbekannt' | 'Automatik' | 'Heizen';
   hvacKey?: 'heating' | 'idle' | 'off' | 'unknown';
   setpoint?: string;
   series: ChartSample[];
@@ -440,7 +443,7 @@ function renderCard(options: CardOptions): string {
     cursor += icon + SPACE_1;
     rowParts.push(
       `<text x="${cursor}" y="${rowBaseline}" ${font(TYPE.row, 400)} fill="${
-        COLORS.text
+        COLORS.muted
       }">${escapeXml(options.hvacState)}</text>`
     );
     cursor += approxWidth(options.hvacState, TYPE.row) + SPACE_1 + 2;
@@ -599,7 +602,8 @@ const cards: CardOptions[] = [
     window: 'open',
     motion: 'idle',
     quiet: 'Ruhe seit 12 Min.',
-    hvacState: 'Bereit',
+    // `show_hvac_mode: true` – the mode replaces the action word.
+    hvacState: 'Automatik',
     hvacKey: 'idle',
     setpoint: '21,5',
     series: samples(22.6, 0.5, 4),
