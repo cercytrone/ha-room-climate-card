@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '../src/chart/climate-chart';
 import type { ChartLabels, RoomClimateChart } from '../src/chart/climate-chart';
 import type { ChartSample } from '../src/chart/geometry';
@@ -34,6 +34,32 @@ function createChart(overrides: Partial<RoomClimateChart> = {}): RoomClimateChar
 
 function setSize(chart: RoomClimateChart, width: number, height: number): void {
   chart.setSize(width, height);
+}
+
+/** Pointer event at a horizontal fraction of the plot (jsdom has no PointerEvent). */
+function pointer(
+  chart: RoomClimateChart,
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointerleave',
+  fraction: number,
+  pointerType = 'mouse'
+): void {
+  const overlay = chart.shadowRoot!.querySelector('.overlay') as HTMLElement | null;
+  if (!overlay) throw new Error('no overlay');
+  const event = new MouseEvent(type, {
+    clientX: fraction * chart.chartSize.width,
+    clientY: 40,
+    bubbles: true,
+  });
+  Object.defineProperty(event, 'pointerType', { value: pointerType });
+  overlay.dispatchEvent(event);
+}
+
+function tooltipOf(chart: RoomClimateChart): HTMLElement {
+  return chart.shadowRoot!.querySelector('.tooltip') as HTMLElement;
+}
+
+function hoverLayer(chart: RoomClimateChart): HTMLElement {
+  return chart.shadowRoot!.querySelector('.hover') as HTMLElement;
 }
 
 describe('climate chart', () => {
@@ -77,7 +103,9 @@ describe('climate chart', () => {
     expect(svg.getAttribute('width')).toBe('320');
     expect(svg.getAttribute('viewBox')).toBe('0 0 320 90');
     expect(svg.getAttribute('role')).toBe('img');
-    expect(svg.getAttribute('aria-label')).toBe(labels.aria);
+    // The visible name still comes first; the measured range is appended.
+    expect(svg.getAttribute('aria-label')).toContain(labels.aria);
+    expect(svg.getAttribute('aria-label')).toContain('Temperatur 21,0–22,0 °C');
   });
 
   it('re-renders without distortion when the size changes', async () => {
@@ -701,5 +729,164 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelector('.state-title')?.textContent?.trim()).toBe(
       'Keine Verlaufsdaten'
     );
+  });
+
+  it('keeps vertical scrolling on the dashboard working', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]) });
+    setSize(chart, 360, 120);
+    await chart.updateComplete;
+    // The overlay covers the plot: without pan-y it would swallow every swipe.
+    const css = String((chart.constructor as unknown as { styles: { cssText: string } }).styles.cssText);
+    expect(css).toContain('touch-action: pan-y');
+    expect(chart.shadowRoot!.querySelector('.overlay')).not.toBeNull();
+  });
+
+  it('shows the measured value under the pointer, not the smoothed one', async () => {
+    const values = Array.from({ length: 40 }, (_, index) => 20 + (index % 5) * 0.1);
+    values[20] = 27.5; // a spike a moving average would never report
+    const series = samples(values);
+    const chart = createChart({
+      temperature: series,
+      curve: 'smooth',
+      smoothing: 'strong',
+      temperatureDecimals: 1,
+      temperatureUnit: '°C',
+      labels,
+    });
+    setSize(chart, 320, 120);
+    await chart.updateComplete;
+
+    const spike = series[20];
+    const fraction = (spike.t - chart.start) / (chart.end - chart.start);
+    pointer(chart, 'pointermove', fraction);
+    await chart.updateComplete;
+
+    expect(hoverLayer(chart).hidden).toBe(false);
+    expect(tooltipOf(chart).dataset.time).toBe(String(spike.t));
+    // The number is the raw measurement – smoothing never reaches 27,5.
+    expect(tooltipOf(chart).textContent).toContain('27,5');
+    expect(tooltipOf(chart).textContent).not.toContain('20,9');
+  });
+
+  it('reports both series at the same instant with their own units', async () => {
+    const chart = createChart({
+      temperature: samples([21, 21.4]),
+      humidity: samples([48, 51]),
+      humidityUnit: '%',
+      temperatureUnit: '°C',
+      humidityDecimals: 0,
+    });
+    setSize(chart, 320, 120);
+    await chart.updateComplete;
+    pointer(chart, 'pointermove', 1);
+    await chart.updateComplete;
+    const text = tooltipOf(chart).textContent ?? '';
+    expect(text).toContain('21,4 °C');
+    expect(text).toContain('51 %');
+  });
+
+  it('snaps to measured samples instead of interpolated bridge points', async () => {
+    const start = now - 6 * 3600_000;
+    const hour = 3600_000;
+    // A real outage between 12:00 and 15:00; `connect` bridges it for the line.
+    const temperature: ChartSample[] = [
+      { t: start, v: 20 },
+      { t: start + hour, v: 21 },
+      { t: start + 2 * hour, v: null },
+      { t: start + 5 * hour, v: 22 },
+      { t: now, v: 22 },
+    ];
+    const chart = createChart({ temperature, gapMode: 'connect', maxGapMinutes: 720 });
+    setSize(chart, 320, 120);
+    await chart.updateComplete;
+
+    // Right in the middle of the bridged stretch: the nearest *measurement* is
+    // the 21 one hour earlier (or the 22 at 15:00), never an invented value.
+    const fraction = (start + 2.5 * hour - chart.start) / (chart.end - chart.start);
+    pointer(chart, 'pointermove', fraction);
+    await chart.updateComplete;
+    const shown = Number(tooltipOf(chart).dataset.time);
+    expect([start + hour, start + 5 * hour]).toContain(shown);
+    expect(tooltipOf(chart).textContent).not.toContain('21,5');
+  });
+
+  it('keeps the readout for a moment after a finger lifts', async () => {
+    vi.useFakeTimers();
+    try {
+      const chart = createChart({ temperature: samples([20, 21, 22]) });
+      setSize(chart, 320, 120);
+      await chart.updateComplete;
+
+      pointer(chart, 'pointerdown', 0.5, 'touch');
+      await chart.updateComplete;
+      expect(hoverLayer(chart).hidden).toBe(false);
+
+      pointer(chart, 'pointerup', 0.5, 'touch');
+      // A touch release is not the same as "look away".
+      pointer(chart, 'pointerleave', 0.5, 'touch');
+      vi.advanceTimersByTime(3900);
+      expect(hoverLayer(chart).hidden).toBe(false);
+      vi.advanceTimersByTime(400);
+      expect(hoverLayer(chart).hidden).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hides the readout when the mouse leaves', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]) });
+    setSize(chart, 320, 120);
+    await chart.updateComplete;
+    pointer(chart, 'pointermove', 0.5);
+    await chart.updateComplete;
+    expect(hoverLayer(chart).hidden).toBe(false);
+    pointer(chart, 'pointerleave', 0.5);
+    expect(hoverLayer(chart).hidden).toBe(true);
+  });
+
+  it('offers no pointer layer when the readout is switched off', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]), showTooltip: false });
+    setSize(chart, 320, 120);
+    await chart.updateComplete;
+    expect(chart.shadowRoot!.querySelector('.overlay')).toBeNull();
+    expect(chart.shadowRoot!.querySelector('.hover')).toBeNull();
+  });
+
+  it('marks the minimum and maximum of both series', async () => {
+    const chart = createChart({
+      temperature: samples([19, 21, 23, 20]),
+      humidity: samples([44, 52, 47, 49]),
+      humidityDecimals: 0,
+    });
+    setSize(chart, 320, 130);
+    await chart.updateComplete;
+    const labels = [...chart.shadowRoot!.querySelectorAll('.extreme-label')].map((node) =>
+      node.textContent?.trim()
+    );
+    expect(labels).toEqual(expect.arrayContaining(['23,0', '19,0', '52', '44']));
+    expect(chart.shadowRoot!.querySelectorAll('.extreme-dot')).toHaveLength(4);
+  });
+
+  it('leaves the extremes alone when they are switched off or space is tight', async () => {
+    const off = createChart({
+      temperature: samples([19, 21, 23, 20]),
+      showExtremes: false,
+    });
+    setSize(off, 320, 130);
+    await off.updateComplete;
+    expect(off.shadowRoot!.querySelector('.extreme-label')).toBeNull();
+
+    const narrow = createChart({ temperature: samples([19, 21, 23, 20]) });
+    setSize(narrow, 180, 130);
+    await narrow.updateComplete;
+    expect(narrow.shadowRoot!.querySelector('.extreme-label')).toBeNull();
+  });
+
+  it('speaks the measured range in the accessible description', async () => {
+    const chart = createChart({ temperature: samples([19, 21, 23, 20]) });
+    setSize(chart, 320, 130);
+    await chart.updateComplete;
+    const aria = chart.shadowRoot!.querySelector('svg')?.getAttribute('aria-label') ?? '';
+    expect(aria).toContain('Temperatur 19,0–23,0 °C');
   });
 });

@@ -809,6 +809,9 @@ export class RoomClimateCard extends LitElement {
 
     const language = this.language();
     const clock = this.chartClock();
+    const humidityUnit = config.humidityEntity
+      ? this.hass?.states?.[config.humidityEntity]?.attributes?.unit_of_measurement
+      : undefined;
 
     const thermostat = config.thermostat.enabled ? readThermostat(this.hass, config, t) : undefined;
 
@@ -853,6 +856,12 @@ export class RoomClimateCard extends LitElement {
         .end=${end}
         .showPoints=${config.chart.showPoints}
         .showGrid=${config.chart.showGrid}
+        .showTooltip=${config.chart.showTooltip}
+        .showExtremes=${config.chart.showExtremes}
+        .temperatureUnit=${temperatureUnitOfSensor}
+        .humidityUnit=${humidityUnit ?? '%'}
+        .temperatureDecimals=${config.temperatureDecimals}
+        .humidityDecimals=${config.humidityDecimals}
         .curve=${config.chart.curve}
         .smoothing=${config.chart.smoothing}
         .gapMode=${config.chart.gapMode}

@@ -1032,6 +1032,58 @@ describe('room climate card', () => {
     expect(chartOf(unknown).setpointUnit).toBe('K');
   });
 
+  it('feeds the readout with the sensor units and the configured decimals', async () => {
+    const hass = createHass({
+      states: baseStates().map((state) => {
+        if (state.entity_id === 'sensor.temp') {
+          return entity('sensor.temp', {
+            state: '71.2',
+            attributes: { unit_of_measurement: '°F', device_class: 'temperature' },
+          });
+        }
+        if (state.entity_id === 'sensor.humidity') {
+          return entity('sensor.humidity', {
+            state: '48.6',
+            attributes: { unit_of_measurement: '%', device_class: 'humidity' },
+          });
+        }
+        return state;
+      }),
+    });
+    const card = mount(
+      { ...fullConfig, temperature_decimals: 1, humidity_decimals: 0 },
+      hass
+    );
+    await card.updateComplete;
+    const chart = q(card, 'room-climate-chart') as HTMLElement & {
+      temperatureUnit?: string;
+      humidityUnit?: string;
+      temperatureDecimals: number;
+      humidityDecimals: number;
+      showTooltip: boolean;
+      showExtremes: boolean;
+    };
+    expect(chart.temperatureUnit).toBe('°F');
+    expect(chart.humidityUnit).toBe('%');
+    expect(chart.temperatureDecimals).toBe(1);
+    expect(chart.humidityDecimals).toBe(0);
+    // Both comfort features are on unless the config says otherwise.
+    expect(chart.showTooltip).toBe(true);
+    expect(chart.showExtremes).toBe(true);
+
+    const quiet = mount(
+      { ...fullConfig, chart_show_tooltip: false, chart_show_extremes: false },
+      createHass({ states: baseStates() })
+    );
+    await quiet.updateComplete;
+    const quietChart = q(quiet, 'room-climate-chart') as HTMLElement & {
+      showTooltip: boolean;
+      showExtremes: boolean;
+    };
+    expect(quietChart.showTooltip).toBe(false);
+    expect(quietChart.showExtremes).toBe(false);
+  });
+
   it('forwards the gap configuration to the chart', async () => {
     const card = mount(
       {

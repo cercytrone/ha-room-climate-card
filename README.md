@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.5.0`.
+  `ROOM-CLIMATE-CARD v2.6.0`.
 
 ---
 
@@ -191,6 +191,12 @@ mehr.
 | `window_entity` | entity | – | Kontaktsensor. |
 | `window_open_states` | list \| string | `on, open, opening, tilted, gekippt` | Zustände, die als „offen“ gelten. |
 
+Ein Hinweis zur Aussagekraft: Die Karte zeigt genau den Zustand, den die Entität meldet. Bei
+Tado ist `binary_sensor.*_window` **keine** Magnetkontakt-Meldung, sondern die Erkennung des
+Thermostats („offenes Fenster erkannt“ – ein Temperaturabfall-Heuristik-Ergebnis). Das ist für
+die Heizungslogik sinnvoll, aber keine Bestätigung, dass wirklich ein Fenster offen steht. Wer
+das genau wissen will, nutzt einen echten Kontaktsensor; die Karte behandelt beide gleich.
+
 ### Bewegung
 
 | Option | Typ | Standard | Beschreibung |
@@ -234,6 +240,8 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 | `chart_humidity_gradient` | boolean | `true` | Sanfter Farbverlauf unter der Feuchtekurve, begrenzt auf deren eigenes Band. Aus = nur die Linie. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
+| `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
+| `chart_show_extremes` | boolean | `true` | Minimum und Maximum der sichtbaren Kurven als dezente Zahlen neben der Kurve. |
 
 ---
 
@@ -386,6 +394,24 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 - **Nur sichtbare Karten laden:** Ein `IntersectionObserver` hält den Fünf-Minuten-Abruf an, wenn
   die Karte aus dem Sichtfeld gescrollt ist; beim Zurückscrollen wird sofort nachgeladen.
   Lange Dashboards erzeugen so keine Dauerlast im Hintergrund.
+- **Wertanzeige (Tooltip):** Beim Zeigen auf die Fläche erscheint eine senkrechte Haarlinie mit
+  Uhrzeit und den Werten beider Reihen. Drei Dinge sind dabei bewusst so gebaut:
+  1. Die Suche läuft über die **gemessenen** Punkte, nicht über die gezeichneten Stützpunkte.
+     Die Kurve ist geglättet, dezimiert und enthält interpolierte Brückenpunkte – keiner davon
+     ist eine Messung.
+  2. Angezeigt wird deshalb der echte Messwert (bei `chart_smoothing: none` identisch mit der
+     Kurve, sonst bewusst abweichend), mit der Einheit und den Nachkommastellen des jeweiligen
+     Sensors.
+  3. Die Ebene setzt `touch-action: pan-y`: ein senkrechter Wisch scrollt weiterhin das
+     Dashboard, nur waagerechtes Erkunden gehört dem Chart. Nach dem Abheben eines Fingers
+     bleibt die Anzeige vier Sekunden stehen (auf einem Wandtablet sonst unlesbar), beim
+     Verlassen mit der Maus verschwindet sie sofort.
+- **Minimum/Maximum:** Die tiefste und höchste echte Messung des Zeitraums stehen als kleine
+  Zahl neben der Kurve (ohne Einheit – Farbe und Band sagen, welche Reihe gemeint ist). Liegen
+  beide Zahlen auf demselben Fleck, rücken sie an die Ränder ihres Bandes, statt eine zu
+  verschlucken; erst wenn selbst dafür kein Platz ist (Band flacher als eine Zeile) bleibt das
+  Maximum allein. Unter 200 px Breite entfallen die Zahlen ganz. Für Screenreader stehen beide Werte zusätzlich in der
+  Beschreibung des Charts („Temperatur 18,2–23,4 °C“), weil dort kein Zeiger hinkommt.
 - **Fallbacks:** Ladezustand („Verlauf wird geladen …“), leerer Zeitraum („Keine
   Verlaufsdaten“) und Fehler („Verlauf konnte nicht geladen werden“).
 
@@ -452,7 +478,11 @@ heating_off_color: '#94a3b8'    # Farbe des Soll-Werts, wenn ausgeschaltet ist
   „Bereit“, „Aus“, „Status unbekannt“); die Flamme selbst ist `aria-hidden`.
 - Fenster- und Bewegungs-Badges haben `role="img"` plus sprechende `aria-label`
   („Fenster offen“, „Keine Bewegung“, „Nicht verfügbar“).
-- Der Chart hat `role="img"` und eine Beschreibung inklusive Zeitraum.
+- Der Chart hat `role="img"` und eine Beschreibung inklusive Zeitraum, Sollwert und – sofern
+  vorhanden – dem gemessenen Bereich beider Reihen („Temperatur 18,2–23,4 °C,
+  Luftfeuchte 41–58 %“).
+- Die Wertanzeige (Tooltip) ist reine Zeiger-Bedienung und für Screenreader ausgeblendet; ihre
+  Zahlen stehen in der Beschreibung des Charts. Minimum und Maximum sind zusätzlich sichtbar.
 - Statusfarben werden immer durch Text bzw. Icon ergänzt (Farbe ist nie die einzige Information).
 - Animationen respektieren `prefers-reduced-motion`.
 - Der Editor ist per Tastatur bedienbar (`details`/`summary` mit Fokus-Ring).
@@ -505,20 +535,21 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 279 Tests in 11 Dateien aus (Stand 2.5.0):
+`npm test` führt 302 Tests in 12 Dateien aus (Stand 2.6.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
 | `tests/config.test.ts` | Standardwerte, kaputte Eingaben, optionale Bereiche, Grenzwerte, Namensauflösung, Schriftgrößen-Clamping, Schriftart-Validierung und Warnung bei unbekannten YAML-Schlüsseln |
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
-| `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung mit erhaltenem Minimum/Maximum |
-| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert im `aria-label`, Punkte, Gitter |
-| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, gemerkte Serien-Auswahl, Sollwert-Umrechnung |
+| `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung mit erhaltenem Minimum/Maximum, Suche nach dem nächsten Messwert (lückenüberspringend), Reihen-Extrema |
+| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert und Messbereich im `aria-label`, Punkte, Gitter, Wertanzeige auf den echten Messwerten, Verhalten bei Berührung, Min/Max-Marken |
+| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, gemerkte Serien-Auswahl, Sollwert-Umrechnung, Einheiten und Nachkommastellen für die Wertanzeige |
 | `tests/editor.test.ts` | Abschnitte, Selektoren (inkl. Linienart Feuchte), Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |
 | `tests/dev-playground.test.ts` | Entwicklungsumgebung inkl. Editor↔Vorschau-Verdrahtung |
+| `tests/examples.test.ts` | Alle Beispiel-YAMLs nutzen ausschließlich bekannte Schlüssel und lösen keine Warnung aus |
 | `tests/version.test.ts` | Release-Metadaten: CHANGELOG streng absteigend, Kopf = `package.json`, Version im Bundle und in der README |
 
 ---
@@ -558,6 +589,11 @@ dist/                      Gebautes Bundle (HACS-Download)
 - Bei sehr hohen Punktzahlen (24 h mit sekündlicher Aktualisierung) wird für die Darstellung
   dezimiert. Dabei bleiben pro Abschnitt Minimum und Maximum erhalten – kurze echte Spitzen
   verschwinden also nicht, feine Zwischenwerte schon.
+- **Keine Fenster-Marker im Chart.** Die Historie des Fenstersensors wäre billig abzufragen
+  (wenige Zustandswechsel), aber ein Marker behauptet einen Zeitpunkt. Bei Tado & Co. ist der
+  Zustand eine Erkennung des Thermostats, keine gemessene Öffnung – ein Marker würde diese
+  Unsicherheit erben und wie ein Beweis aussehen. Die Karte zeigt den Zustand deshalb nur als
+  Badge, ohne ihn in den Verlauf zu zeichnen.
 - HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
   `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
 - Die README-Vorschau ist gerendert (Demo-Daten), kein Screenshot einer echten Installation.
