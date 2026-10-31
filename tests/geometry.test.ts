@@ -654,6 +654,34 @@ describe('axis helpers', () => {
     expect(tickCountForWidth(900)).toBe(5);
   });
 
+  it('keeps the low and high of every bucket when decimating', () => {
+    // 24 h of one-minute samples with a single short spike.
+    const values = Array.from({ length: 1440 }, (_, index) => 20 + Math.sin(index / 40) * 0.4);
+    values[613] = 27.5; // the peak that used to disappear
+    const samples: ChartSample[] = values.map((value, index) => ({
+      t: index * 60_000,
+      v: Number(value.toFixed(2)),
+    }));
+
+    const result = decimate(samples, 200);
+    expect(result.length).toBeLessThanOrEqual(200);
+    expect(result.length).toBeGreaterThan(50);
+    const kept = result.map((sample) => sample.v as number);
+    expect(Math.max(...kept)).toBe(27.5);
+    expect(Math.min(...kept)).toBeCloseTo(Math.min(...values), 2);
+    // First and last stay, the order is chronological.
+    expect(result[0]).toBe(samples[0]);
+    expect(result[result.length - 1]).toBe(samples[samples.length - 1]);
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i].t).toBeGreaterThan(result[i - 1].t);
+    }
+  });
+
+  it('leaves short series untouched when decimating', () => {
+    const samples = series([20, 21, 22]);
+    expect(decimate(samples, 200)).toBe(samples);
+  });
+
   it('decimates long series but keeps first and last sample', () => {
     const samples = series(Array.from({ length: 5000 }, (_, index) => index));
     const result = decimate(samples, 500);

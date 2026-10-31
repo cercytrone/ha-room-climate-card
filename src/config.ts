@@ -298,8 +298,85 @@ function asStringList(value: unknown): string[] {
  * Builds a fully resolved configuration. Never throws: malformed values fall
  * back to their defaults so a broken YAML file cannot crash the dashboard.
  */
+/**
+ * Every key the card understands. Used to point out typos in YAML instead of
+ * silently ignoring them (`chart_show_legend`, `temperature_comfort_*`, …).
+ */
+export const KNOWN_CONFIG_KEYS: readonly string[] = [
+  'type',
+  'name',
+  'name_entity',
+  'icon',
+  'height',
+  'border_radius',
+  'theme',
+  'temperature_entity',
+  'humidity_entity',
+  'temperature_decimals',
+  'humidity_decimals',
+  'temperature_font_size',
+  'temperature_font_family',
+  'humidity_font_size',
+  'humidity_font_family',
+  'show_series_labels',
+  'accent_color',
+  'humidity_color',
+  'temperature_comfort_color',
+  'show_window',
+  'window_entity',
+  'window_open_states',
+  'show_motion',
+  'motion_entity',
+  'motion_show_last_changed',
+  'show_thermostat',
+  'climate_entity',
+  'show_climate_row',
+  'show_setpoint',
+  'show_hvac_status',
+  'show_hvac_mode',
+  'heating_color',
+  'heating_idle_color',
+  'heating_off_color',
+  'show_temperature_chart',
+  'show_humidity_chart',
+  'chart_hours',
+  'chart_height',
+  'chart_curve',
+  'chart_smoothing',
+  'chart_gap_mode',
+  'chart_max_gap_minutes',
+  'chart_gap_style',
+  'chart_humidity_line_style',
+  'chart_show_points',
+  'chart_show_grid',
+  'chart_temperature_gradient',
+  'chart_humidity_gradient',
+];
+
+/** Keys already reported, so a re-render does not flood the console. */
+const reportedKeys = new Set<string>();
+
+/** Warns about unknown configuration keys (once per key). */
+function reportUnknownKeys(config: Record<string, unknown>): void {
+  for (const key of Object.keys(config)) {
+    if (KNOWN_CONFIG_KEYS.includes(key) || reportedKeys.has(key)) continue;
+    reportedKeys.add(key);
+    // eslint-disable-next-line no-console -- a visible hint beats a silent typo
+    console.warn(
+      `[room-climate-card] Unbekannter Konfigurationsschlüssel "${key}" – wird ignoriert. ` +
+        'Bekannte Schlüssel stehen in der README.'
+    );
+  }
+}
+
+/** Test helper: forget which keys were reported. */
+export function resetUnknownKeyWarnings(): void {
+  reportedKeys.clear();
+}
+
 export function normalizeConfig(input: unknown): ResolvedConfig {
   const config = (isRecord(input) ? input : {}) as RoomClimateCardConfig;
+  reportUnknownKeys(config as Record<string, unknown>);
 
   const temperatureEntity = asEntityId(config.temperature_entity);
   const humidityEntity = asEntityId(config.humidity_entity);

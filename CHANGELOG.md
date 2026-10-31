@@ -4,6 +4,42 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.5.0] – 2026-10-31
+
+### Behoben
+
+- **Zeitachse zeigte die Zeitzone des Browsers.** Beschriftung und Datumszeile des Charts nutzten
+  nur die Zone des Geräts; die Zeitzone und das Uhrzeitformat von Home Assistant wurden geprüft,
+  aber nie angewendet. Jetzt folgt die Achse `hass.config.time_zone` und `hass.locale` – inklusive
+  12-Stunden-Format bei `time_format: am_pm`. Ändert sich die Zone in der Konfiguration, wird die
+  Achse neu gezeichnet.
+- **Soll-Linie stand in der falschen Einheit.** Der Sollwert des Thermostats wurde unverändert vor
+  die Temperaturkurve gelegt – bei einem Sensor in °F und einem Thermostat in °C lag die
+  gestrichelte Linie rund 40 Einheiten daneben. Die Einheit kommt jetzt aus den Attributen der
+  Climate-Entität (Systemstandard nur als Rückfall), der Sollwert wird in die Skala des Sensors
+  umgerechnet. Sind die Einheiten unbekannt, entfällt die Linie bewusst – statt sie zu raten.
+- **Der Sollwert war für Screenreader unsichtbar.** Die gestrichelte Linie ist rein dekorativ; die
+  Beschreibung des Charts endet jetzt mit „Soll 22,0 °C“. Damit wird auch `setpointUnit` wieder
+  verwendet, das vorher berechnet und nie gelesen wurde.
+- **Dezimierung verlor echte Spitzen.** Bei langen Zeiträumen wurde jeder n-te Punkt behalten –
+  eine kurze Temperaturspitze zwischen zwei Stichproben verschwand. Jetzt bleiben pro Abschnitt
+  Minimum und Maximum (plus erster und letzter Wert) erhalten; die Kurve entspricht damit dem
+  Verlauf, nicht einer beliebigen Stichprobe.
+- **Karten außerhalb des Sichtfelds fragten weiter alle fünf Minuten ab.** Ein
+  `IntersectionObserver` pausiert den Abruf, solange die Karte nicht sichtbar ist, und lädt beim
+  Zurückscrollen sofort nach, wenn die Daten älter als das Aktualisierungsintervall sind.
+- **Ausgeblendete Serien waren nach einem Reload wieder da.** Die Auswahl wird jetzt pro
+  Entitäten-Paar im `localStorage` gemerkt (fehlertolerant: ohne Speicher gilt sie nur für die
+  Sitzung) und von allen Karten desselben Raums geteilt.
+- **Unbekannte YAML-Schlüssel verschwanden stillschweigend.** Ein Tippfehler wie
+  `chart_shwo_grid` hatte keine Wirkung und keinen Hinweis. Jetzt warnt die Karte einmal pro
+  Schlüssel in der Konsole.
+- **`window` als Parametername** in `getStubConfig` verdeckte das globale `window` – umbenannt.
+- **Doppeltes `getConfigElement`** (einmal statisch, einmal als Instanzmethode) – die
+  Instanzmethode war toter Code und ist entfernt.
+- **Farbverlauf der Temperaturlinie mit zwei identischen Stopps** – ein Gradient, der nichts
+  bewirkte. Entfernt; die Linie zeichnet direkt die Akzentfarbe.
+
 ## [2.4.0] – 2026-10-31
 
 ### Behoben

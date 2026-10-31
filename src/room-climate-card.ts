@@ -25,9 +25,20 @@ import {
   type ThermostatReading,
 } from './data/states';
 import { HistoryRepository, type HistoryMap } from './data/history';
+import {
+  hiddenSeriesStorageKey,
+  loadHiddenSeries,
+  saveHiddenSeries,
+} from './data/hidden-series';
 import { createTranslator, type Translator } from './localize';
 import type { HomeAssistant } from './types';
-import { formatNumber, formatRelative, parseNumericState, withAlpha } from './utils/format';
+import {
+  convertTemperature,
+  formatNumber,
+  formatRelative,
+  parseNumericState,
+  withAlpha,
+} from './utils/format';
 import { icons } from './ui/icons';
 import './chart/climate-chart';
 import type { ChartSeriesKey } from './chart/climate-chart';
@@ -78,9 +89,14 @@ export class RoomClimateCard extends LitElement {
   private tickTimer?: ReturnType<typeof setInterval>;
   private resizeObserver?: ResizeObserver;
   private historyKey = '';
+  /** Storage slot of the current card; empty until a config has been applied. */
+  private hiddenSeriesKey = '';
   private historyFetchedAt = 0;
   private pendingLoad?: ReturnType<typeof setTimeout>;
   private lastConnected = true;
+  /** `false` while the card is scrolled out of view: no polling in the dark. */
+  private visible = true;
+  private intersectionObserver?: IntersectionObserver;
   /** Backoff of the retry after a failed history request (0 = nothing pending). */
   private retryDelay = 0;
   private readonly onVisibilityChange = (): void => {
@@ -109,6 +125,23 @@ export class RoomClimateCard extends LitElement {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.onVisibilityChange);
     }
+    // Only poll while the card is actually on screen (dashboards can be long).
+    if (typeof IntersectionObserver !== 'undefined' && !this.intersectionObserver) {
+      this.intersectionObserver = new IntersectionObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const wasVisible = this.visible;
+        this.visible = entry.isIntersecting;
+        if (!wasVisible && this.visible && this.isConnected) {
+          // Back on screen after a while: catch up instead of waiting for the
+          // next tick of the five-minute timer.
+          if (Date.now() - this.historyFetchedAt > HISTORY_REFRESH_MS) {
+            this.loadHistory(this.historyKey, true);
+          }
+        }
+      });
+      this.intersectionObserver.observe(this);
+    }
     this.ensureHistory();
     if (!this._haIconReady && typeof customElements !== 'undefined') {
       customElements
@@ -125,6 +158,9 @@ export class RoomClimateCard extends LitElement {
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.onVisibilityChange);
     }
+    this.intersectionObserver?.disconnect();
+    this.intersectionObserver = undefined;
+    this.visible = true;
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     if (this.tickTimer) clearInterval(this.tickTimer);
     if (this.pendingLoad) clearTimeout(this.pendingLoad);
@@ -138,7 +174,7 @@ export class RoomClimateCard extends LitElement {
   private startTimers(): void {
     if (!this.refreshTimer) {
       this.refreshTimer = setInterval(() => {
-        if (!this.isConnected) return;
+        if (!this.isConnected || !this.visible) return;
         this.loadHistory(this.historyKey, true);
       }, HISTORY_REFRESH_MS);
     }
@@ -157,6 +193,15 @@ export class RoomClimateCard extends LitElement {
   setConfig(config: unknown): void {
     const resolved = normalizeConfig(config);
     this._config = resolved;
+    // Restore the toggled-off series for exactly this pair of entities.
+    const hiddenKey = hiddenSeriesStorageKey(
+      resolved.temperatureEntity,
+      resolved.humidityEntity
+    );
+    if (hiddenKey !== this.hiddenSeriesKey) {
+      this.hiddenSeriesKey = hiddenKey;
+      this._hiddenSeries = loadHiddenSeries(hiddenKey);
+    }
     const key = this.historyKeyFor(resolved);
     if (key !== this.historyKey) {
       this.historyKey = '';
@@ -174,10 +219,6 @@ export class RoomClimateCard extends LitElement {
     return document.createElement(EDITOR_TAG);
   }
 
-  getConfigElement(): HTMLElement {
-    return document.createElement(EDITOR_TAG);
-  }
-
   static getStubConfig(hass?: HomeAssistant): RoomClimateCardConfig {
     const states = hass?.states ?? {};
     const entries = Object.values(states);
@@ -190,7 +231,7 @@ export class RoomClimateCard extends LitElement {
     const humidity = pick(
       (entity) => entity.entity_id.startsWith('sensor.') && entity.attributes?.device_class === 'humidity'
     );
-    const window = pick(
+    const windowSensor = pick(
       (entity) =>
         entity.entity_id.startsWith('binary_sensor.') &&
         ['window', 'door', 'opening'].includes(String(entity.attributes?.device_class))
@@ -204,7 +245,7 @@ export class RoomClimateCard extends LitElement {
     const config: RoomClimateCardConfig = { type: `custom:${CARD_TAG}` };
     if (temperature) config.temperature_entity = temperature;
     if (humidity) config.humidity_entity = humidity;
-    if (window) config.window_entity = window;
+    if (windowSensor) config.window_entity = windowSensor;
     if (motion) config.motion_entity = motion;
     if (climate) config.climate_entity = climate;
     return config;
@@ -234,6 +275,19 @@ export class RoomClimateCard extends LitElement {
 
   private language(): string {
     return this.hass?.locale?.language ?? this.hass?.language ?? 'en';
+  }
+
+  /**
+   * Time zone and clock format of the Home Assistant instance. Without this the
+   * axis would show the browser zone (wrong on a remote dashboard) and always
+   * the locale default instead of the user's 12/24-hour preference.
+   */
+  private chartClock(): { timeZone?: string; hour12?: boolean } {
+    const locale = this.hass?.locale;
+    const timeZone = locale?.time_zone || this.hass?.config?.time_zone || undefined;
+    const format = locale?.time_format;
+    const hour12 = format === 'am_pm' ? true : format === '24' ? false : undefined;
+    return { timeZone, hour12 };
   }
 
   private historyEntityIds(config: ResolvedConfig): string[] {
@@ -370,7 +424,9 @@ export class RoomClimateCard extends LitElement {
       if (
         previous.locale?.language !== this.hass.locale?.language ||
         previous.locale?.number_format !== this.hass.locale?.number_format ||
-        previous.locale?.time_format !== this.hass.locale?.time_format
+        previous.locale?.time_format !== this.hass.locale?.time_format ||
+        previous.locale?.time_zone !== this.hass.locale?.time_zone ||
+        previous.config?.time_zone !== this.hass.config?.time_zone
       ) {
         return true;
       }
@@ -656,6 +712,7 @@ export class RoomClimateCard extends LitElement {
     this._hiddenSeries = this._hiddenSeries.includes(key)
       ? this._hiddenSeries.filter((item) => item !== key)
       : [...this._hiddenSeries, key];
+    if (this.hiddenSeriesKey) saveHiddenSeries(this.hiddenSeriesKey, this._hiddenSeries);
   }
 
   private sensorAria(
@@ -751,8 +808,26 @@ export class RoomClimateCard extends LitElement {
         : undefined;
 
     const language = this.language();
+    const clock = this.chartClock();
 
     const thermostat = config.thermostat.enabled ? readThermostat(this.hass, config, t) : undefined;
+
+    /*
+     * The setpoint is drawn on the temperature scale. If the thermostat reports
+     * a different scale than the sensor (say °F vs °C), the reference line would
+     * sit at a completely wrong height – so it is converted, and dropped when a
+     * conversion is impossible instead of inventing a position.
+     */
+    const temperatureUnitOfSensor =
+      (config.temperatureEntity
+        ? this.hass?.states?.[config.temperatureEntity]?.attributes?.unit_of_measurement
+        : undefined) ?? '°C';
+    const rawSetpoint = thermostat?.setpoint ?? null;
+    const convertedSetpoint =
+      rawSetpoint === null || !thermostat
+        ? null
+        : convertTemperature(rawSetpoint, thermostat.unit, temperatureUnitOfSensor);
+    const setpoint = convertedSetpoint ?? (thermostat?.unit === temperatureUnitOfSensor ? rawSetpoint : null);
     const labels = {
       empty: t.t('noHistory'),
       emptyHint: t.t('noHistoryHint'),
@@ -771,8 +846,8 @@ export class RoomClimateCard extends LitElement {
         .humidity=${humiditySamples}
         .accentColor=${config.accentColor}
         .humidityColor=${config.humidity.color}
-        .setpoint=${thermostat?.setpoint ?? null}
-        .setpointUnit=${thermostat?.unit ?? '°C'}
+        .setpoint=${setpoint}
+        .setpointUnit=${temperatureUnitOfSensor}
         .hiddenSeries=${this._hiddenSeries}
         .start=${start}
         .end=${end}
@@ -788,6 +863,8 @@ export class RoomClimateCard extends LitElement {
         .showHumidityArea=${config.chart.showHumidityGradient}
         .cornerRadius=${config.borderRadius}
         .language=${language}
+        .timeZone=${clock.timeZone}
+        .hour12=${clock.hour12}
         .loading=${this._historyLoading}
         .error=${this._historyError}
         .labels=${labels}

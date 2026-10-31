@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_OPEN_STATES,
   DEFAULT_READING_FONT_SIZE,
@@ -8,6 +8,7 @@ import {
   hasChart,
   normalizeConfig,
   preferredCardHeight,
+  resetUnknownKeyWarnings,
   resolveName,
 } from '../src/config';
 import { createHass, entity } from './helpers';
@@ -121,6 +122,39 @@ describe('normalizeConfig', () => {
       true
     );
     expect(normalizeConfig({ chart_humidity_gradient: 0 }).chart.showHumidityGradient).toBe(true);
+  });
+
+  it('warns about unknown configuration keys, once per key', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      resetUnknownKeyWarnings();
+      normalizeConfig({ type: 'custom:room-climate-card', chart_show_legend: true });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('chart_show_legend');
+
+      // Same typo again (the editor normalises on every change): no new warning.
+      normalizeConfig({ type: 'custom:room-climate-card', chart_show_legend: true });
+      expect(warn).toHaveBeenCalledTimes(1);
+
+      // A different typo is reported separately.
+      normalizeConfig({ temperature_comfort_min: 20 });
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(String(warn.mock.calls[1][0])).toContain('temperature_comfort_min');
+
+      // Known keys stay silent.
+      resetUnknownKeyWarnings();
+      warn.mockClear();
+      normalizeConfig({
+        type: 'custom:room-climate-card',
+        temperature_entity: 'sensor.t',
+        chart_smoothing: 'medium',
+        show_climate_row: false,
+      });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      resetUnknownKeyWarnings();
+    }
   });
 
   it('never throws for nonsense input', () => {

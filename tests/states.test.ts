@@ -126,6 +126,30 @@ describe('readThermostat', () => {
     return readThermostat(hass, config, de);
   }
 
+  it('takes the setpoint unit from the entity, not the unit system', () => {
+    const result = reading('heat', {
+      hvac_action: 'heating',
+      temperature: 22,
+      unit_of_measurement: '°F',
+    });
+    // A thermostat may report Fahrenheit while the system default is Celsius.
+    expect(result.unit).toBe('°F');
+  });
+
+  it('falls back to the system unit when the entity has none', () => {
+    const config = normalizeConfig(base);
+    const hass = createHass({
+      states: [entity('climate.living', { state: 'heat', attributes: { temperature: 22 } })],
+    });
+    hass.config = { unit_system: { temperature: 'us_customary' } };
+    expect(readThermostat(hass, config, de).unit).toBe('°F');
+
+    const metric = createHass({
+      states: [entity('climate.living', { state: 'heat', attributes: { temperature: 22 } })],
+    });
+    expect(readThermostat(metric, config, de).unit).toBe('°C');
+  });
+
   it('reports heating only when hvac_action says heating', () => {
     const result = reading('heat', { hvac_action: 'heating', temperature: 22 });
     expect(result.status).toBe('heating');

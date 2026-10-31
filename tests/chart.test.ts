@@ -101,12 +101,13 @@ describe('climate chart', () => {
     await chart.updateComplete;
     const root = chart.shadowRoot!;
     expect(root.querySelectorAll('.series-line')).toHaveLength(2);
-    // Gradient definitions exist, but the stroke is a single accent colour…
-    expect(root.querySelectorAll('[id$="-temp-stroke"]')).toHaveLength(1);
+    // No pointless stroke gradient: only the two area fills define stops.
+    expect(root.querySelectorAll('[id$="-temp-stroke"]')).toHaveLength(0);
+    expect(root.querySelectorAll('defs > *')).toHaveLength(2);
     expect(root.querySelectorAll('[id$="-temp-fill"]')).toHaveLength(1);
     // …and the humidity carries its own, quieter fill in its own band.
     expect(root.querySelectorAll('[id$="-humidity-fill"]')).toHaveLength(1);
-    expect(root.querySelectorAll('stop')).toHaveLength(8);
+    expect(root.querySelectorAll('stop')).toHaveLength(6);
     expect(root.querySelectorAll('path[style*="temp-fill"]')).toHaveLength(1);
     expect(root.querySelectorAll('path[style*="humidity-fill"]')).toHaveLength(1);
     // No legend: the colour dot lives next to the reading, not in the chart.
@@ -147,9 +148,10 @@ describe('climate chart', () => {
     const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
     const humidity = lines.find((line) => line.style.stroke === '#8B86D6');
     expect(humidity).toBeDefined();
-    const stop = chart.shadowRoot!.querySelector('[id$="-temp-stroke"] stop')!;
-    expect(stop.getAttribute('stop-color')).toBe('#4FD1A5');
-    expect(stop.getAttribute('stop-opacity')).toBe('1');
+    // The temperature curve paints the accent directly – no `url(#…)` indirection.
+    const temperature = lines.find((line) => line.style.stroke === '#4FD1A5');
+    expect(temperature).toBeDefined();
+    expect(chart.shadowRoot!.querySelector('[id$="-temp-stroke"]')).toBeNull();
   });
 
   it('keeps the humidity in its own band above the temperature curve', async () => {
@@ -206,6 +208,48 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelector('.setpoint-line')).toBeNull();
   });
 
+  it('names the setpoint in the accessible description', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      setpoint: 21,
+      setpointUnit: '°C',
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const label = chart.shadowRoot!.querySelector('svg')?.getAttribute('aria-label');
+    // The dashed reference is invisible to screen readers: it belongs in the name.
+    expect(label).toContain('Soll 21,0 °C');
+  });
+
+  it('formats the axis in the given time zone and clock format', async () => {
+    const start = new Date('2026-10-24T06:00:00Z').getTime();
+    const end = new Date('2026-10-24T12:00:00Z').getTime();
+    const label = async (options: Partial<RoomClimateChart>) => {
+      const chart = createChart({
+        temperature: [
+          { t: start, v: 20 },
+          { t: end, v: 21 },
+        ],
+        start,
+        end,
+        language: 'de',
+        ...options,
+      });
+      setSize(chart, 420, 140);
+      await chart.updateComplete;
+      return chart.shadowRoot!.querySelector('.axis-label')?.textContent?.trim() ?? '';
+    };
+
+    // Browser zone would be whatever the test machine has – the instance zone wins.
+    expect(await label({ timeZone: 'UTC' })).toContain('06:00');
+    expect(await label({ timeZone: 'Europe/Berlin' })).toContain('08:00');
+    // 12-hour clock on request.
+    expect(await label({ timeZone: 'UTC', hour12: true })).toContain('6:00');
+    expect(await label({ timeZone: 'UTC', hour12: true })).toMatch(/AM/i);
+    // An invalid zone must not throw: it falls back to the browser zone.
+    expect(await label({ timeZone: 'Not/AZone' })).not.toBe('');
+  });
+
   it('lets one series be switched off without losing the other', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22]),
@@ -216,7 +260,7 @@ describe('climate chart', () => {
     await chart.updateComplete;
     const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
     expect(lines).toHaveLength(1);
-    expect(lines[0].style.stroke).toContain('temp-stroke');
+    expect(lines[0].style.stroke).toBe('#4FD1A5');
     expect(chart.shadowRoot!.querySelector('.state-title')).toBeNull();
   });
 
@@ -266,7 +310,7 @@ describe('climate chart', () => {
     // Default humidity colour is the subdued indigo; the temperature uses a
     // gradient reference, so both lines are easy to tell apart.
     const humidityLine = lines.find((line) => line.style.stroke === '#8B86D6');
-    const temperatureLine = lines.find((line) => line.style.stroke.includes('temp-stroke'));
+    const temperatureLine = lines.find((line) => line.style.stroke === '#4FD1A5');
     expect(humidityLine).toBeDefined();
     expect(humidityLine?.style.strokeDasharray).toBe('0.1 5.5');
     // The temperature curve is untouched.

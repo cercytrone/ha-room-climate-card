@@ -1,8 +1,10 @@
 import { LitElement, css, html, nothing, svg, type TemplateResult } from 'lit';
 import { MAX_CHART_POINTS } from '../const';
+import { formatNumber } from '../utils/format';
 import {
   areaPath,
   buildSegments,
+  decimateIndices,
   prepareSamples,
   extent,
   linearScale,
@@ -28,25 +30,13 @@ import {
 function decimateSegment(segment: SeriesSegment, maxPoints: number): SeriesSegment {
   const { samples, bridged } = segment;
   if (samples.length <= maxPoints || maxPoints < 3) return segment;
-  const stride = Math.ceil(samples.length / maxPoints);
-  const keptSamples: ChartSample[] = [];
+  // Min/max buckets instead of every n-th sample: peaks survive (see geometry).
+  const indices = decimateIndices(samples, maxPoints);
+  const keptSamples = indices.map((index) => samples[index]);
   const keptBridged: boolean[] = [];
-  let lastIndex = 0;
-  for (let i = 0; i < samples.length; i += stride) {
-    if (!keptSamples.length) {
-      keptSamples.push(samples[i]);
-      lastIndex = i;
-      continue;
-    }
-    keptSamples.push(samples[i]);
-    // Edge is bridged if any skipped edge in between was interpolated.
-    keptBridged.push(bridged.slice(lastIndex + 1, i + 1).some(Boolean));
-    lastIndex = i;
-  }
-  const finalIndex = samples.length - 1;
-  if (lastIndex !== finalIndex) {
-    keptSamples.push(samples[finalIndex]);
-    keptBridged.push(bridged.slice(lastIndex + 1, finalIndex + 1).some(Boolean));
+  for (let i = 1; i < indices.length; i++) {
+    // An edge stays "bridged" if any skipped edge in between was interpolated.
+    keptBridged.push(bridged.slice(indices[i - 1] + 1, indices[i] + 1).some(Boolean));
   }
   return { samples: keptSamples, bridged: keptBridged };
 }
@@ -111,6 +101,8 @@ export class RoomClimateChart extends LitElement {
     showHumidityArea: { attribute: false },
     cornerRadius: { attribute: false },
     language: { attribute: false },
+    timeZone: { attribute: false },
+    hour12: { attribute: false },
     loading: { attribute: false },
     error: { attribute: false },
     labels: { attribute: false },
@@ -262,6 +254,10 @@ export class RoomClimateChart extends LitElement {
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 26;
   language = 'de';
+  /** IANA zone of the Home Assistant instance; empty = browser zone. */
+  timeZone?: string;
+  /** `true` = 12-hour clock, `false` = 24-hour, `undefined` = locale default. */
+  hour12?: boolean;
   loading = false;
   error?: string;
   labels: ChartLabels = {
@@ -535,13 +531,11 @@ export class RoomClimateChart extends LitElement {
       });
     };
 
-    const tempPaths = smooth
-      ? tempSegments.flatMap((segment) =>
-          seriesElement(segment, tempY!, `url(#${this.uid}-temp-stroke)`)
-        )
-      : tempSegments.flatMap((segment) =>
-          seriesElement(segment, tempY!, this.accentColor, { color: this.accentColor })
-        );
+    // One colour, drawn straight: the old gradient had two identical stops and
+    // therefore never changed anything – it only forced a `url(#…)` indirection.
+    const tempPaths = tempSegments.flatMap((segment) =>
+      seriesElement(segment, tempY!, this.accentColor, { color: this.accentColor })
+    );
 
     // Restrained area fills, one per series and each one inside its own band.
     const mergedArea = (
@@ -626,20 +620,28 @@ export class RoomClimateChart extends LitElement {
     const lastTemp = [...tempSeries].reverse().find((sample) => sample.v !== null);
     const lastHumidity = [...humiditySeries].reverse().find((sample) => sample.v !== null);
 
+    // The dashed reference is invisible to screen readers, so its value and unit
+    // are part of the accessible name.
+    const setpointText =
+      showSetpoint && setpointValue !== null
+        ? `${this.labels.setpoint} ${formatNumber(setpointValue, this.language, 1)}${
+            this.setpointUnit ? ` ${this.setpointUnit}` : ''
+          }`
+        : '';
+    const ariaLabel = setpointText
+      ? `${this.labels.aria}. ${setpointText}`
+      : this.labels.aria;
+
     return svg`<svg
       width=${width}
       height=${chartHeight}
       viewBox="0 0 ${width} ${chartHeight}"
       role="img"
-      aria-label=${this.labels.aria}
+      aria-label=${ariaLabel}
       preserveAspectRatio="xMidYMid meet"
       focusable="false"
     >
       <defs>
-        <linearGradient id=${`${this.uid}-temp-stroke`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color=${this.accentColor} stop-opacity="1" />
-          <stop offset="1" stop-color=${this.accentColor} stop-opacity="1" />
-        </linearGradient>
         <linearGradient id=${`${this.uid}-temp-fill`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
           <stop offset="0" stop-color=${this.accentColor} stop-opacity="0.22" />
           <stop offset="0.55" stop-color=${this.accentColor} stop-opacity="0.08" />
@@ -708,17 +710,22 @@ export class RoomClimateChart extends LitElement {
   private formatDayTime(timestamp: number): string {
     const date = new Date(timestamp);
     const locale = this.language || 'en';
+    // Home Assistant formats times in the zone of the instance, not in the zone
+    // of whatever browser happens to open the dashboard.
+    const zone = this.timeZone ? { timeZone: this.timeZone } : {};
+    const clock: Intl.DateTimeFormatOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      ...(typeof this.hour12 === 'boolean' ? { hour12: this.hour12 } : {}),
+    };
     let weekday: string;
     let time: string;
     try {
-      weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' })
+      weekday = new Intl.DateTimeFormat(locale, { weekday: 'short', ...zone })
         .format(date)
         .replace(/[.,]/g, '')
         .trim();
-      time = new Intl.DateTimeFormat(locale, {
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(date);
+      time = new Intl.DateTimeFormat(locale, { ...clock, ...zone }).format(date);
     } catch {
       weekday = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][date.getDay()];
       time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;

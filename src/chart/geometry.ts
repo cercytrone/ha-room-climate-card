@@ -632,15 +632,57 @@ export function tickCountForWidth(width: number): number {
 }
 
 /**
+ * Indices that survive decimation: the first and last sample plus the minimum
+ * and the maximum of every bucket.
+ *
+ * Taking every n-th sample was cheaper, but it silently dropped peaks – a short
+ * spike between two kept samples disappeared from a 24 h chart although it was
+ * the most interesting thing in it. Min/max per bucket keeps the envelope.
+ */
+export function decimateIndices(samples: ChartSample[], maxPoints: number): number[] {
+  const count = samples.length;
+  if (count <= maxPoints || maxPoints < 3) return samples.map((_, index) => index);
+
+  // Two points per bucket (low + high), plus the two fixed ends.
+  const buckets = Math.max(1, Math.floor((maxPoints - 2) / 2));
+  const kept = new Set<number>([0, count - 1]);
+  const size = count / buckets;
+  for (let bucket = 0; bucket < buckets; bucket++) {
+    const from = Math.floor(bucket * size);
+    const to = Math.min(count - 1, Math.floor((bucket + 1) * size) - 1);
+    let lowIndex = -1;
+    let highIndex = -1;
+    let low = Infinity;
+    let high = -Infinity;
+    for (let index = from; index <= to; index++) {
+      const value = samples[index].v;
+      if (value === null || !Number.isFinite(value)) continue;
+      if (value < low) {
+        low = value;
+        lowIndex = index;
+      }
+      if (value > high) {
+        high = value;
+        highIndex = index;
+      }
+    }
+    if (lowIndex === -1) {
+      // Nothing numeric in this bucket: keep one sample so the gap stays a gap.
+      kept.add(from);
+      continue;
+    }
+    kept.add(lowIndex);
+    kept.add(highIndex);
+  }
+  return [...kept].sort((a, b) => a - b);
+}
+
+/**
  * Reduces very long series to a manageable number of points while keeping the
- * first and last sample. Purely for rendering performance.
+ * first and last sample *and* the low/high of every bucket. Purely for
+ * rendering performance.
  */
 export function decimate(samples: ChartSample[], maxPoints: number): ChartSample[] {
   if (samples.length <= maxPoints || maxPoints < 3) return samples;
-  const stride = Math.ceil(samples.length / maxPoints);
-  const result: ChartSample[] = [];
-  for (let i = 0; i < samples.length; i += stride) result.push(samples[i]);
-  const last = samples[samples.length - 1];
-  if (result[result.length - 1] !== last) result.push(last);
-  return result;
+  return decimateIndices(samples, maxPoints).map((index) => samples[index]);
 }

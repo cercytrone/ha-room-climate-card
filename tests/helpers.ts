@@ -84,3 +84,21 @@ export async function flush(times = 3): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 }
+
+/** Triggers the most recently created IntersectionObserver for an element. */
+export function setVisible(element: Element, visible: boolean): void {
+  const observers = (
+    globalThis as unknown as {
+      TestIntersectionObserver: {
+        instances: Array<{ targets: Set<Element>; trigger: (visible: boolean) => void }>;
+      };
+    }
+  ).TestIntersectionObserver.instances;
+  for (let i = observers.length - 1; i >= 0; i--) {
+    if (observers[i].targets.has(element)) {
+      observers[i].trigger(visible);
+      return;
+    }
+  }
+  observers[observers.length - 1]?.trigger(visible);
+}

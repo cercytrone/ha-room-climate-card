@@ -78,6 +78,33 @@ export function temperatureUnit(entityUnit: string | undefined): string {
   return entityUnit && entityUnit.trim().length ? entityUnit.trim() : '°C';
 }
 
+/** Canonical temperature scale for a unit string, or `null` if unknown. */
+export function temperatureScale(unit: string | undefined): 'C' | 'F' | null {
+  const text = unit?.trim().toLowerCase();
+  if (!text) return null;
+  if (text.includes('°f') || text === 'f' || text.startsWith('fahrenheit')) return 'F';
+  if (text.includes('°c') || text === 'c' || text.startsWith('celsius')) return 'C';
+  return null;
+}
+
+/**
+ * Converts a temperature between the two scales Home Assistant uses. Returns
+ * `null` when either unit is unknown, so callers can decide not to draw a
+ * reference line instead of guessing.
+ */
+export function convertTemperature(
+  value: number,
+  from: string | undefined,
+  to: string | undefined
+): number | null {
+  if (!Number.isFinite(value)) return null;
+  const source = temperatureScale(from);
+  const target = temperatureScale(to);
+  if (!source || !target) return null;
+  if (source === target) return value;
+  return source === 'C' ? value * 1.8 + 32 : (value - 32) / 1.8;
+}
+
 export function humidityUnit(entityUnit: string | undefined): string {
   const unit = entityUnit?.trim();
   if (!unit) return '%';
