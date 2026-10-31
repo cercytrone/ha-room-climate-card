@@ -71,6 +71,11 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   climate_entity?: string;
   /** Whole heating/status row below the readings. Default on. */
   show_climate_row?: boolean;
+  /**
+   * What a tap on the card (or Enter on the status row) does: open the
+   * more-info dialog of the climate entity, or nothing. Default `more-info`.
+   */
+  tap_action?: TapAction;
   show_setpoint?: boolean;
   show_hvac_status?: boolean;
   show_hvac_mode?: boolean;
@@ -127,6 +132,9 @@ export interface ResolvedThermostatConfig {
   idleColor: string;
   offColor: string;
 }
+
+/** Tap on the card: open Home Assistant's more-info dialog, or nothing. */
+export type TapAction = 'more-info' | 'none';
 
 export interface ResolvedChartConfig {
   showTemperature: boolean;
@@ -192,6 +200,8 @@ export interface ResolvedConfig {
   motion: ResolvedMotionConfig;
   thermostat: ResolvedThermostatConfig;
   chart: ResolvedChartConfig;
+  /** `more-info` opens the dialog of the climate entity on tap. */
+  tapAction: TapAction;
 }
 
 export const DEFAULT_OPEN_STATES = ['on', 'open', 'opening', 'tilted', 'gekippt'];
@@ -337,6 +347,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'show_thermostat',
   'climate_entity',
   'show_climate_row',
+  'tap_action',
   'show_setpoint',
   'show_hvac_status',
   'show_hvac_mode',
@@ -499,6 +510,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       // the dashed helper lines are opt-in now.
       showGrid: asBoolean(config.chart_show_grid) ?? false,
     },
+    tapAction: config.tap_action === 'none' ? 'none' : 'more-info',
   };
 }
 

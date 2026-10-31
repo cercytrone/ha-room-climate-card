@@ -58,6 +58,10 @@ interface EditorText {
   climateEntity: string;
   showClimateRow: string;
   showSetpoint: string;
+  tapAction: string;
+  tapMoreInfo: string;
+  tapNone: string;
+  tapHelper: string;
   showHvacStatus: string;
   showHvacMode: string;
   heatingColor: string;
@@ -119,7 +123,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     general: 'Allgemein',
     sensors: 'Sensoren',
     typography: 'Messwerte (Schrift)',
-    colors: 'Farben & Grenzwerte',
+    colors: 'Farben',
     window: 'Fenster',
     motion: 'Bewegung',
     thermostat: 'Thermostat',
@@ -165,6 +169,11 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     climateEntity: 'Thermostat-Entität',
     showClimateRow: 'Statuszeile unter dem Messwert (Heizstatus & Solltemperatur) anzeigen',
     showSetpoint: 'Solltemperatur in der Statuszeile anzeigen',
+    tapAction: 'Tippen auf die Karte',
+    tapMoreInfo: 'Thermostat öffnen',
+    tapNone: 'Nichts',
+    tapHelper:
+      'Öffnet den Dialog der Climate-Entität von Home Assistant – dort lassen sich Solltemperatur und Modus einstellen. Die Statuszeile ist derselbe Knopf für die Tastatur; Messwerte und Chart behalten ihre eigene Funktion.',
     showHvacStatus: 'Heizstatus (Flamme + Statuswort) anzeigen',
     showHvacMode: 'Betriebsmodus anzeigen',
     heatingColor: 'Icon-Farbe Heizen (nur bei aktiver Heizanforderung)',
@@ -205,7 +214,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     grid: 'Gitternetz',
     points: 'Datenpunkte',
     tooltip: 'Werte beim Überfahren',
-    extremes: 'Minimum und Maximum markieren',
+    extremes: 'Minimum/Maximum im Chart anzeigen',
     comfortHelper:
       'Beim Zeigen auf die Kurve erscheinen Uhrzeit und die echten Messwerte. Minimum und Maximum stehen dauerhaft an der Kurve.',
     missingEntity: 'Bitte eine Entität auswählen.',
@@ -216,7 +225,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     general: 'General',
     sensors: 'Sensors',
     typography: 'Readings (font)',
-    colors: 'Colours & thresholds',
+    colors: 'Colours',
     window: 'Window',
     motion: 'Motion',
     thermostat: 'Thermostat',
@@ -262,6 +271,11 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     climateEntity: 'Climate entity',
     showClimateRow: 'Show the status row (heating state & target temperature)',
     showSetpoint: 'Show target temperature in the status row',
+    tapAction: 'Tap on the card',
+    tapMoreInfo: 'Open thermostat',
+    tapNone: 'Nothing',
+    tapHelper:
+      "Opens Home Assistant's dialog for the climate entity, where target temperature and mode are set. The status row is the same button for keyboards; readings and chart keep their own behaviour.",
     showHvacStatus: 'Show heating state (flame + wording)',
     showHvacMode: 'Show HVAC mode',
     heatingColor: 'Heating icon colour (active heating demand only)',
@@ -302,7 +316,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     grid: 'Grid lines',
     points: 'Data points',
     tooltip: 'Values on hover',
-    extremes: 'Mark minimum and maximum',
+    extremes: 'Show minimum/maximum in the chart',
     comfortHelper:
       'Pointing at the curve shows the time and the actual measurements. Minimum and maximum stay visible next to the curve.',
     missingEntity: 'Please select an entity.',
@@ -913,6 +927,22 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.showClimateRow,
         value: this.rawBoolean('show_climate_row') ?? true,
         disabled: !enabled,
+      })}
+      ${this.renderField({
+        key: 'tap_action',
+        label: t.tapAction,
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'more-info', label: t.tapMoreInfo },
+              { value: 'none', label: t.tapNone },
+            ],
+          },
+        },
+        value: this.stringValue('tap_action', 'more-info'),
+        disabled: !enabled || !this.rowVisible,
+        helper: t.tapHelper,
       })}
       ${this.renderSwitch({
         key: 'show_setpoint',

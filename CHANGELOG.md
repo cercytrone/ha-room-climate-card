@@ -4,6 +4,32 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.7.0] – 2026-10-31
+
+### Hinzugefügt
+
+- **Tippen auf die Karte öffnet das Thermostat.** Ein Klick oder Touch auf die Karte (außerhalb
+  der Messwerte und des Charts) öffnet den More-Info-Dialog der Climate-Entität – dort werden
+  Solltemperatur und Modus eingestellt. Die Karte schickt dafür nur das `hass-more-info`-Event mit
+  `entityId` nach oben (bubbles + composed), genau wie Home Assistants eigene Kacheln; es gibt
+  keine eigene Heizungssteuerung und keine Navigation.
+- **Tastatur-Pendant:** Ist ein Thermostat verknüpft, wird die Statuszeile ein echter
+  `<button>` mit Fokusring, `title` und dem Zusatz „Thermostat öffnen“ im Namen; das Statuswort
+  bleibt darin eine Live-Region.
+- **Abschaltbar:** `tap_action: none` (Editor: *Tippen auf die Karte* → *Nichts*) schaltet das
+  Tippziel ab; ohne sichtbare Statuszeile (`show_climate_row: false`) gibt es keines, damit kein
+  Zeiger-Ziel ohne Tastatur-Pendant entsteht.
+
+### Geändert
+
+- Messwerte und Chart behalten ihre eigene Funktion: ein Klick auf einen Messwert blendet weiter
+  die Serie aus, ein Tippen in den Chart zeigt die Wertanzeige. Beide stoppen das Karten-Tippziel.
+- Der Schalter für die Extremwerte heißt im Editor jetzt **Minimum/Maximum im Chart anzeigen**
+  (vorher „Minimum und Maximum markieren“) – an derselben Stelle unter *Verlauf*, weiterhin
+  standardmäßig an.
+- Der Editor-Abschnitt *Farben & Grenzwerte* heißt wieder **Farben**: Grenzwerte gibt es seit
+  2.0.0 nicht mehr, dort stehen nur noch Akzent- und Sekundärfarbe.
+
 ## [2.6.0] – 2026-10-31
 
 ### Hinzugefügt

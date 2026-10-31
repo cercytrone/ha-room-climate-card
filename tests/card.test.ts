@@ -179,7 +179,10 @@ describe('room climate card', () => {
     expect(text(card, '.reading.humidity .reading-value')).toBe('–');
     expect(q(card, '.reading.temperature')?.getAttribute('aria-label')).toContain('Nicht verfügbar');
     expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
-    expect(q(card, '.climate-row')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
+    // The row is a button now, so its name says what it does as well.
+    expect(q(card, '.climate-row')?.getAttribute('aria-label')).toBe(
+      'Nicht verfügbar – Thermostat öffnen'
+    );
     expect(q(card, '.flame')?.classList.contains('status-unavailable')).toBe(true);
     expect(q(card, '.climate-setpoint')).toBeNull();
   });
@@ -1030,6 +1033,98 @@ describe('room climate card', () => {
     await unknown.updateComplete;
     expect(chartOf(unknown).setpoint).toBeNull();
     expect(chartOf(unknown).setpointUnit).toBe('K');
+  });
+
+  it('opens the thermostat dialog when the card is tapped', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const events: Array<{ entityId?: string }> = [];
+    card.addEventListener('hass-more-info', (event) =>
+      events.push((event as CustomEvent<{ entityId: string }>).detail)
+    );
+
+    expect(q(card, '.card')?.classList.contains('is-tappable')).toBe(true);
+    (q(card, '.card') as HTMLElement).click();
+    expect(events).toEqual([{ entityId: 'climate.thermostat' }]);
+  });
+
+  it('gives the status row a keyboard path to the same dialog', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const events: string[] = [];
+    card.addEventListener('hass-more-info', (event) =>
+      events.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+    );
+
+    const row = q(card, '.climate-row') as HTMLButtonElement;
+    expect(row.tagName).toBe('BUTTON');
+    expect(row.type).toBe('button');
+    expect(row.getAttribute('title')).toBe('Thermostat öffnen');
+    expect(row.getAttribute('aria-label')).toContain('Heizt');
+    expect(row.getAttribute('aria-label')).toContain('Thermostat öffnen');
+    // The state stays a live region inside the button.
+    expect(q(card, '.climate-row .climate-state')?.getAttribute('role')).toBe('status');
+
+    row.click();
+    // The row handles its own click: exactly one event, not two.
+    expect(events).toEqual(['climate.thermostat']);
+  });
+
+  it('leaves the card\'s own controls alone', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const events: string[] = [];
+    card.addEventListener('hass-more-info', (event) =>
+      events.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+    );
+
+    // A tap on a reading toggles its series instead.
+    (q(card, '.reading.temperature') as HTMLButtonElement).click();
+    await card.updateComplete;
+    expect(events).toEqual([]);
+    expect((q(card, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries)
+      .toEqual(['temperature']);
+
+    // The chart owns its taps (readout/crosshair).
+    (q(card, '.chart-slot') as HTMLElement).click();
+    expect(events).toEqual([]);
+  });
+
+  it('offers no tap target when there is nothing to open', async () => {
+    const withoutClimate = mount(
+      { ...fullConfig, climate_entity: undefined, show_thermostat: false },
+      createHass({ states: baseStates() })
+    );
+    await withoutClimate.updateComplete;
+    expect(q(withoutClimate, '.card')?.classList.contains('is-tappable')).toBe(false);
+    expect(q(withoutClimate, '.climate-row')).toBeNull();
+
+    // Switching the tap off keeps the row, but as a plain live region.
+    const off = mount(
+      { ...fullConfig, tap_action: 'none' },
+      createHass({ states: baseStates() })
+    );
+    await off.updateComplete;
+    const events: string[] = [];
+    off.addEventListener('hass-more-info', (event) =>
+      events.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+    );
+    expect(q(off, '.card')?.classList.contains('is-tappable')).toBe(false);
+    const row = q(off, '.climate-row') as HTMLElement;
+    expect(row.tagName).toBe('DIV');
+    expect(row.getAttribute('role')).toBe('status');
+    (q(off, '.card') as HTMLElement).click();
+    expect(events).toEqual([]);
+  });
+
+  it('does not offer a pointer-only target while the status row is hidden', async () => {
+    const card = mount(
+      { ...fullConfig, show_climate_row: false },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    expect(q(card, '.climate-row')).toBeNull();
+    expect(q(card, '.card')?.classList.contains('is-tappable')).toBe(false);
   });
 
   it('feeds the readout with the sensor units and the configured decimals', async () => {
