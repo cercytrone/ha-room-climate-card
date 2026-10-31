@@ -82,6 +82,9 @@ interface EditorText {
   humidityLineSolid: string;
   humidityLineDotted: string;
   humidityLineHelper: string;
+  temperatureGradient: string;
+  humidityGradient: string;
+  gradientHelper: string;
   grid: string;
   points: string;
   missingEntity: string;
@@ -179,6 +182,10 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityLineDotted: 'Gepunktet',
     humidityLineHelper:
       'Nur die Feuchtekurve. Die Temperaturkurve bleibt unverändert; Fläche, Endpunkt und Farben gelten weiter.',
+    temperatureGradient: 'Farbverlauf unter der Temperaturkurve',
+    humidityGradient: 'Farbverlauf unter der Feuchtekurve',
+    gradientHelper:
+      'Der dezente Flächenverlauf unter der Kurve. Aus bleibt die Kurve allein stehen – ideal für sehr flache Karten.',
     grid: 'Gitternetz',
     points: 'Datenpunkte',
     missingEntity: 'Bitte eine Entität auswählen.',
@@ -261,6 +268,10 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityLineDotted: 'Dotted',
     humidityLineHelper:
       'Humidity curve only. The temperature curve is unchanged; area, end marker and colours still apply.',
+    temperatureGradient: 'Gradient under the temperature curve',
+    humidityGradient: 'Gradient under the humidity curve',
+    gradientHelper:
+      'The soft area fill below the curve. Off leaves the line on its own – useful for very flat cards.',
     grid: 'Grid lines',
     points: 'Data points',
     missingEntity: 'Please select an entity.',
@@ -962,6 +973,19 @@ export class RoomClimateCardEditor extends LitElement {
         },
         value: this.stringValue('chart_curve', 'smooth'),
         disabled: !anyChart,
+      })}
+      ${this.renderSwitch({
+        key: 'chart_temperature_gradient',
+        label: t.temperatureGradient,
+        value: this.rawBoolean('chart_temperature_gradient') ?? true,
+        disabled: !showTemperature,
+      })}
+      ${this.renderSwitch({
+        key: 'chart_humidity_gradient',
+        label: t.humidityGradient,
+        value: this.rawBoolean('chart_humidity_gradient') ?? true,
+        disabled: !showHumidity,
+        helper: t.gradientHelper,
       })}
       ${this.renderField({
         key: 'chart_humidity_line_style',

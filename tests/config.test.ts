@@ -100,6 +100,29 @@ describe('normalizeConfig', () => {
     }
   });
 
+  it('keeps both chart gradients on by default and switches them separately', () => {
+    const defaults = normalizeConfig({});
+    expect(defaults.chart.showTemperatureGradient).toBe(true);
+    expect(defaults.chart.showHumidityGradient).toBe(true);
+
+    const off = normalizeConfig({
+      chart_temperature_gradient: false,
+      chart_humidity_gradient: false,
+    });
+    expect(off.chart.showTemperatureGradient).toBe(false);
+    expect(off.chart.showHumidityGradient).toBe(false);
+
+    const mixed = normalizeConfig({ chart_humidity_gradient: false });
+    expect(mixed.chart.showTemperatureGradient).toBe(true);
+    expect(mixed.chart.showHumidityGradient).toBe(false);
+
+    // `false` must survive, junk must not.
+    expect(normalizeConfig({ chart_temperature_gradient: 'nein' }).chart.showTemperatureGradient).toBe(
+      true
+    );
+    expect(normalizeConfig({ chart_humidity_gradient: 0 }).chart.showHumidityGradient).toBe(true);
+  });
+
   it('never throws for nonsense input', () => {
     for (const input of [undefined, null, 42, 'text', [], { temperature_entity: 17 }]) {
       expect(() => normalizeConfig(input)).not.toThrow();

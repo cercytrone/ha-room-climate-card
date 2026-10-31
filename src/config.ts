@@ -85,6 +85,10 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_humidity_line_style?: HumidityLineStyle;
   chart_show_points?: boolean;
   chart_show_grid?: boolean;
+  /** Soft colour gradient under the temperature curve. Default on. */
+  chart_temperature_gradient?: boolean;
+  /** Soft colour gradient under the humidity curve. Default on. */
+  chart_humidity_gradient?: boolean;
 }
 
 export interface ResolvedWindowConfig {
@@ -124,6 +128,10 @@ export interface ResolvedChartConfig {
   humidityLineStyle: HumidityLineStyle;
   showPoints: boolean;
   showGrid: boolean;
+  /** Area fill under the temperature curve. */
+  showTemperatureGradient: boolean;
+  /** Area fill under the humidity curve. */
+  showHumidityGradient: boolean;
 }
 
 
@@ -384,6 +392,8 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       gapStyle,
       humidityLineStyle,
       showPoints: asBoolean(config.chart_show_points) ?? false,
+      showTemperatureGradient: asBoolean(config.chart_temperature_gradient) ?? true,
+      showHumidityGradient: asBoolean(config.chart_humidity_gradient) ?? true,
       // The reference sheet reduces the axis to a hairline plus three labels;
       // the dashed helper lines are opt-in now.
       showGrid: asBoolean(config.chart_show_grid) ?? false,

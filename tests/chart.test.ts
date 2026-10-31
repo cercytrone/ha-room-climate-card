@@ -92,7 +92,7 @@ describe('climate chart', () => {
     expect(svg.getAttribute('height')).toBe('110');
   });
 
-  it('draws both series in their own colour with one restrained area fill', async () => {
+  it('draws both series in their own colour with one restrained area fill each', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22, 21, 20.5]),
       humidity: samples([45, 47, 52, 55, 50]),
@@ -104,10 +104,11 @@ describe('climate chart', () => {
     // Gradient definitions exist, but the stroke is a single accent colour…
     expect(root.querySelectorAll('[id$="-temp-stroke"]')).toHaveLength(1);
     expect(root.querySelectorAll('[id$="-temp-fill"]')).toHaveLength(1);
-    expect(root.querySelectorAll('stop')).toHaveLength(5);
-    // …and the humidity has no area fill at all: one gradient, one surface.
-    expect(root.querySelectorAll('[id$="-humidity-fill"]')).toHaveLength(0);
+    // …and the humidity carries its own, quieter fill in its own band.
+    expect(root.querySelectorAll('[id$="-humidity-fill"]')).toHaveLength(1);
+    expect(root.querySelectorAll('stop')).toHaveLength(8);
     expect(root.querySelectorAll('path[style*="temp-fill"]')).toHaveLength(1);
+    expect(root.querySelectorAll('path[style*="humidity-fill"]')).toHaveLength(1);
     // No legend: the colour dot lives next to the reading, not in the chart.
     expect(root.querySelector('.legend')).toBeNull();
     expect(root.querySelector('.legend-item')).toBeNull();
@@ -270,8 +271,102 @@ describe('climate chart', () => {
     expect(humidityLine?.style.strokeDasharray).toBe('0.1 5.5');
     // The temperature curve is untouched.
     expect(temperatureLine?.style.strokeDasharray).toBe('');
-    // The humidity has no area fill at all – only its stroke is dotted.
-    expect(chart.shadowRoot!.querySelectorAll('[id$="humidity-fill"]')).toHaveLength(0);
+  });
+
+  it('keeps the humidity fill inside the humidity band', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 21, 20.5]),
+      humidity: samples([45, 47, 52, 55, 50]),
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    // Geometry mirrors the component: 20 px axis space, 6 px top inset, the
+    // humidity owning the upper 30 % and the temperature starting at 44 %.
+    const plotHeight = 130 - 20 - 6;
+    const temperatureTop = 6 + plotHeight * 0.44;
+    const path = chart.shadowRoot!.querySelector('path[style*="humidity-fill"]') as SVGPathElement;
+    const numbers = path
+      .getAttribute('d')!
+      .match(/-?\d+(\.\d+)?/g)!
+      .map(Number);
+    const yValues: number[] = [];
+    for (let i = 1; i < numbers.length - 2; i += 2) yValues.push(numbers[i]);
+    expect(yValues.length).toBeGreaterThan(2);
+    expect(Math.max(...yValues)).toBeLessThan(temperatureTop);
+  });
+
+  it('gives the humidity its own, quieter gradient inside its band', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 21, 20.5]),
+      humidity: samples([45, 47, 52, 55, 50]),
+      humidityColor: '#8B86D6',
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const gradient = chart.shadowRoot!.querySelector('[id$="-humidity-fill"]')!;
+    const stops = Array.from(gradient.querySelectorAll('stop')).map((stop) => ({
+      color: stop.getAttribute('stop-color'),
+      opacity: Number(stop.getAttribute('stop-opacity')),
+    }));
+    expect(stops).toHaveLength(3);
+    // Own colour, softer than the temperature fill (0.22 / 0.08) so it never
+    // competes with the hero value.
+    for (const stop of stops) expect(stop.color).toBe('#8B86D6');
+    expect(stops[0].opacity).toBeCloseTo(0.2, 2);
+    expect(stops[1].opacity).toBeCloseTo(0.07, 2);
+    expect(stops[2].opacity).toBe(0);
+    for (let i = 1; i < stops.length; i++) {
+      expect(stops[i].opacity).toBeLessThanOrEqual(stops[i - 1].opacity);
+    }
+  });
+
+  it('switches each gradient off independently', async () => {
+    const both = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+    });
+    setSize(both, 340, 120);
+    await both.updateComplete;
+    expect(both.shadowRoot!.querySelectorAll('.series-area')).toHaveLength(2);
+
+    const noTemperature = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      showTemperatureArea: false,
+    });
+    setSize(noTemperature, 340, 120);
+    await noTemperature.updateComplete;
+    expect(noTemperature.shadowRoot!.querySelectorAll('.series-area')).toHaveLength(1);
+    expect(
+      noTemperature.shadowRoot!.querySelector('path[style*="humidity-fill"]')
+    ).not.toBeNull();
+    expect(
+      noTemperature.shadowRoot!.querySelector('path[style*="temp-fill"]')
+    ).toBeNull();
+
+    const noHumidity = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      showHumidityArea: false,
+    });
+    setSize(noHumidity, 340, 120);
+    await noHumidity.updateComplete;
+    expect(noHumidity.shadowRoot!.querySelectorAll('.series-area')).toHaveLength(1);
+    expect(
+      noHumidity.shadowRoot!.querySelector('path[style*="temp-fill"]')
+    ).not.toBeNull();
+
+    // Both off: the curves stay, only the surfaces disappear.
+    const none = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      showTemperatureArea: false,
+      showHumidityArea: false,
+    });
+    setSize(none, 340, 120);
+    await none.updateComplete;
+    expect(none.shadowRoot!.querySelectorAll('.series-area')).toHaveLength(0);
+    expect(none.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(2);
   });
 
   it('keeps both curves solid by default', async () => {

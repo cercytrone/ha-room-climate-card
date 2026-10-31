@@ -657,6 +657,27 @@ describe('room climate card', () => {
     expect(chart.humidity?.length).toBe(20);
   });
 
+  it('hands both gradient switches to the chart component', async () => {
+    const chartOf = (card: RoomClimateCard) =>
+      q(card, 'room-climate-chart') as HTMLElement & {
+        showTemperatureArea?: boolean;
+        showHumidityArea?: boolean;
+      };
+
+    const defaults = mount(fullConfig, createHass({ states: baseStates() }));
+    await defaults.updateComplete;
+    expect(chartOf(defaults).showTemperatureArea).toBe(true);
+    expect(chartOf(defaults).showHumidityArea).toBe(true);
+
+    const off = mount(
+      { ...fullConfig, chart_temperature_gradient: false, chart_humidity_gradient: false },
+      createHass({ states: baseStates() })
+    );
+    await off.updateComplete;
+    expect(chartOf(off).showTemperatureArea).toBe(false);
+    expect(chartOf(off).showHumidityArea).toBe(false);
+  });
+
   it('shows a fallback when history is unavailable', async () => {
     const hass = createHass({ states: baseStates(), history: {} });
     const card = mount(fullConfig, hass);
