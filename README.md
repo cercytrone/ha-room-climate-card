@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.3.0`.
+  `ROOM-CLIMATE-CARD v2.4.0`.
 
 ---
 
@@ -228,7 +228,7 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 | `chart_smoothing` | `none` \| `light` \| `medium` \| `strong` | `light` | Stufe der Kurvenglättung. `none` zeichnet jeden Messwert, `light` nimmt nur das Sensor-Zittern, `medium`/`strong` beruhigen sehr unruhige Sensoren. Wirkt nur bei `chart_curve: smooth`. |
 | `chart_humidity_line_style` | `solid` \| `dotted` | `solid` | Feuchtekurve durchgezogen oder **gepunktet** zeichnen. Betrifft nur die Feuchte; Fläche, Endpunkt und Farben bleiben. |
 | `chart_gap_mode` | `connect` \| `break` | `connect` | Echte Ausfälle (`unavailable`/`unknown`) überbrücken oder sichtbar unterbrechen. Konstante Phasen ohne HA-Samples werden **immer** durchgehend gezeichnet. |
-| `chart_max_gap_minutes` | number | `120` | Längste Ausfallzeit (Minuten), die noch überbrückt wird; längere bleiben offen. |
+| `chart_max_gap_minutes` | number | `120` | Längste **echte** Ausfallzeit (Minuten), die noch überbrückt wird; längere bleiben offen. Ruhige Phasen ohne Samples zählen nicht mit. |
 | `chart_gap_style` | `solid` \| `dashed` | `solid` | Überbrückte Abschnitte wie gemessene zeichnen oder gestrichelt markieren. |
 | `chart_temperature_gradient` | boolean | `true` | Sanfter Farbverlauf unter der Temperaturkurve. Aus = nur die Linie. |
 | `chart_humidity_gradient` | boolean | `true` | Sanfter Farbverlauf unter der Feuchtekurve, begrenzt auf deren eigenes Band. Aus = nur die Linie. |
@@ -300,21 +300,36 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   verwendet.
 - **Caching:** Antworten werden 2 Minuten pro Entität + Zeitraum im Speicher gehalten; ein
   Karten-Resize oder Theme-Wechsel erzeugt keine neuen Requests. Aktualisierung alle 5 Minuten
-  und sofort, wenn die Verbindung zurückkehrt.
+  und sofort, wenn die Verbindung zurückkehrt, die Seite wieder sichtbar wird
+  (`visibilitychange`, wichtig für Wandtablets und schlafende Tabs) oder die Karte neu rendert.
+- **Live-Anschluss:** Der aktuelle Zustand aus `hass.states` wird an die Kurve gehängt, wenn er
+  neuer ist als der letzte History-Wert – die Kurve endet damit genau bei dem Wert, der oben
+  groß steht (auch bei einem gerade eben erfolgten `unavailable`).
+- **Fehlerverhalten:** Ein fehlgeschlagener Abruf leert das Diagramm **nicht**. Die zuletzt
+  gültige Kurve bleibt stehen, der Fehler wird gemeldet und der Abruf mit wachsendem Abstand
+  wiederholt (15 s, 30 s, 60 s … maximal 5 Minuten). Während eines Backoffs startet keine
+  Sensor-Änderung einen neuen Versuch.
 - **Aufbereitung:** Nur nicht numerische Zustände (`unavailable`, `unknown`, Text) sind eine
   echte Lücke. Fehlende Zeilen zwischen zwei Messwerten bedeuten dagegen „Wert unverändert“
   (HA schreibt nur Änderungen). Samples außerhalb des Zeitfensters werden verworfen, Dubletten
   zusammengefasst – so entstehen keine Spitzen oder Flächen an den Rändern.
 - **Konstante Phasen:** Home Assistant speichert nur Zustands*änderungen*. Bleibt ein Wert
   stundenlang gleich (nachts häufig), gibt es **keine** Samples – das ist aber keine fehlende
-  Messung, sondern eine bekannte Konstante. Solche Stellen werden immer linear und durchgezogen
-  gezeichnet, wie in der HA-eigenen Chart. Ein `max_gap_minutes`-Limit gilt hier bewusst nicht.
-- **Echte Ausfälle:** `unavailable`/`unknown` sind echte Information. Ausfälle bis
-  `chart_max_gap_minutes` werden überbrückt (`chart_gap_style: solid`, Standard; optional
-  `dashed`), längere bleiben sichtbar offen. Es werden keine Stunden erfunden.
+  Messung, sondern eine bekannte Konstante. Solche Stellen werden als **Stufe** gezeichnet: Der
+  letzte Wert wird flach gehalten und springt erst eine Sekunde vor dem nächsten Messwert. Ein
+  `max_gap_minutes`-Limit gilt hier bewusst nicht, und `chart_gap_mode: break` bricht sie nie
+  auf – nur echte Ausfälle brechen die Linie.
+- **Echte Ausfälle:** `unavailable`/`unknown` sind echte Information. Gemessen wird nur die
+  **tatsächliche Ausfallzeit**, also ab dem Moment, in dem der Sensor nicht verfügbar wurde –
+  nicht der Abstand zum letzten gültigen Messwert davor. (Genau das war der Fehler bis 2.3.0:
+  Nach einer ruhigen Nacht sah ein einminütiger Aussetzer wie ein mehrstündiger Ausfall aus und
+  riss die Kurve auf.) Ausfälle bis `chart_max_gap_minutes` werden überbrückt
+  (`chart_gap_style: solid`, Standard; optional `dashed`), längere bleiben sichtbar offen – die
+  Linie endet dann dort, wo die Messung endete. Es werden keine Stunden erfunden.
 - **Kanten:** Der erste und letzte Messwert werden bis an die Fensterkanten gehalten, weil ein
-  HA-Zustand bis zur nächsten Änderung gilt; Samples außerhalb des Fensters (z. B. aus
-  `include_start_time_state`) werden verworfen, Dubletten zusammengefasst.
+  HA-Zustand bis zur nächsten Änderung gilt. Der letzte Zustand **vor** dem Zeitfenster wird als
+  Startwert übernommen (Carry-in) statt verworfen – nach einer ruhigen Nacht ist er oft der
+  einzige Wert, der den Fensterbeginn beschreibt. Dubletten werden zusammengefasst.
 - **Fläche:** Alle Teilflächen einer Reihe liegen in einem einzigen `<path>` – so kann der
   Farbverlauf an einer echten Unterbrechung keine Naht zeigen. Jede Reihe hat ihren eigenen
   Verlauf; der der Feuchte endet exakt an der Unterkante ihres Bandes und läuft nie in die
@@ -435,7 +450,7 @@ heating_off_color: '#94a3b8'    # Farbe des Soll-Werts, wenn ausgeschaltet ist
 | „Custom element doesn't exist: room-climate-card“ | Ressource fehlt oder wurde als *JavaScript-Modul* nicht registriert. URL prüfen, Typ auf „JavaScript-Modul“ stellen, Seite neu laden. |
 | Karte zeigt „–“ | Entität ist `unavailable`/`unknown` oder liefert keinen numerischen Zustand. In *Entwicklerwerkzeuge → Zustände* prüfen. |
 | Kein Verlaufsdatum | Der Recorder ist deaktiviert, die Entität wird nicht aufgezeichnet, oder der Zeitraum liegt vor dem Retention-Zeitfenster (`recorder: purge_keep_days`). |
-| Chart zeigt Lücken | Echter Ausfall (`unavailable`/`unknown`) länger als `chart_max_gap_minutes` – oder bewusst `chart_gap_mode: break`. Konstante Phasen brechen die Linie nie. |
+| Chart zeigt Lücken | Echter Ausfall (`unavailable`/`unknown`) länger als `chart_max_gap_minutes` – oder bewusst `chart_gap_mode: break`. Konstante Phasen brechen die Linie nie, sie werden als Stufe gezeichnet. |
 | Chart zeigt Aussetzer, HA-Chart nicht | Seit 1.1.2 behoben: früher galten konstante Phasen als Datenlücke. Prüfen, ob die Ressource wirklich auf 1.1.2 zeigt. |
 | Linie wirkt an einer Stelle „gerade“ | Dort wurde ein kurzer Ausfall überbrückt (Standard: durchgezogen). Mit `chart_gap_style: dashed` wird der Abschnitt als überbrückt markiert. |
 | Thermostat-Icon bleibt grau/gestrichelt | Die Integration liefert kein `hvac_action`. Bewusst kein erfundenes „Heizt“ – der Tooltip nennt den Grund. |

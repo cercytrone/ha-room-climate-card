@@ -369,6 +369,36 @@ describe('climate chart', () => {
     expect(none.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(2);
   });
 
+  it('keeps a quiet stretch flat instead of ramping it over hours', async () => {
+    // Three hours of 5-minute readings around 20 °C, then a 2.5 h quiet stretch
+    // (the value did not change), then a real jump to 21 °C.
+    const values: ChartSample[] = [];
+    for (let i = 0; i < 36; i++) {
+      values.push({ t: now - 6 * 3600_000 + i * 5 * 60_000, v: 20 + (i % 2) * 0.05 });
+    }
+    values.push({ t: now - 0.5 * 3600_000, v: 21 });
+
+    const chart = createChart({ temperature: values, smoothing: 'light' });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const path = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+    const numbers = path
+      .getAttribute('d')!
+      .match(/-?\d+(\.\d+)?/g)!
+      .map(Number);
+    const points: Array<[number, number]> = [];
+    for (let i = 0; i + 1 < numbers.length; i += 2) points.push([numbers[i], numbers[i + 1]]);
+
+    // Everything in the quiet stretch still sits on the old level …
+    const tail = points.slice(-4);
+    const jump = tail[tail.length - 2];
+    const flat = tail[0];
+    expect(flat[1]).toBeCloseTo(jump[1], 1);
+    // … and the jump happens in the last few pixels, not across the stretch.
+    expect(jump[0]).toBeGreaterThan(320);
+    expect(flat[0]).toBeGreaterThan(150);
+  });
+
   it('applies the smoothing level chosen in the editor', async () => {
     // A jittery but drifting signal – the kind an HA sensor delivers.
     const values = [

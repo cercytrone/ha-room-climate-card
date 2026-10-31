@@ -27,10 +27,11 @@ import {
 import { HistoryRepository, type HistoryMap } from './data/history';
 import { createTranslator, type Translator } from './localize';
 import type { HomeAssistant } from './types';
-import { formatNumber, formatRelative, withAlpha } from './utils/format';
+import { formatNumber, formatRelative, parseNumericState, withAlpha } from './utils/format';
 import { icons } from './ui/icons';
 import './chart/climate-chart';
 import type { ChartSeriesKey } from './chart/climate-chart';
+import type { ChartSample } from './chart/geometry';
 import './editor/room-climate-editor';
 
 type Density = 'xs' | 'sm' | 'md';
@@ -38,6 +39,10 @@ type Density = 'xs' | 'sm' | 'md';
 const WINDOW_OPEN_COLOR = '#fbbf24';
 const MOTION_ACTIVE_COLOR = '#34d399';
 const NEUTRAL_COLOR = 'var(--rcc-neutral)';
+
+/** Backoff bounds for retrying a failed history request. */
+const RETRY_MIN_MS = 15 * 1000;
+const RETRY_MAX_MS = 5 * 60 * 1000;
 
 export class RoomClimateCard extends LitElement {
   static properties = {
@@ -76,6 +81,16 @@ export class RoomClimateCard extends LitElement {
   private historyFetchedAt = 0;
   private pendingLoad?: ReturnType<typeof setTimeout>;
   private lastConnected = true;
+  /** Backoff of the retry after a failed history request (0 = nothing pending). */
+  private retryDelay = 0;
+  private readonly onVisibilityChange = (): void => {
+    if (typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+    if (!this.isConnected || !this._config) return;
+    // Timers are throttled while a tab or wall tablet is asleep: catch up as
+    // soon as the card can be seen again.
+    this._now = Date.now();
+    this.loadHistory(this.historyKey, true);
+  };
   _haIconReady = typeof customElements !== 'undefined' && Boolean(customElements.get('ha-icon'));
 
   // ---------------------------------------------------------------- lifecycle
@@ -91,6 +106,9 @@ export class RoomClimateCard extends LitElement {
       });
       this.resizeObserver.observe(this);
     }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+    }
     this.ensureHistory();
     if (!this._haIconReady && typeof customElements !== 'undefined') {
       customElements
@@ -104,6 +122,9 @@ export class RoomClimateCard extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    }
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     if (this.tickTimer) clearInterval(this.tickTimer);
     if (this.pendingLoad) clearTimeout(this.pendingLoad);
@@ -242,7 +263,9 @@ export class RoomClimateCard extends LitElement {
       }
       return;
     }
-    if (key === this.historyKey && this.historyFetchedAt > 0) return;
+    // After a failed load the backoff timer owns the retry: not every state
+    // change of the sensors may start a new request.
+    if (key === this.historyKey && (this.historyFetchedAt > 0 || this.retryDelay > 0)) return;
     this.historyKey = key;
     if (this.pendingLoad) clearTimeout(this.pendingLoad);
     this.pendingLoad = setTimeout(() => {
@@ -267,14 +290,46 @@ export class RoomClimateCard extends LitElement {
       this._history = data;
       this._historyWindow = { start, end };
       this.historyFetchedAt = Date.now();
+      this.retryDelay = 0;
       if (force) this.requestUpdate();
     } catch (error) {
       if (this.historyKey !== key) return;
       this._historyError = error instanceof Error ? error.message : String(error);
-      this._history = {};
+      // Keep the last good curve: one failed request (reconnect, recorder
+      // restart, purge) must not empty the chart. Retry with a growing delay.
+      this.retryDelay = Math.min(Math.max(this.retryDelay * 2, RETRY_MIN_MS), RETRY_MAX_MS);
+      if (this.pendingLoad) clearTimeout(this.pendingLoad);
+      this.pendingLoad = setTimeout(() => {
+        this.pendingLoad = undefined;
+        if (!this.isConnected) return;
+        this.loadHistory(key, true);
+      }, this.retryDelay);
     } finally {
       if (this.historyKey === key) this._historyLoading = false;
     }
+  }
+
+  /**
+   * Appends the current state when it is newer than the fetched history, so the
+   * curve ends exactly at the value shown in the big reading – including a
+   * sensor that just became unavailable.
+   */
+  private withLiveState(
+    samples: ChartSample[] | undefined,
+    entityId: string,
+    end: number
+  ): ChartSample[] | undefined {
+    if (!samples || !samples.length) return samples;
+    const state = this.hass?.states?.[entityId];
+    if (!state) return samples;
+    const changed = Date.parse(state.last_changed);
+    if (!Number.isFinite(changed)) return samples;
+    const last = samples[samples.length - 1];
+    const t = Math.min(changed, end);
+    if (t <= last.t) return samples;
+    const value = parseNumericState(state.state);
+    if (last.v === value) return samples;
+    return [...samples, { t, v: value }];
   }
 
   private updateDensity(measuredHeight: number): void {
@@ -528,6 +583,7 @@ export class RoomClimateCard extends LitElement {
               )}`,
               color: config.accentColor,
               toggleable: config.chart.showTemperature,
+              t,
             })
           : nothing}
         ${showHumidity
@@ -546,6 +602,7 @@ export class RoomClimateCard extends LitElement {
               )}`,
               color: config.humidity.color,
               toggleable: config.chart.showHumidity,
+              t,
             })
           : nothing}
       </div>
@@ -563,8 +620,10 @@ export class RoomClimateCard extends LitElement {
     ariaLabel: string;
     color: string;
     toggleable: boolean;
+    t: Translator;
   }): TemplateResult {
     const hidden = this._hiddenSeries.includes(options.key);
+    const t = options.t;
     const text =
       options.value !== null
         ? formatNumber(options.value, options.language, options.decimals)
@@ -585,8 +644,8 @@ export class RoomClimateCard extends LitElement {
       class="reading ${options.className} ${hidden ? 'is-hidden' : ''}"
       style="--series-color:${options.color}"
       aria-pressed=${!hidden}
-      aria-label="${options.ariaLabel} – ${hidden ? 'Serie eingeblendet' : 'Serie ausgeblendet'}"
-      title="${hidden ? 'Serie einblenden' : 'Serie ausblenden'}"
+      aria-label="${options.ariaLabel} – ${hidden ? t.t('seriesHidden') : t.t('seriesShown')}"
+      title="${hidden ? t.t('showSeries') : t.t('hideSeries')}"
       @click=${() => this.toggleSeries(options.key)}
     >
       <span class="reading-number">${content}</span>
@@ -674,13 +733,21 @@ export class RoomClimateCard extends LitElement {
 
   private renderChart(config: ResolvedConfig, t: Translator): TemplateResult | typeof nothing {
     if (!hasChart(config)) return nothing;
+    // The window ends "now", not at the last fetch (up to five minutes ago), and
+    // the live state closes the remaining gap to the reading above.
+    const end = Date.now();
+    const start = end - config.chart.hours * 60 * 60 * 1000;
     const temperatureSamples =
       config.chart.showTemperature && config.temperatureEntity
-        ? this._history[config.temperatureEntity]
+        ? this.withLiveState(
+            this._history[config.temperatureEntity],
+            config.temperatureEntity,
+            end
+          )
         : undefined;
     const humiditySamples =
       config.chart.showHumidity && config.humidityEntity
-        ? this._history[config.humidityEntity]
+        ? this.withLiveState(this._history[config.humidityEntity], config.humidityEntity, end)
         : undefined;
 
     const language = this.language();
@@ -707,8 +774,8 @@ export class RoomClimateCard extends LitElement {
         .setpoint=${thermostat?.setpoint ?? null}
         .setpointUnit=${thermostat?.unit ?? '°C'}
         .hiddenSeries=${this._hiddenSeries}
-        .start=${this._historyWindow.start}
-        .end=${this._historyWindow.end}
+        .start=${start}
+        .end=${end}
         .showPoints=${config.chart.showPoints}
         .showGrid=${config.chart.showGrid}
         .curve=${config.chart.curve}

@@ -171,6 +171,9 @@ export interface SeriesSegment {
   bridged: boolean[];
 }
 
+/** Distance of the hold anchor in front of the next real sample (ms). */
+const HOLD_LEAD_MS = 1000;
+
 const MAX_BRIDGE_POINTS = 8;
 
 function interpolate(
@@ -200,10 +203,16 @@ function interpolate(
 /**
  * Turns samples into renderable segments.
  *
- * - Holes shorter than `maxGapMs` are interpolated linearly, so the chart is
- *   continuous while it still only uses values that were actually measured at
- *   both ends of the hole.
- * - Longer holes are kept broken (never invent hours of data).
+ * - A quiet stretch (no new sample) is *not* missing data: Home Assistant only
+ *   stores changes, so the last value is held flat and steps to the next sample
+ *   one second before it. This never breaks the line, whatever its length –
+ *   previously such a stretch was drawn as a slow ramp, which suggested a change
+ *   over hours that never happened.
+ * - An explicit `unavailable` / `unknown` stretch is real information and may be
+ *   shown as a hole. Its length is measured from the moment the entity became
+ *   unavailable, *not* from the last valid sample: a quiet night followed by a
+ *   one-minute dropout used to look like a multi-hour outage.
+ * - With `gapMode: 'break'` only those explicit holes stay broken.
  * - The first and last sample are held to the window edges, because a Home
  *   Assistant state is valid until it changes.
  */
@@ -229,6 +238,20 @@ export function buildSegments(
     current = null;
     previous = null;
     unavailableSince = null;
+  };
+
+  /**
+   * Holds the last valid value flat until `until` (the moment the entity went
+   * unavailable) so the line ends where the measurement ended instead of
+   * stopping at the last sample and looking like a longer outage.
+   */
+  const holdUntil = (until: number | null): void => {
+    if (!current || !previous || until === null || until <= previous.t) return;
+    const held: ChartSample = { t: until, v: previous.v };
+    current.samples.push(held);
+    // A hold is a known value, not an interpolation – never drawn dashed.
+    current.bridged.push(false);
+    previous = held;
   };
 
   for (const sample of samples) {
@@ -263,14 +286,36 @@ export function buildSegments(
      *    changes, so there is no sample – but the value is known to be
      *    unchanged until the next one. This is *not* missing data and must
      *    never break the line (the HA frontend chart does not break either).
+     *    It is drawn as a step: hold the old value, then jump.
      * 2. The entity was explicitly `unavailable` / `unknown`. That is real
      *    information, so it may be shown as a hole when it lasts too long.
+     *    Only the time the entity was *really* unavailable counts – the quiet
+     *    stretch before it was measured and is not part of the hole.
      */
     const explicitHole = unavailableSince !== null;
-    const bridgeable =
-      gapMode === 'connect' && (!explicitHole || delta <= maxGapMs);
+
+    if (!explicitHole) {
+      // Quiet stretch: hold the old value, step one second before the new one.
+      const lead = Math.min(HOLD_LEAD_MS, delta / 2);
+      current.samples.push({ t: sample.t - lead, v: previous.v });
+      current.bridged.push(false);
+      current.samples.push(sample);
+      current.bridged.push(false);
+      previous = sample;
+      continue;
+    }
+
+    const holeStart = Math.max(previous.t, unavailableSince as number);
+    const holeMs = sample.t - holeStart;
+    const bridgeable = gapMode === 'connect' && holeMs <= maxGapMs;
 
     if (bridgeable) {
+      if (holeStart > previous.t) {
+        current.samples.push({ t: holeStart, v: previous.v });
+        // Holding a known value up to the outage is not an interpolation.
+        current.bridged.push(false);
+        previous = { t: holeStart, v: previous.v };
+      }
       interpolate(current, previous, sample, threshold);
       current.samples.push(sample);
       current.bridged.push(true);
@@ -279,10 +324,14 @@ export function buildSegments(
       continue;
     }
 
+    // Real outage: end the visible line where the measurement ended.
+    holdUntil(unavailableSince);
     flush();
     current = { samples: [sample], bridged: [] };
     previous = sample;
   }
+  // The sensor was unavailable at the end of the window: stop where it stopped.
+  if (trailingNull) holdUntil(unavailableSince);
   flush();
 
   if (!segments.length) return segments;
@@ -309,10 +358,14 @@ export function buildSegments(
 }
 
 /**
- * Sorts samples, drops duplicated timestamps, ignores invalid values and
- * removes everything outside the visible window. Live data can contain all of
- * these – e.g. `include_start_time_state` returns a sample at (or slightly
- * before) the window start, which would otherwise be drawn off canvas.
+ * Sorts samples, drops duplicated timestamps, ignores invalid values and clips
+ * everything to the visible window.
+ *
+ * The last state *before* the window is kept as a carry-in sample at `start`:
+ * a Home Assistant state stays valid until it changes, so on a quiet night this
+ * is often the only value that describes the beginning of the window. Dropping
+ * it (which happened as soon as the sliding window moved past its timestamp)
+ * left the chart empty or started it with the wrong value.
  */
 export function prepareSamples(
   samples: ChartSample[] | undefined,
@@ -322,17 +375,25 @@ export function prepareSamples(
   if (!samples || !samples.length) return [];
   const sorted = [...samples].sort((a, b) => a.t - b.t);
   const result: ChartSample[] = [];
+  let carry: ChartSample | null = null;
   for (const sample of sorted) {
     if (!Number.isFinite(sample.t)) continue;
-    if (start !== undefined && sample.t < start) continue;
     if (end !== undefined && sample.t > end) continue;
     const value = sample.v === null || !Number.isFinite(sample.v as number) ? null : (sample.v as number);
+    if (start !== undefined && sample.t < start) {
+      // Keep the newest state before the window – it is still valid at `start`.
+      carry = { t: start, v: value };
+      continue;
+    }
     const previous = result[result.length - 1];
     if (previous && previous.t === sample.t) {
       result[result.length - 1] = { t: sample.t, v: value };
       continue;
     }
     result.push({ t: sample.t, v: value });
+  }
+  if (carry && start !== undefined && (!result.length || result[0].t > start)) {
+    result.unshift(carry);
   }
   return result;
 }
@@ -451,10 +512,25 @@ export function areaPath(points: Point[], baseline: number, smooth: boolean): st
  * The window has to stay small: a moving average flattens real extrema, and
  * this chart exists to show what actually happened.
  */
-export function movingAverage(samples: ChartSample[], window: number): ChartSample[] {
+export interface SmoothingOptions {
+  /**
+   * Largest time distance (ms) between two samples that may still be averaged.
+   * Home Assistant only stores changes, so neighbours can be hours apart; a
+   * value from three hours ago says nothing about the current jitter and would
+   * smear a step into a ramp.
+   */
+  maxDeltaMs?: number;
+}
+
+export function movingAverage(
+  samples: ChartSample[],
+  window: number,
+  options: SmoothingOptions = {}
+): ChartSample[] {
   const size = Math.max(1, Math.round(window));
   if (size < 3 || samples.length < 3) return samples.map((sample) => ({ ...sample }));
   const radius = Math.floor(size / 2);
+  const maxDelta = options.maxDeltaMs ?? Infinity;
   // Precision of the measurement itself: at least one decimal (so the average of
   // integers is not thrown away), at most two (so a fine sensor keeps its shape).
   const precision = Math.min(
@@ -468,6 +544,7 @@ export function movingAverage(samples: ChartSample[], window: number): ChartSamp
     for (let offset = -radius; offset <= radius; offset++) {
       const neighbour = samples[index + offset];
       if (!neighbour || neighbour.v === null) continue;
+      if (offset !== 0 && Math.abs(neighbour.t - sample.t) > maxDelta) continue;
       sum += neighbour.v;
       count += 1;
     }
