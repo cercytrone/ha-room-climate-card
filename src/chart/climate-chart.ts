@@ -11,6 +11,7 @@ import {
   projectRun,
   seriesPath,
   smoothingWindow,
+  type SmoothingLevel,
   splitAtBridges,
   tickCountForWidth,
   timeTicks,
@@ -56,6 +57,18 @@ const FALLBACK_HEIGHT = 112;
 const HUMIDITY_BAND_HEIGHT = 0.3;
 const TEMPERATURE_BAND_TOP = 0.44;
 
+/**
+ * Vertical domain per series.
+ *
+ * `minSpan` is the *smallest* value range the band ever shows. It used to be
+ * generous (0.8 °C / 6 %), which turned a room that only moves a few tenths into
+ * a nearly straight line – the curve looked flat although the measurement was
+ * alive. A small minimum keeps a constant sensor readable without squashing a
+ * real swing; `padding` adds breathing room above and below.
+ */
+const TEMPERATURE_DOMAIN = { minSpan: 0.4, padding: 0.15 } as const;
+const HUMIDITY_DOMAIN = { minSpan: 3, padding: 0.15 } as const;
+
 export type ChartSeriesKey = 'temperature' | 'humidity';
 
 let uidCounter = 0;
@@ -88,6 +101,7 @@ export class RoomClimateChart extends LitElement {
     showPoints: { attribute: false },
     showGrid: { attribute: false },
     curve: { attribute: false },
+    smoothing: { attribute: false },
     gapMode: { attribute: false },
     maxGapMinutes: { attribute: false },
     gapStyle: { attribute: false },
@@ -230,6 +244,8 @@ export class RoomClimateChart extends LitElement {
   showPoints = false;
   showGrid = false;
   curve: 'smooth' | 'linear' = 'smooth';
+  /** Averaging level of both curves, set in the visual editor. */
+  smoothing: SmoothingLevel = 'light';
   /** `connect` interpolates holes, `break` leaves them visible. */
   gapMode: GapMode = 'connect';
   /** Largest hole in minutes that will be interpolated. */
@@ -402,10 +418,10 @@ export class RoomClimateChart extends LitElement {
     const tempExtent = extent(tempValues);
     const humidityExtent = extent(humidityValues);
     const tempDomain = tempExtent
-      ? padDomain(tempExtent[0], tempExtent[1], { minSpan: 0.8, padding: 0.18 })
+      ? padDomain(tempExtent[0], tempExtent[1], TEMPERATURE_DOMAIN)
       : null;
     const humidityDomain = humidityExtent
-      ? padDomain(humidityExtent[0], humidityExtent[1], { minSpan: 6, padding: 0.2 })
+      ? padDomain(humidityExtent[0], humidityExtent[1], HUMIDITY_DOMAIN)
       : null;
 
     const tempY = tempDomain ? linearScale(tempDomain, [temperatureBottom, temperatureTop]) : null;
@@ -440,9 +456,12 @@ export class RoomClimateChart extends LitElement {
     const smooth = this.curve === 'smooth';
     const prepare = (segments: SeriesSegment[]): SeriesSegment[] =>
       segments.map((segment) => {
-        // Short averaging window: no sawtooth, but real peaks survive.
+        // Averaging window from the user's level: `none` draws every value.
         const averaged = smooth
-          ? movingAverage(segment.samples, smoothingWindow(segment.samples.length))
+          ? movingAverage(
+              segment.samples,
+              smoothingWindow(segment.samples.length, this.smoothing)
+            )
           : segment.samples;
         return decimateSegment({ samples: averaged, bridged: segment.bridged }, perSegmentLimit);
       });

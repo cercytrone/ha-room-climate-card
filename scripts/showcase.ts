@@ -227,13 +227,13 @@ function renderCard(options: CardOptions): string {
       ? padDomain(
           Math.min(tempExtent[0], setpointValue ?? tempExtent[0]),
           Math.max(tempExtent[1], setpointValue ?? tempExtent[1]),
-          { minSpan: 0.8, padding: 0.18 }
+          { minSpan: 0.4, padding: 0.15 }
         )
       : null;
   const humidityExtent = extentOf(options.humiditySeries);
   const humidityDomain =
     humidityExtent && humidityVisible
-      ? padDomain(humidityExtent[0], humidityExtent[1], { minSpan: 6, padding: 0.2 })
+      ? padDomain(humidityExtent[0], humidityExtent[1], { minSpan: 3, padding: 0.15 })
       : null;
 
   const tempScale = tempDomain

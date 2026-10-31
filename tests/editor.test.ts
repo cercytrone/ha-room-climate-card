@@ -297,6 +297,36 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Farbverlauf unter der Temperaturkurve').disabled).toBe(false);
   });
 
+  it('offers four smoothing levels for the curves', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const smoothing = selectorByLabel(editor, 'Glättung der Kurven');
+    // Default is the light touch, so the field shows a stored value.
+    expect(smoothing.value).toBe('light');
+
+    (smoothing as unknown as { emit: (value: string) => void }).emit('none');
+    expect(emitted?.chart_smoothing).toBe('none');
+    await editor.updateComplete;
+
+    openAll(editor);
+    (selectorByLabel(editor, 'Glättung der Kurven') as unknown as { emit: (v: string) => void }).emit(
+      'strong'
+    );
+    expect(emitted?.chart_smoothing).toBe('strong');
+  });
+
+  it('disables the smoothing level for straight connections', async () => {
+    const editor = await mountEditor({ ...baseConfig, chart_curve: 'linear' });
+    openAll(editor);
+    // Straight connections are not averaged at all, so the field is pointless.
+    expect(selectorByLabel(editor, 'Glättung der Kurven').disabled).toBe(true);
+  });
+
   it('offers the data gap options and disables them in break mode', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

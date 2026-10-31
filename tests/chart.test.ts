@@ -369,6 +369,60 @@ describe('climate chart', () => {
     expect(none.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(2);
   });
 
+  it('applies the smoothing level chosen in the editor', async () => {
+    // A jittery but drifting signal – the kind an HA sensor delivers.
+    const values = [
+      21.4, 21.8, 21.5, 22.1, 21.6, 22.4, 21.9, 22.6, 22.1, 21.7, 22.2, 21.8, 22.5, 21.9,
+      21.3, 21.7, 21.2, 21.6, 21.0, 20.8, 21.1, 20.7, 21.2, 20.9, 21.4, 21.8, 21.5,
+    ];
+    const yRange = async (smoothing: RoomClimateChart['smoothing']) => {
+      const chart = createChart({ temperature: samples(values), smoothing });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      const path = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+      const numbers = path
+        .getAttribute('d')!
+        .match(/-?\d+(\.\d+)?/g)!
+        .map(Number);
+      const ys = numbers.filter((_, index) => index % 2 === 1);
+      return Math.max(...ys) - Math.min(...ys);
+    };
+
+    const off = await yRange('none');
+    const light = await yRange('light');
+    const strong = await yRange('strong');
+
+    // More smoothing = less vertical travel. The ladder must be strict, so every
+    // step is visible on screen and not just in theory.
+    expect(off).toBeGreaterThan(light);
+    expect(light).toBeGreaterThan(strong);
+  });
+
+  it('uses the height of its band for small temperature swings', async () => {
+    // A well insulated room: 0.15 °C over six hours. The old domain forced a
+    // 0.8 °C window and flattened this into a straight line.
+    const tiny = [
+      21.0, 21.02, 21.0, 21.04, 21.03, 21.06, 21.05, 21.08, 21.07, 21.09, 21.1, 21.12, 21.1,
+      21.13, 21.15, 21.12, 21.1, 21.08, 21.06, 21.05, 21.03, 21.02, 21.0, 21.01, 20.99, 21.0,
+    ];
+    // Smoothing is measured separately – here only the vertical domain counts.
+    const chart = createChart({ temperature: samples(tiny), smoothing: 'none' });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const path = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+    const numbers = path
+      .getAttribute('d')!
+      .match(/-?\d+(\.\d+)?/g)!
+      .map(Number);
+    const ys = numbers.filter((_, index) => index % 2 === 1);
+    const travel = Math.max(...ys) - Math.min(...ys);
+
+    // Temperature band: 130 − 20 − 6 = 104 px plot, the lower 56 % is ours.
+    const band = (130 - 20 - 6) * (1 - 0.44);
+    expect(travel).toBeGreaterThan(band * 0.25);
+    expect(travel).toBeLessThan(band);
+  });
+
   it('keeps both curves solid by default', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22]),
