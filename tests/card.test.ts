@@ -3,7 +3,7 @@ import '../src/main';
 import type { RoomClimateCard } from '../src/room-climate-card';
 import type { RoomClimateCardConfig } from '../src/config';
 import type { HomeAssistant } from '../src/types';
-import { createHass, entity, flush, resizeTo, type EntityInit } from './helpers';
+import { createHass, entity, flush, resizeTo, setVisible, type EntityInit } from './helpers';
 
 const now = Date.now();
 
@@ -635,6 +635,40 @@ describe('room climate card', () => {
     expect(temperature.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('remembers switched-off series across mounts', async () => {
+    const hass = createHass({ states: baseStates() });
+    const first = mount(fullConfig, hass);
+    await first.updateComplete;
+    (q(first, '.reading.temperature') as HTMLButtonElement).click();
+    await first.updateComplete;
+    expect((q(first, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries)
+      .toEqual(['temperature']);
+
+    // New card instance, same entities: the preference survives a reload.
+    const second = mount(fullConfig, hass);
+    await second.updateComplete;
+    expect(
+      (q(second, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries
+    ).toEqual(['temperature']);
+    expect((q(second, '.reading.temperature') as HTMLButtonElement).getAttribute('aria-pressed'))
+      .toBe('false');
+
+    // Switching it back on clears the stored entry.
+    (q(second, '.reading.temperature') as HTMLButtonElement).click();
+    await second.updateComplete;
+    expect(window.localStorage.length).toBe(0);
+
+    // Another room keeps its own state.
+    const other = mount(
+      { ...fullConfig, temperature_entity: 'sensor.temp_b', humidity_entity: 'sensor.humidity_b' },
+      hass
+    );
+    await other.updateComplete;
+    expect(
+      (q(other, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries
+    ).toEqual([]);
+  });
+
   it('offers no toggle when the series is not drawn in the chart', async () => {
     const card = mount(
       { ...fullConfig, show_temperature_chart: false, show_humidity_chart: false },
@@ -882,6 +916,120 @@ describe('room climate card', () => {
       if (original) Object.defineProperty(Document.prototype, 'visibilityState', original);
       vi.useRealTimers();
     }
+  });
+
+  it('does not poll while the card is out of view', async () => {
+    vi.useFakeTimers();
+    try {
+      const history = historyFor(['sensor.temp', 'sensor.humidity']);
+      const send = vi.fn(async () => history);
+      const hass = createHass({ states: baseStates(), history });
+      hass.connection!.sendMessagePromise = send;
+
+      const card = mount(fullConfig, hass);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(send).toHaveBeenCalledTimes(1);
+
+      // Scrolled away: the five-minute timer stays quiet.
+      setVisible(card, false);
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      expect(send).toHaveBeenCalledTimes(1);
+
+      // Back on screen: it catches up immediately instead of waiting for the tick.
+      setVisible(card, true);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(send).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses the Home Assistant time zone and clock format for the axis', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-24T12:00:00Z'));
+      const history = historyFor(['sensor.temp']);
+      const start = new Date('2026-10-24T06:00:00Z').getTime();
+      const end = new Date('2026-10-24T12:00:00Z').getTime();
+      history['sensor.temp'] = [
+        { s: '21.0', lu: Math.floor(start / 1000) },
+        { s: '21.5', lu: Math.floor(end / 1000) },
+      ];
+      const hass = createHass({ states: baseStates(), history });
+      hass.config = { unit_system: { temperature: '°C' }, time_zone: 'Europe/Berlin' };
+      hass.locale = { language: 'de', time_zone: 'Europe/Berlin', time_format: '24' };
+
+      const card = mount({ ...fullConfig, chart_hours: 6 }, hass);
+      await vi.advanceTimersByTimeAsync(300);
+      await card.updateComplete;
+      const chart = q(card, 'room-climate-chart') as HTMLElement & {
+        timeZone?: string;
+        hour12?: boolean;
+        setSize: (w: number, h: number) => void;
+        shadowRoot: ShadowRoot;
+        updateComplete: Promise<unknown>;
+      };
+      expect(chart.timeZone).toBe('Europe/Berlin');
+      expect(chart.hour12).toBe(false);
+
+      chart.setSize(420, 140);
+      await chart.updateComplete;
+      const firstLabel = chart.shadowRoot.querySelector('.axis-label')?.textContent?.trim();
+      // 06:00 UTC is 08:00 in Berlin – not the browser's zone.
+      expect(firstLabel).toContain('08:00');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('converts the setpoint when the thermostat reports another scale', async () => {
+    const chartOf = (card: RoomClimateCard) =>
+      q(card, 'room-climate-chart') as HTMLElement & {
+        setpoint: number | null;
+        setpointUnit?: string;
+      };
+
+    // Sensor in °F, thermostat in °C: 22 °C has to land at 71.6 °F, otherwise
+    // the dashed line would sit far below the curve.
+    const mixed = mount(fullConfig, {
+      ...createHass({
+        states: baseStates().map((state) => {
+          if (state.entity_id === 'sensor.temp') {
+            return entity('sensor.temp', {
+              state: '71.2',
+              attributes: { unit_of_measurement: '°F', device_class: 'temperature' },
+            });
+          }
+          return state;
+        }),
+      }),
+    });
+    await mixed.updateComplete;
+    expect(chartOf(mixed).setpoint).toBeCloseTo(71.6, 5);
+    expect(chartOf(mixed).setpointUnit).toBe('°F');
+
+    // Same scale on both sides: the value is passed through untouched.
+    const same = mount(fullConfig, createHass({ states: baseStates() }));
+    await same.updateComplete;
+    expect(chartOf(same).setpoint).toBe(22);
+    expect(chartOf(same).setpointUnit).toBe('°C');
+
+    // Unknown scale (Kelvin): no reference line at all – never a guessed one.
+    const unknown = mount(fullConfig, {
+      ...createHass({
+        states: baseStates().map((state) =>
+          state.entity_id === 'sensor.temp'
+            ? entity('sensor.temp', {
+                state: '295.15',
+                attributes: { unit_of_measurement: 'K', device_class: 'temperature' },
+              })
+            : state
+        ),
+      }),
+    });
+    await unknown.updateComplete;
+    expect(chartOf(unknown).setpoint).toBeNull();
+    expect(chartOf(unknown).setpointUnit).toBe('K');
   });
 
   it('forwards the gap configuration to the chart', async () => {

@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.4.0`.
+  `ROOM-CLIMATE-CARD v2.5.0`.
 
 ---
 
@@ -370,6 +370,22 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   40 × 34 px wird nichts gezeichnet statt zu verzerren. Die Zeitbeschriftung wird um den
   Karten-Eckenradius eingerückt, damit erstes und letztes Label nicht im abgerundeten Eck
   verschwinden.
+- **Zeitachse:** Beschriftung und Datumszeile folgen der Zeitzone und dem Uhrzeitformat von Home
+  Assistant (`hass.config.time_zone`, `hass.locale`), nicht der Zone des Browsers. Auf einem
+  Wandtablet mit falsch gestellter Zeitzone steht damit trotzdem die richtige Uhrzeit; bei
+  `time_format: am_pm` erscheint die Achse im 12-Stunden-Format.
+- **Sollwert:** Die gestrichelte Soll-Linie wird in die Einheit des Temperatursensors umgerechnet
+  (22 °C am Thermostat, Sensor in °F → 71,6 °F), sonst läge sie weit neben der Kurve. Die Einheit
+  stammt aus den Attributen der Climate-Entität, mit dem Systemstandard als Rückfall. Ist eine
+  der beiden Einheiten unbekannt, entfällt die Linie – lieber keine Linie als eine an falscher
+  Stelle. Für Screenreader steht der Sollwert in der Beschreibung des Charts („Soll 22,0 °C“).
+- **Serien ein-/ausblenden:** Ein Klick auf einen Messwert blendet seine Kurve aus. Diese Wahl
+  wird pro Entitäten-Paar im `localStorage` gemerkt und übersteht einen Reload; alle Karten für
+  denselben Raum teilen sie. Ist der Speicher gesperrt (privater Modus, sandboxed iframe), gilt
+  die Auswahl nur für die Sitzung.
+- **Nur sichtbare Karten laden:** Ein `IntersectionObserver` hält den Fünf-Minuten-Abruf an, wenn
+  die Karte aus dem Sichtfeld gescrollt ist; beim Zurückscrollen wird sofort nachgeladen.
+  Lange Dashboards erzeugen so keine Dauerlast im Hintergrund.
 - **Fallbacks:** Ladezustand („Verlauf wird geladen …“), leerer Zeitraum („Keine
   Verlaufsdaten“) und Fehler („Verlauf konnte nicht geladen werden“).
 
@@ -456,12 +472,14 @@ heating_off_color: '#94a3b8'    # Farbe des Soll-Werts, wenn ausgeschaltet ist
 | Thermostat-Icon bleibt grau/gestrichelt | Die Integration liefert kein `hvac_action`. Bewusst kein erfundenes „Heizt“ – der Tooltip nennt den Grund. |
 | Icon-Farbe passt nicht | `heating_color`, `heating_idle_color`, `heating_off_color` im Editor setzen. |
 | Feld im Editor lässt sich nicht leeren / Schalter springt um | Behoben in 1.1.3: Eingaben sind jetzt Entwürfe, leere Zwischenstände ändern die Konfiguration nicht. |
+| Konsole: „Unbekannter Konfigurationsschlüssel …“ | Tippfehler in der YAML – der Schlüssel wird ignoriert. Die Meldung nennt den Namen; die vollständige Liste steht unter [Konfiguration](#konfiguration). |
 | Änderungen im Editor erscheinen nicht | Browser-Cache: Hard-Reload; Versionsparameter an der Ressourcen-URL ergänzen. |
 | Karte nach Update unverändert | HACS-Update durchführen, danach HA-Frontend neu laden und Browser-Cache leeren. |
 
-Debug-Ausgaben: Die Karte loggt bewusst nur ihre Version in der Browser-Konsole. Für die
-Fehlersuche ist die Konfiguration der Karte (Dashboard → Karte bearbeiten → YAML anzeigen) und
-der Zustand der Entität unter *Entwicklerwerkzeuge → Zustände* maßgeblich.
+Debug-Ausgaben: Die Karte loggt ihre Version und – einmal pro Schlüssel – einen Hinweis auf
+unbekannte Konfigurationsschlüssel (Tippfehler wie `chart_shwo_grid` bleiben sonst still
+wirkungslos). Für die Fehlersuche ist die Konfiguration der Karte (Dashboard → Karte bearbeiten →
+YAML anzeigen) und der Zustand der Entität unter *Entwicklerwerkzeuge → Zustände* maßgeblich.
 
 ---
 
@@ -487,16 +505,16 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 249 Tests in 11 Dateien aus (Stand 2.2.0):
+`npm test` führt 279 Tests in 11 Dateien aus (Stand 2.5.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
-| `tests/config.test.ts` | Standardwerte, kaputte Eingaben, optionale Bereiche, Grenzwerte, Namensauflösung, Schriftgrößen-Clamping und Schriftart-Validierung |
+| `tests/config.test.ts` | Standardwerte, kaputte Eingaben, optionale Bereiche, Grenzwerte, Namensauflösung, Schriftgrößen-Clamping, Schriftart-Validierung und Warnung bei unbekannten YAML-Schlüsseln |
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
-| `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung |
-| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung, Punkte, Gitter |
-| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer |
+| `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung mit erhaltenem Minimum/Maximum |
+| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert im `aria-label`, Punkte, Gitter |
+| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, gemerkte Serien-Auswahl, Sollwert-Umrechnung |
 | `tests/editor.test.ts` | Abschnitte, Selektoren (inkl. Linienart Feuchte), Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |
@@ -517,6 +535,7 @@ src/
   types.ts                 Minimale HA-Typen
   data/states.ts           Auswertung von Sensoren, Fenster, Bewegung, Thermostat
   data/history.ts          History-Abfrage (WebSocket + REST) und Cache
+  data/hidden-series.ts    Merkt ausgeblendete Serien (localStorage, fehlertolerant)
   chart/geometry.ts        Reine Geometrie: Skalen, Pfade, Lücken, Verläufe
   chart/climate-chart.ts   Chart-Web-Component (SVG, ResizeObserver)
   editor/room-climate-editor.ts  Visueller Editor (ha-selector)
@@ -537,7 +556,8 @@ dist/                      Gebautes Bundle (HACS-Download)
 - Die Historie wird über die bestehende HA-Verbindung geladen; ohne Recorder-Daten bleibt der
   Chart leer (mit Hinweistext).
 - Bei sehr hohen Punktzahlen (24 h mit sekündlicher Aktualisierung) wird für die Darstellung
-  dezimiert – die Kurve entspricht dann einer Stichprobe, nicht jedem Einzelwert.
+  dezimiert. Dabei bleiben pro Abschnitt Minimum und Maximum erhalten – kurze echte Spitzen
+  verschwinden also nicht, feine Zwischenwerte schon.
 - HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
   `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
 - Die README-Vorschau ist gerendert (Demo-Daten), kein Screenshot einer echten Installation.

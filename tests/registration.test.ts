@@ -34,17 +34,17 @@ describe('card registration', () => {
     expect(CARD_VERSION).toBe('test');
   });
 
-  it('returns a usable config element from the instance and the class', () => {
-    const card = document.createElement(CARD_TAG) as HTMLElement & {
-      getConfigElement: () => HTMLElement;
-    };
-    const instanceEditor = card.getConfigElement();
-    expect(instanceEditor.tagName.toLowerCase()).toBe(EDITOR_TAG);
-
+  it('returns a usable config element from the class', () => {
+    // Home Assistant only ever calls the static form; the duplicate instance
+    // method was removed.
     const ctor = customElements.get(CARD_TAG) as unknown as {
       getConfigElement: () => HTMLElement;
     };
     expect(ctor.getConfigElement().tagName.toLowerCase()).toBe(EDITOR_TAG);
+    const card = document.createElement(CARD_TAG) as HTMLElement & {
+      getConfigElement?: () => HTMLElement;
+    };
+    expect(card.getConfigElement).toBeUndefined();
   });
 
   it('exposes the picker stub config', () => {

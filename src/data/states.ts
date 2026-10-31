@@ -109,9 +109,13 @@ export function readThermostat(
   t: Translator
 ): ThermostatReading {
   const entityId = config.thermostat.entity;
-  const unit = temperatureUnit(
+  // The entity's own unit wins over the unit system: an integration may report
+  // its target temperature in a different scale than the system default.
+  const systemUnit = temperatureUnit(
     hass?.config?.unit_system?.temperature === 'us_customary' ? '°F' : undefined
   );
+  const entityUnit = hass?.states[entityId ?? '']?.attributes?.unit_of_measurement;
+  const unit = temperatureUnit(typeof entityUnit === 'string' ? entityUnit : systemUnit);
   if (!entityId) {
     return { status: 'missing', label: t.t('unavailable'), colorKey: 'unknown', setpoint: null, unit };
   }
