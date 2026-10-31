@@ -678,6 +678,24 @@ describe('room climate card', () => {
     expect(chartOf(off).showHumidityArea).toBe(false);
   });
 
+  it('passes the smoothing level to the chart component', async () => {
+    const smoothingOf = (card: RoomClimateCard) =>
+      (q(card, 'room-climate-chart') as HTMLElement & { smoothing?: string }).smoothing;
+
+    const defaults = mount(fullConfig, createHass({ states: baseStates() }));
+    await defaults.updateComplete;
+    expect(smoothingOf(defaults)).toBe('light');
+
+    for (const level of ['none', 'medium', 'strong']) {
+      const card = mount(
+        { ...fullConfig, chart_smoothing: level as never },
+        createHass({ states: baseStates() })
+      );
+      await card.updateComplete;
+      expect(smoothingOf(card)).toBe(level);
+    }
+  });
+
   it('shows a fallback when history is unavailable', async () => {
     const hass = createHass({ states: baseStates(), history: {} });
     const card = mount(fullConfig, hass);

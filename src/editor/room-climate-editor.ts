@@ -70,6 +70,12 @@ interface EditorText {
   curve: string;
   curveSmooth: string;
   curveLinear: string;
+  smoothing: string;
+  smoothingNone: string;
+  smoothingLight: string;
+  smoothingMedium: string;
+  smoothingStrong: string;
+  smoothingHelper: string;
   gapMode: string;
   gapConnect: string;
   gapBreak: string;
@@ -168,6 +174,13 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     curve: 'Kurvenverlauf',
     curveSmooth: 'Geglättet',
     curveLinear: 'Direkt verbunden',
+    smoothing: 'Glättung der Kurven',
+    smoothingNone: 'Aus – jeder Messwert',
+    smoothingLight: 'Leicht (Standard)',
+    smoothingMedium: 'Mittel',
+    smoothingStrong: 'Stark – für sehr unruhige Sensoren',
+    smoothingHelper:
+      'Je ruhiger die Stufe, desto flacher wirkt der Verlauf. „Aus“ zeigt jede gemessene Bewegung, „Leicht“ nimmt nur das Sensor-Zittern, „Mittel“ und „Stark“ bügeln bewusst mehr aus.',
     gapMode: 'Datenlücken',
     gapConnect: 'Kurze Ausfälle überbrücken',
     gapBreak: 'Ausfälle sichtbar unterbrechen',
@@ -254,6 +267,13 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     curve: 'Curve',
     curveSmooth: 'Smoothed',
     curveLinear: 'Straight',
+    smoothing: 'Curve smoothing',
+    smoothingNone: 'Off – every reading',
+    smoothingLight: 'Light (default)',
+    smoothingMedium: 'Medium',
+    smoothingStrong: 'Strong – for very noisy sensors',
+    smoothingHelper:
+      'The calmer the level, the flatter the curve looks. “Off” shows every measured move, “Light” only removes the sensor jitter, “Medium” and “Strong” deliberately iron out more.',
     gapMode: 'Data gaps',
     gapConnect: 'Bridge short outages',
     gapBreak: 'Show outages as broken',
@@ -973,6 +993,25 @@ export class RoomClimateCardEditor extends LitElement {
         },
         value: this.stringValue('chart_curve', 'smooth'),
         disabled: !anyChart,
+      })}
+      ${this.renderField({
+        key: 'chart_smoothing',
+        label: t.smoothing,
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'none', label: t.smoothingNone },
+              { value: 'light', label: t.smoothingLight },
+              { value: 'medium', label: t.smoothingMedium },
+              { value: 'strong', label: t.smoothingStrong },
+            ],
+          },
+        },
+        value: this.stringValue('chart_smoothing', 'light'),
+        disabled: !anyChart || this.stringValue('chart_curve', 'smooth') === 'linear',
+        helper: t.smoothingHelper,
+        onChange: (value) => this.patch({ chart_smoothing: String(value) }),
       })}
       ${this.renderSwitch({
         key: 'chart_temperature_gradient',

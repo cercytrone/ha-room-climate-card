@@ -1,3 +1,8 @@
+import {
+  DEFAULT_SMOOTHING,
+  SMOOTHING_LEVELS,
+  type SmoothingLevel,
+} from './chart/geometry';
 import type { HomeAssistant, LovelaceCardConfig } from './types';
 
 export type ThemeMode = 'auto' | 'dark' | 'light';
@@ -8,6 +13,7 @@ export type GapMode = 'connect' | 'break';
 export type GapStyle = 'solid' | 'dashed';
 /** Line style of the humidity curve: a continuous stroke or a dotted one. */
 export type HumidityLineStyle = 'solid' | 'dotted';
+export type { SmoothingLevel } from './chart/geometry';
 
 /**
  * Card configuration as written in YAML / produced by the visual editor.
@@ -78,6 +84,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_hours?: number;
   chart_height?: number;
   chart_curve?: CurveMode;
+  /** How strongly the curve is averaged: `none` … `strong`. */
+  chart_smoothing?: SmoothingLevel;
   chart_gap_mode?: GapMode;
   chart_max_gap_minutes?: number;
   chart_gap_style?: GapStyle;
@@ -122,6 +130,8 @@ export interface ResolvedChartConfig {
   hours: number;
   height: number;
   curve: CurveMode;
+  /** Averaging level of the curves, selectable in the editor. */
+  smoothing: SmoothingLevel;
   gapMode: GapMode;
   maxGapMinutes: number;
   gapStyle: GapStyle;
@@ -319,6 +329,9 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       : 'auto';
 
   const curve: CurveMode = config.chart_curve === 'linear' ? 'linear' : 'smooth';
+  const smoothing: SmoothingLevel = SMOOTHING_LEVELS.includes(config.chart_smoothing as SmoothingLevel)
+    ? (config.chart_smoothing as SmoothingLevel)
+    : DEFAULT_SMOOTHING;
   const gapMode: GapMode = config.chart_gap_mode === 'break' ? 'break' : 'connect';
   const gapStyle: GapStyle = config.chart_gap_style === 'dashed' ? 'dashed' : 'solid';
   const humidityLineStyle: HumidityLineStyle =
@@ -387,6 +400,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       hours: Math.round(asNumber(config.chart_hours, 1, 168, 6)),
       height: Math.round(asNumber(config.chart_height, 30, 400, 112)),
       curve,
+      smoothing,
       gapMode,
       maxGapMinutes: Math.round(asNumber(config.chart_max_gap_minutes, 5, 720, 120)),
       gapStyle,

@@ -712,6 +712,7 @@ export class RoomClimateCard extends LitElement {
         .showPoints=${config.chart.showPoints}
         .showGrid=${config.chart.showGrid}
         .curve=${config.chart.curve}
+        .smoothing=${config.chart.smoothing}
         .gapMode=${config.chart.gapMode}
         .maxGapMinutes=${config.chart.maxGapMinutes}
         .gapStyle=${config.chart.gapStyle}

@@ -455,6 +455,12 @@ export function movingAverage(samples: ChartSample[], window: number): ChartSamp
   const size = Math.max(1, Math.round(window));
   if (size < 3 || samples.length < 3) return samples.map((sample) => ({ ...sample }));
   const radius = Math.floor(size / 2);
+  // Precision of the measurement itself: at least one decimal (so the average of
+  // integers is not thrown away), at most two (so a fine sensor keeps its shape).
+  const precision = Math.min(
+    2,
+    Math.max(1, samples.reduce((max, sample) => Math.max(max, decimalsOf(sample.v)), 0))
+  );
   return samples.map((sample, index) => {
     if (sample.v === null) return { ...sample };
     let sum = 0;
@@ -466,24 +472,69 @@ export function movingAverage(samples: ChartSample[], window: number): ChartSamp
       count += 1;
     }
     if (!count) return { ...sample };
-    // Keep one decimal – exactly what the sensor reports; further digits are
-    // noise that only makes the path data longer.
-    return { t: sample.t, v: Math.round((sum / count) * 10) / 10 };
+    // Round to the precision the sensor itself reports: a 0.1 °C sensor keeps
+    // 0.1, a fine-grained one keeps its second decimal. A fixed one decimal used
+    // to swallow every movement below 0.05 and flattened fine sensors visibly.
+    return { t: sample.t, v: roundTo(sum / count, precision) };
   });
 }
 
 /**
- * Window length for a run of `count` samples.
+ * How strongly the curve is averaged, selectable in the editor.
  *
- * Deliberately short: 3 points for most runs, at most 5 for dense ones. The
- * first version went up to 9 and ironed the curve flat – peaks and small dips
- * disappeared. Half the previous window keeps the jitter away while the shape of
- * the measurement stays recognisable. Always odd so the average is centred.
+ * `none` draws every measured value, `light` removes the sensor's own jitter,
+ * `medium` and `strong` calm very noisy sensors down. Since "too flat" is a
+ * matter of taste and of the sensor, this is a user setting instead of a fixed
+ * constant.
  */
-export function smoothingWindow(count: number): number {
+export type SmoothingLevel = 'none' | 'light' | 'medium' | 'strong';
+
+export const SMOOTHING_LEVELS: readonly SmoothingLevel[] = [
+  'none',
+  'light',
+  'medium',
+  'strong',
+] as const;
+
+/** Default level: a light touch, the shape of the measurement stays visible. */
+export const DEFAULT_SMOOTHING: SmoothingLevel = 'light';
+
+/**
+ * Averaging window per level: `[shortRun, denseRun]`, in samples.
+ *
+ * Always odd so the average is centred; 1 means "no averaging at all".
+ */
+const SMOOTHING_WINDOWS: Record<SmoothingLevel, readonly [number, number]> = {
+  none: [1, 1],
+  light: [3, 5],
+  medium: [5, 9],
+  strong: [9, 15],
+};
+
+/** Number of decimals a value is written with (capped at two). */
+function decimalsOf(value: number | null): number {
+  if (value === null || !Number.isFinite(value)) return 0;
+  const text = String(value);
+  const dot = text.indexOf('.');
+  if (dot === -1) return 0;
+  return Math.min(2, text.length - dot - 1);
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+/**
+ * Window length for a run of `count` samples at the given level.
+ *
+ * Runs shorter than five samples are never averaged: there is no neighbour to
+ * compare with, and averaging would only invent a value.
+ */
+export function smoothingWindow(count: number, level: SmoothingLevel = DEFAULT_SMOOTHING): number {
   if (count < 5) return 1;
-  if (count < 60) return 3;
-  return 5;
+  const [shortRun, denseRun] = SMOOTHING_WINDOWS[level] ?? SMOOTHING_WINDOWS[DEFAULT_SMOOTHING];
+  return count < 60 ? shortRun : denseRun;
 }
 
 export function timeTicks(start: number, end: number, count: number): number[] {

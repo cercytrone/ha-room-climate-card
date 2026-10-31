@@ -51,7 +51,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Kurzer gleitender Mittelwert plus monotone Glättung, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.2.0`.
+  `ROOM-CLIMATE-CARD v2.3.0`.
 
 ---
 
@@ -225,6 +225,7 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 | `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48). |
 | `chart_height` | number | `112` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
 | `chart_curve` | `smooth` \| `linear` | `smooth` | Geglättete (überschwingungsfreie) oder direkt verbundene Linien. |
+| `chart_smoothing` | `none` \| `light` \| `medium` \| `strong` | `light` | Stufe der Kurvenglättung. `none` zeichnet jeden Messwert, `light` nimmt nur das Sensor-Zittern, `medium`/`strong` beruhigen sehr unruhige Sensoren. Wirkt nur bei `chart_curve: smooth`. |
 | `chart_humidity_line_style` | `solid` \| `dotted` | `solid` | Feuchtekurve durchgezogen oder **gepunktet** zeichnen. Betrifft nur die Feuchte; Fläche, Endpunkt und Farben bleiben. |
 | `chart_gap_mode` | `connect` \| `break` | `connect` | Echte Ausfälle (`unavailable`/`unknown`) überbrücken oder sichtbar unterbrechen. Konstante Phasen ohne HA-Samples werden **immer** durchgehend gezeichnet. |
 | `chart_max_gap_minutes` | number | `120` | Längste Ausfallzeit (Minuten), die noch überbrückt wird; längere bleiben offen. |
@@ -250,7 +251,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, Zeitraum, Chart-Höhe, Kurvenverlauf, Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -278,9 +279,10 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 - **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
   Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
   in Versalien mit 0,09 em Laufweite.
-- **Ruhiger Verlauf:** kurzer gleitender Mittelwert (3–5 Punkte) plus monotone Glättung,
-  1,9 px Linie ohne Leuchten, je ein sehr dezenter Flächenverlauf für beide Kurven; die Feuchte
-  bekommt ein eigenes Band im oberen Drittel, statt die Temperaturkurve zu kreuzen.
+- **Ruhiger Verlauf:** gleitender Mittelwert in vier wählbaren Stufen (Standard: leicht) plus
+  monotone Glättung, 1,9 px Linie ohne Leuchten, je ein sehr dezenter Flächenverlauf für beide
+  Kurven; die Feuchte bekommt ein eigenes Band im oberen Drittel, statt die Temperaturkurve zu
+  kreuzen.
 - **Reduzierte Achse:** eine Haarlinie als Basis, drei Labels in 10,5 px bei 32 % Deckkraft –
   „Sa 05:40 · So 05:40 · Jetzt“.
 - **Hell und dunkel:** beide Varianten sind vollständig ausgestaltet und respektieren
@@ -322,11 +324,25 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   Punktreihe gezeichnet (`stroke-dasharray: 0.1 5.5` mit runden Kappen, dadurch echte runde
   Punkte in jedem Browser). Die Temperaturkurve, die Flächen, der Endpunkt und die Farben
   bleiben unverändert.
-- **Glättung:** Zwei milde Stufen. Ein kurzer zentrierter Mittelwert (3 Punkte, bei dichten
-  Reihen 5 – nicht mehr 7/9) nimmt das Sensor-Zittern, danach interpoliert eine monotone
-  kubische Kurve (Fritsch–Carlson), die nicht überschwingt und innerhalb der Messwerte bleibt.
-  Die erste Fassung glättete zu stark und bügelte echte Ausschläge platt; die aktuelle Fenster-
-  breite ist der Mittelweg: ruhig, aber in der Form noch klar die Messung.
+- **Glättung in Stufen:** `chart_smoothing` schaltet zwischen vier Stufen, im Editor unter
+  *Glättung der Kurven*:
+
+  | Stufe | Mittelwertfenster | Charakter |
+  | --- | --- | --- |
+  | `none` (Aus) | keins | jeder Messwert, volle Kontur – auch jedes Zittern |
+  | `light` (Standard) | 3 Punkte, bei dichten Reihen 5 | Sensor-Zittern weg, Form bleibt |
+  | `medium` | 5 / 9 Punkte | deutlich ruhiger |
+  | `strong` | 9 / 15 Punkte | für sehr unruhige Sensoren |
+
+  Danach interpoliert eine monotone kubische Kurve (Fritsch–Carlson), die nicht überschwingt und
+  innerhalb der Messwerte bleibt. Kurven unter fünf Punkten werden nie gemittelt – dort gäbe es
+  keinen Nachbarn, nur einen erfundenen Wert. Mit `chart_curve: linear` ist die Stufe wirkungslos
+  und im Editor ausgegraut.
+- **Ausschlag statt gerader Linie:** Das vertikale Fenster war früher großzügig (mindestens
+  0,8 °C bzw. 6 %), wodurch ein ruhiger Raum zur fast geraden Linie wurde. Jetzt sind es
+  0,4 °C bzw. 3 % – kleine echte Schwankungen nutzen das Band sichtbar. Zusätzlich rundet der
+  Mittelwert auf die Genauigkeit des Sensors (mindestens eine, höchstens zwei Nachkommastellen):
+  ein feiner Sensor verliert seine Bewegung nicht mehr an eine feste 0,1er-Rundung.
 - **Farben:** Beide Kurven nutzen einen vertikalen Verlauf, der exakt an ihrem Band ausgerichtet
   ist. Die Temperaturfläche blendet von 22 % über 8 % auf 0 % Deckkraft aus, die Feuchtefläche
   entsprechend ruhiger von 18 % über 6 % auf 0 % – dieselbe Bauart, aber sichtbar leiser, damit

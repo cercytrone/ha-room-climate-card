@@ -4,6 +4,37 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.3.0] – 2026-10-31
+
+### Hinzugefügt
+
+- **Glättung in vier Stufen, im visuellen Editor wählbar:** `chart_smoothing` mit
+  `none` / `light` / `medium` / `strong` (Standard `light`) unter *Verlauf → Glättung der
+  Kurven*. `none` zeichnet jeden Messwert, `light` nimmt nur das Sensor-Zittern, `medium` und
+  `strong` beruhigen sehr unruhige Sensoren. Der Editor erklärt den Trade-off direkt am Feld
+  und graut es aus, wenn `chart_curve: linear` gewählt ist.
+
+  Mittelwertfenster je Stufe (kurze / dichte Reihen): `none` 1/1, `light` 3/5,
+  `medium` 5/9, `strong` 9/15 Punkte.
+
+### Geändert
+
+- **Kurven wirken nicht mehr flach.** Drei Ursachen behoben:
+  - Das vertikale Fenster war zu großzügig (mindestens 0,8 °C bzw. 6 %) und drückte ruhige
+    Räume zur Geraden. Jetzt 0,4 °C bzw. 3 % mit etwas weniger Rand (0,15 statt 0,18/0,2).
+  - Der Mittelwert rundete fest auf **eine** Nachkommastelle und verschluckte damit jede
+    Bewegung unter 0,05. Er rundet jetzt auf die Genauigkeit des Sensors (mindestens eine,
+    höchstens zwei Nachkommastellen).
+  - Die Stufe ist wählbar (siehe oben), statt fest verdrahtet zu sein.
+
+  Gemessener vertikaler Ausschlag im Temperaturband einer 360 × 130-Karte (27 Messwerte,
+  mittlere Stufe):
+
+  | Datenlage | vorher (2.2.0) | `none` | `light` | `medium` | `strong` |
+  | --- | --- | --- | --- | --- | --- |
+  | ruhiger Raum, 0,16 °C | 7,5 px | 17,9 px | 15,7 px | 13,4 px | 12,3 px |
+  | unruhiger Sensor, 1,9 °C | 31,6 px | 44,8 px | 33,0 px | 28,3 px | 23,6 px |
+
 ## [2.2.0] – 2026-10-31
 
 ### Hinzugefügt

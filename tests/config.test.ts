@@ -203,6 +203,17 @@ describe('normalizeConfig', () => {
     expect(config.window.openStates).toEqual(['on', 'tilted']);
   });
 
+  it('defaults to light smoothing and accepts every level', () => {
+    expect(normalizeConfig({}).chart.smoothing).toBe('light');
+    for (const level of ['none', 'light', 'medium', 'strong'] as const) {
+      expect(normalizeConfig({ chart_smoothing: level }).chart.smoothing).toBe(level);
+    }
+    // Unknown values fall back to the default instead of reaching the chart.
+    for (const value of ['off', 'hart', 3, null, {}, true]) {
+      expect(normalizeConfig({ chart_smoothing: value }).chart.smoothing).toBe('light');
+    }
+  });
+
   it('defaults the gap handling to a continuous, solid line', () => {
     const config = normalizeConfig({ temperature_entity: 'sensor.t' });
     expect(config.chart.gapMode).toBe('connect');
