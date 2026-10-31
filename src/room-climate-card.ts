@@ -468,10 +468,11 @@ export class RoomClimateCard extends LitElement {
       .join(';');
 
     return html`<div
-      class="card ${themeClass} density-${this._density} ${config.height ? 'fixed-height' : 'auto-height'}"
+      class="card ${themeClass} density-${this._density} ${config.height ? 'fixed-height' : 'auto-height'} ${this.tapTarget ? 'is-tappable' : ''}"
       style="${style}"
       role="group"
       aria-label="${this.cellAriaLabel(config, t)}"
+      @click=${this.handleCardClick}
     >
       ${this.renderHeader(config, t)} ${this.renderReadings(config, t)}
       ${this.renderClimateRow(config, t)} ${this.renderChart(config, t)}
@@ -726,6 +727,48 @@ export class RoomClimateCard extends LitElement {
   }
 
   /**
+   * Entity a tap on the card opens. Only offered while the status row is
+   * visible, because that row is the keyboard path to the same action – a
+   * pointer-only target would be a trap.
+   */
+  private get tapTarget(): string | undefined {
+    const config = this._config;
+    if (!config || config.tapAction === 'none') return undefined;
+    if (!hasStatusRow(config)) return undefined;
+    return config.thermostat.entity;
+  }
+
+  /**
+   * Opens Home Assistant's more-info dialog. `hass-more-info` is the event the
+   * frontend's own tiles dispatch; the dialog (with the climate controls)
+   * belongs to Home Assistant, so there is nothing to rebuild or navigate to.
+   */
+  private openMoreInfo(entityId: string): void {
+    this.dispatchEvent(
+      new CustomEvent('hass-more-info', {
+        detail: { entityId },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /**
+   * A tap anywhere on the card opens the thermostat – except on the elements
+   * that do something themselves (readings toggle a series, the chart shows its
+   * readout, links and form fields keep their meaning).
+   */
+  private handleCardClick = (event: MouseEvent): void => {
+    const entityId = this.tapTarget;
+    if (!entityId) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, a, input, select, textarea, .chart-slot, room-climate-chart')) {
+      return;
+    }
+    this.openMoreInfo(entityId);
+  };
+
+  /**
    * Heating row below the readings: colour-coded flame, the current HVAC action
    * and the target temperature. Deliberately one line at one size – no badges to
    * optically centre, nothing to misalign.
@@ -750,20 +793,42 @@ export class RoomClimateCard extends LitElement {
           }`
         : '';
 
-    return html`<div class="climate-row" role="status" aria-label="${this.thermostatAria(thermostat)}">
-      ${showStatus
+    const entityId = this.tapTarget;
+    const content = html`${showStatus
         ? html`<span class="flame status-${thermostat.status}" style="color:${color}" aria-hidden="true"
             >${this.heatingIcon(thermostat)}</span
           >`
         : nothing}
-      <span class="climate-state">${showMode ? thermostat.modeLabel : thermostat.label}</span>
+      <span class="climate-state" role=${entityId ? 'status' : nothing}
+        >${showMode ? thermostat.modeLabel : thermostat.label}</span
+      >
       ${showSetpoint
         ? html`<span class="climate-sep" aria-hidden="true">·</span>
             <span class="climate-setpoint"
               ><span class="climate-setpoint-label">${t.t('setpoint')}</span> ${setpointText}</span
             >`
-        : nothing}
-    </div>`;
+        : nothing}`;
+
+    // Without a target the row stays a plain live region; with one it becomes a
+    // real button, so keyboard users have the same path as a finger.
+    if (!entityId) {
+      return html`<div
+        class="climate-row"
+        role="status"
+        aria-label="${this.thermostatAria(thermostat)}"
+      >
+        ${content}
+      </div>`;
+    }
+    return html`<button
+      type="button"
+      class="climate-row is-tappable"
+      aria-label="${this.thermostatAria(thermostat)} – ${t.t('openThermostat')}"
+      title="${t.t('openThermostat')}"
+      @click=${() => this.openMoreInfo(entityId)}
+    >
+      ${content}
+    </button>`;
   }
 
   /** Icon for the current HVAC action; the colour carries the state. */
@@ -1200,6 +1265,38 @@ export class RoomClimateCard extends LitElement {
       line-height: 16px;
       color: var(--rcc-muted);
       white-space: nowrap;
+    }
+    /* The row is a button when the card has somewhere to go on tap. */
+    button.climate-row {
+      appearance: none;
+      border: 0;
+      background: none;
+      padding: 0;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      position: relative;
+      border-radius: 6px;
+    }
+    /* A 20 px line is no touch target: grow the hit area, not the layout. */
+    button.climate-row::after {
+      content: '';
+      position: absolute;
+      inset: -6px -4px;
+    }
+    button.climate-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    button.climate-row:focus-visible {
+      outline: 2px solid var(--rcc-accent);
+      outline-offset: 2px;
+    }
+    /* Whole-card tap target, minus the parts that act on their own. */
+    .card.is-tappable {
+      cursor: pointer;
+    }
+    .card.is-tappable .chart-slot {
+      cursor: default;
     }
     .flame {
       display: inline-flex;

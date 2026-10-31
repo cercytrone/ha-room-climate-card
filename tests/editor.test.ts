@@ -85,7 +85,7 @@ describe('room climate card editor', () => {
       'Allgemein',
       'Sensoren',
       'Messwerte (Schrift)',
-      'Farben & Grenzwerte',
+      'Farben',
       'Fenster',
       'Bewegung',
       'Thermostat',
@@ -290,6 +290,32 @@ describe('room climate card editor', () => {
     expect(emitted?.chart_humidity_gradient).toBe(false);
   });
 
+  it('lets the tap target of the card be chosen', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const select = selectorByLabel(editor, 'Tippen auf die Karte');
+    expect(select.type).toBe('select');
+    // Home Assistant's dialog is the default.
+    expect(select.value).toBe('more-info');
+    const options = select.selector.select.options.map((option: { value: string }) => option.value);
+    expect(options).toEqual(['more-info', 'none']);
+
+    select.emit('none');
+    await editor.updateComplete;
+    expect(emitted?.tap_action).toBe('none');
+  });
+
+  it('disables the tap target without a thermostat row', async () => {
+    const editor = await mountEditor({ ...baseConfig, show_thermostat: false });
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Tippen auf die Karte').disabled).toBe(true);
+  });
+
   it('offers switches for the readout and the min/max marks', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);
@@ -299,7 +325,7 @@ describe('room climate card editor', () => {
     });
 
     const tooltip = selectorByLabel(editor, 'Werte beim Überfahren');
-    const extremes = selectorByLabel(editor, 'Minimum und Maximum markieren');
+    const extremes = selectorByLabel(editor, 'Minimum/Maximum im Chart anzeigen');
     // Both comfort features are on by default.
     expect(tooltip.value).toBe(true);
     expect(extremes.value).toBe(true);
@@ -310,7 +336,7 @@ describe('room climate card editor', () => {
     expect(emitted?.chart_show_extremes).toBeUndefined();
 
     openAll(editor);
-    selectorByLabel(editor, 'Minimum und Maximum markieren').emit(false);
+    selectorByLabel(editor, 'Minimum/Maximum im Chart anzeigen').emit(false);
     await editor.updateComplete;
     expect(emitted?.chart_show_extremes).toBe(false);
   });
