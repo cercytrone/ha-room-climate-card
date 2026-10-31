@@ -609,11 +609,18 @@ describe('room climate card', () => {
     expect(temperature.tagName).toBe('BUTTON');
     expect(temperature.getAttribute('aria-pressed')).toBe('true');
     expect(chart().hiddenSeries).toEqual([]);
+    // The name describes the current state and the title the action.
+    expect(temperature.getAttribute('aria-label')).toContain('Serie eingeblendet');
+    expect(temperature.getAttribute('title')).toBe('Serie ausblenden');
 
     temperature.click();
     await card.updateComplete;
     expect(temperature.getAttribute('aria-pressed')).toBe('false');
     expect(temperature.classList.contains('is-hidden')).toBe(true);
+    // Was swapped before: a hidden series announced itself as "shown".
+    expect(temperature.getAttribute('aria-label')).toContain('Serie ausgeblendet');
+    expect(temperature.getAttribute('aria-label')).not.toContain('Serie eingeblendet');
+    expect(temperature.getAttribute('title')).toBe('Serie einblenden');
     expect(chart().hiddenSeries).toEqual(['temperature']);
     // The caption dot of that series dims with it.
     expect(q(card, '.reading-labels .series-label')?.classList.contains('is-hidden')).toBe(true);
@@ -653,8 +660,63 @@ describe('room climate card', () => {
       humidity?: Array<{ t: number; v: number | null }>;
     };
     expect(chart).not.toBeNull();
-    expect(chart.temperature?.length).toBe(20);
-    expect(chart.humidity?.length).toBe(20);
+    // 20 history samples plus the live state, which closes the gap to "now".
+    expect(chart.temperature?.length).toBe(21);
+    expect(chart.humidity?.length).toBe(21);
+    const lastTemperature = chart.temperature?.[chart.temperature.length - 1];
+    expect(lastTemperature?.v).toBe(21.78);
+    const lastHumidity = chart.humidity?.[chart.humidity.length - 1];
+    expect(lastHumidity?.v).toBe(50.4);
+  });
+
+  it('appends the live state only when it is newer than the history', async () => {
+    const chartOf = (card: RoomClimateCard) =>
+      q(card, 'room-climate-chart') as HTMLElement & {
+        temperature?: Array<{ t: number; v: number | null }>;
+      };
+
+    // The sensor did not change since the last history sample: no extra point.
+    const history = historyFor(['sensor.temp']);
+    const lastSample = history['sensor.temp'][history['sensor.temp'].length - 1];
+    const unchanged = mount(
+      fullConfig,
+      createHass({
+        states: baseStates().map((state) =>
+          state.entity_id === 'sensor.temp'
+            ? entity('sensor.temp', {
+                state: lastSample.s,
+                attributes: { unit_of_measurement: '°C' },
+                lastChanged: new Date(lastSample.lu * 1000).toISOString(),
+              })
+            : state
+        ),
+        history,
+      })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await unchanged.updateComplete;
+    expect(chartOf(unchanged).temperature?.length).toBe(20);
+
+    // A sensor that just went unavailable ends the curve with a gap marker.
+    const offline = mount(
+      fullConfig,
+      createHass({
+        states: baseStates().map((state) =>
+          state.entity_id === 'sensor.temp'
+            ? entity('sensor.temp', {
+                state: 'unavailable',
+                attributes: { unit_of_measurement: '°C' },
+              })
+            : state
+        ),
+        history,
+      })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await offline.updateComplete;
+    const points = chartOf(offline).temperature!;
+    expect(points.length).toBe(21);
+    expect(points[points.length - 1].v).toBeNull();
   });
 
   it('hands both gradient switches to the chart component', async () => {
@@ -711,6 +773,115 @@ describe('room climate card', () => {
     expect(chart.shadowRoot.querySelector('.state-title')?.textContent?.trim()).toBe(
       'Keine Verlaufsdaten'
     );
+  });
+
+  it('keeps the last good curve when a later request fails', async () => {
+    vi.useFakeTimers();
+    try {
+      const history = historyFor(['sensor.temp', 'sensor.humidity']);
+      const send = vi.fn(async () => history);
+      const hass = createHass({ states: baseStates(), history });
+      hass.connection!.sendMessagePromise = send;
+      hass.callApi = async () => {
+        throw new Error('boom');
+      };
+
+      const card = mount(fullConfig, hass);
+      await vi.advanceTimersByTimeAsync(200);
+      const chartOf = () =>
+        q(card, 'room-climate-chart') as HTMLElement & {
+          temperature?: Array<{ t: number; v: number | null }>;
+        };
+      expect(chartOf().temperature?.length).toBe(21);
+
+      // Every later request fails: the curve must survive.
+      send.mockImplementation(async () => {
+        throw new Error('recorder offline');
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1000);
+
+      expect(chartOf().temperature?.length).toBe(21);
+      expect(card._historyError).toBeTruthy();
+      await card.updateComplete;
+      // The chart shows the old curve, not the error state.
+      const chart = chartOf() as unknown as {
+        shadowRoot: ShadowRoot;
+      };
+      expect(chart.shadowRoot.querySelector('.series-line')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a failed load with a growing backoff instead of on every update', async () => {
+    vi.useFakeTimers();
+    try {
+      const send = vi.fn(async () => {
+        throw new Error('not yet');
+      });
+      const hass = createHass({ states: baseStates() });
+      hass.connection!.sendMessagePromise = send;
+      hass.callApi = async () => {
+        throw new Error('not yet');
+      };
+
+      const card = mount(fullConfig, hass);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(send).toHaveBeenCalledTimes(1);
+
+      // State updates during the backoff do not start another request.
+      card.hass = { ...hass };
+      await vi.advanceTimersByTimeAsync(1000);
+      card.hass = { ...hass };
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(send).toHaveBeenCalledTimes(1);
+
+      // After the first backoff step (15 s) exactly one retry is made.
+      await vi.advanceTimersByTimeAsync(15 * 1000);
+      expect(send).toHaveBeenCalledTimes(2);
+
+      // The next one waits twice as long.
+      await vi.advanceTimersByTimeAsync(15 * 1000);
+      expect(send).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(15 * 1000);
+      expect(send).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('catches up when the page becomes visible again', async () => {
+    vi.useFakeTimers();
+    const original = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+    try {
+      const history = historyFor(['sensor.temp', 'sensor.humidity']);
+      const send = vi.fn(async () => history);
+      const hass = createHass({ states: baseStates(), history });
+      hass.connection!.sendMessagePromise = send;
+
+      const card = mount(fullConfig, hass);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(send).toHaveBeenCalledTimes(1);
+
+      // Three minutes later (past the cache TTL) a wall tablet wakes up.
+      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+      Object.defineProperty(Document.prototype, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(200);
+      expect(send).toHaveBeenCalledTimes(2);
+
+      // The listener is removed with the card.
+      card.remove();
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(200);
+      expect(send).toHaveBeenCalledTimes(2);
+    } finally {
+      if (original) Object.defineProperty(Document.prototype, 'visibilityState', original);
+      vi.useRealTimers();
+    }
   });
 
   it('forwards the gap configuration to the chart', async () => {

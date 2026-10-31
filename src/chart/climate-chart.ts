@@ -6,6 +6,7 @@ import {
   prepareSamples,
   extent,
   linearScale,
+  medianInterval,
   movingAverage,
   padDomain,
   projectRun,
@@ -443,9 +444,31 @@ export class RoomClimateChart extends LitElement {
       gapMode: this.gapMode,
       maxGapMs: Math.max(5, this.maxGapMinutes) * 60 * 1000,
     };
-    const rawTempSegments: SeriesSegment[] = tempDomain ? buildSegments(tempSeries, segmentOptions) : [];
+
+    /*
+     * Averaging happens *before* the segmentation, so a quiet stretch that is
+     * drawn as a step stays a step. Afterwards it would be averaged together
+     * with samples from hours ago and turn back into a slow ramp.
+     * The time guard keeps far-away neighbours out of the average.
+     */
+    const smooth = this.curve === 'smooth';
+    const smoothSeries = (series: ChartSample[]): ChartSample[] => {
+      if (!smooth || series.length < 5) return series;
+      const window = smoothingWindow(series.length, this.smoothing);
+      if (window < 3) return series;
+      const spacing = medianInterval(series);
+      return movingAverage(series, window, {
+        maxDeltaMs: Math.max(60_000, spacing * 3),
+      });
+    };
+    const tempSmoothed = smoothSeries(tempSeries);
+    const humiditySmoothed = smoothSeries(humiditySeries);
+
+    const rawTempSegments: SeriesSegment[] = tempDomain
+      ? buildSegments(tempSmoothed, segmentOptions)
+      : [];
     const rawHumiditySegments: SeriesSegment[] = humidityDomain
-      ? buildSegments(humiditySeries, segmentOptions)
+      ? buildSegments(humiditySmoothed, segmentOptions)
       : [];
     const segmentCount = Math.max(1, rawTempSegments.length + rawHumiditySegments.length);
     const perSegmentLimit = Math.max(60, Math.floor(MAX_CHART_POINTS / segmentCount));
@@ -453,18 +476,8 @@ export class RoomClimateChart extends LitElement {
     // Denoise before projecting: a centred moving average (only for the smooth
     // curve) plus the monotone interpolation below. Both keep the values inside
     // the measured range – no invented peaks.
-    const smooth = this.curve === 'smooth';
     const prepare = (segments: SeriesSegment[]): SeriesSegment[] =>
-      segments.map((segment) => {
-        // Averaging window from the user's level: `none` draws every value.
-        const averaged = smooth
-          ? movingAverage(
-              segment.samples,
-              smoothingWindow(segment.samples.length, this.smoothing)
-            )
-          : segment.samples;
-        return decimateSegment({ samples: averaged, bridged: segment.bridged }, perSegmentLimit);
-      });
+      segments.map((segment) => decimateSegment(segment, perSegmentLimit));
 
     const tempSegments = prepare(rawTempSegments);
     const humiditySegments = prepare(rawHumiditySegments);

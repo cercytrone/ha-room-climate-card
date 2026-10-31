@@ -4,6 +4,41 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.4.0] – 2026-10-31
+
+### Behoben
+
+- **Kurze Aussetzer nach ruhigen Phasen rissen die Kurve auf.** Die Ausfalllänge wurde ab dem
+  letzten *gültigen* Messwert gemessen statt ab dem Beginn des Ausfalls. Nach einer ruhigen
+  Nacht (letzter Wert 04:15, nächster 08:00) sah ein einminütiger Aussetzer um 07:59 deshalb wie
+  ein 3¾-stündiger Ausfall aus, überschritt `chart_max_gap_minutes` und brach die Linie auf –
+  obwohl der Sensor nur kurz weg war. Jetzt zählt ausschließlich die tatsächliche Ausfallzeit.
+- **Ruhige Phasen wurden als Rampe gezeichnet.** Ohne neue Messwerte lief die Linie langsam
+  zwischen zwei Stunden alten Werten – als hätte sich der Raum über Stunden gleichmäßig
+  verändert. Sie wird jetzt als **Stufe** gezeichnet: alter Wert flach, Sprung eine Sekunde vor
+  dem nächsten Messwert (wie die HA-eigene Chart).
+- **`chart_gap_mode: break` brach auch ruhige Phasen.** Jetzt brechen nur noch echte
+  `unavailable`/`unknown`-Phasen die Linie.
+- **Der Startwert des Fensters konnte verloren gehen.** Der letzte Zustand *vor* dem Zeitfenster
+  wird nun als Carry-in am Fensterbeginn übernommen (`include_start_time_state`) statt verworfen
+  – nach einer ruhigen Nacht war er oft der einzige Wert für den Fensteranfang.
+- **Ein fehlgeschlagener Abruf leerte das Diagramm.** Die zuletzt gültige Kurve bleibt jetzt
+  stehen; der Abruf wird mit wachsendem Abstand wiederholt (15 s → 5 min), und während eines
+  Backoffs startet keine Sensor-Änderung einen neuen Versuch.
+- **`aria-label` beim Ein-/Ausblenden einer Serie war vertauscht** („Serie eingeblendet“ bei
+  ausgeblendeter Serie). Die Texte sind jetzt in `localize.ts` und korrekt zugeordnet.
+
+### Geändert
+
+- **Zeitfenster und Live-Wert:** Das Diagramm endet bei „jetzt“ statt beim Zeitpunkt des letzten
+  Abrufs (bis zu fünf Minuten älter) und hängt den aktuellen Sensorzustand an die Kurve. Die
+  Kurve endet damit genau bei dem Wert, der oben groß steht.
+- **Aufwachen:** Ein `visibilitychange`-Listener lädt die Daten neu, sobald die Seite wieder
+  sichtbar wird (Wandtablets, schlafende Tabs); er wird mit der Karte entfernt.
+- **Glättung greift vor der Segmentierung.** Vorher wurde nach dem Segmentieren gemittelt –
+  dadurch wurde eine gerade gezeichnete Stufe wieder zur Rampe. Zusätzlich mittelt der Filter
+  nur Nachbarn, die höchstens drei typische Messabstände entfernt sind.
+
 ## [2.3.0] – 2026-10-31
 
 ### Hinzugefügt

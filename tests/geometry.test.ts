@@ -144,8 +144,9 @@ describe('segments with interpolation', () => {
     return { t: hoursFromStart * hour, v };
   }
 
-  it('connects a hole with interpolated points', () => {
-    // 6 minute cadence, then a 90 minute hole.
+  it('draws a quiet stretch as a step instead of a ramp', () => {
+    // 6 minute cadence, then 90 minutes without a sample (value unchanged –
+    // Home Assistant does not store that), then a real change.
     const samples = [at(1, 20), at(1.1, 20.2), at(2.6, 21), at(2.7, 21.1)];
     const segments = buildSegments(samples, {
       rangeMs: end - start,
@@ -155,15 +156,20 @@ describe('segments with interpolation', () => {
       maxGapMs: 2 * hour,
     });
     expect(segments).toHaveLength(1);
-    const { samples: values, bridged } = segments[0];
-    expect(values.length).toBeGreaterThan(samples.length);
-    expect(bridged.some(Boolean)).toBe(true);
-    // Interpolated values stay between the two measured values.
-    for (const sample of values) {
-      expect(sample.v as number).toBeGreaterThanOrEqual(20);
-      expect(sample.v as number).toBeLessThanOrEqual(21.1);
-    }
-    // Timestamps stay sorted.
+    const { samples: values } = segments[0];
+
+    // The old value is held until just before the change, then it jumps.
+    const held = values.filter((sample) => sample.t > at(1.1, 0).t && sample.t < at(2.6, 0).t);
+    expect(held).toHaveLength(1);
+    expect(held[0].v).toBe(20.2);
+    expect(at(2.6, 0).t - held[0].t).toBeLessThanOrEqual(1000);
+
+    // No sample in between suggests a slow change that never happened.
+    const between = values.filter(
+      (sample) => sample.t > at(1.1, 0).t && sample.t < held[0].t && sample.v !== 20.2
+    );
+    expect(between).toHaveLength(0);
+    for (const sample of values) expect(sample.v as number).toBeLessThanOrEqual(21.1);
     for (let i = 1; i < values.length; i++) {
       expect(values[i].t).toBeGreaterThan(values[i - 1].t);
     }
@@ -206,11 +212,83 @@ describe('segments with interpolation', () => {
       maxGapMs: 2 * hour,
     });
     expect(segments).toHaveLength(1);
-    expect(segments[0].bridged.some(Boolean)).toBe(true);
-
     const values = segments[0].samples.map((sample) => sample.v as number);
     expect(Math.min(...values)).toBeGreaterThanOrEqual(20);
     expect(Math.max(...values)).toBeLessThanOrEqual(20.3);
+
+    // Everything after the last small step holds 20.2 until the real change.
+    const flat = segments[0].samples.filter(
+      (sample) => sample.t > at(1.3, 0).t && sample.t < at(5.2, 0).t
+    );
+    for (const sample of flat) expect(sample.v).toBe(20.2);
+  });
+
+  it('measures an outage from the moment it started, not from the last value', () => {
+    // A quiet night: 04:15 last value, then a one-minute dropout at 07:59,
+    // then the next real change at 08:00. The stretch before the dropout was
+    // measured, so it must not count as outage time.
+    const samples = [at(4.25, 21.4), at(7.983, null), at(8, 21.9)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(1);
+
+    // The very same outage in the middle of a dense series is bridged too.
+    const dense = [at(1, 20), at(1.1, 20.1), at(1.2, null), at(1.25, 20.2), at(1.3, 20.3)];
+    const bridged = buildSegments(dense, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 2 * hour,
+    });
+    expect(bridged).toHaveLength(1);
+  });
+
+  it('breaks on a real outage even after a long quiet stretch', () => {
+    // 04:15 last value, unavailable from 06:00 to 08:00 (2 h > 1 h limit).
+    const samples = [at(4.25, 21.4), at(6, null), at(8, 21.9)];
+    const segments = buildSegments(samples, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'connect',
+      maxGapMs: 1 * hour,
+    });
+    expect(segments).toHaveLength(2);
+    // The first segment ends where the measurement ended, not at 04:15.
+    const first = segments[0].samples;
+    expect(first[first.length - 1].t).toBe(at(6, 0).t);
+    expect(first[first.length - 1].v).toBe(21.4);
+  });
+
+  it('never breaks a quiet stretch in break mode', () => {
+    // `chart_gap_mode: break` may only show real outages – a value that simply
+    // did not change is not a hole.
+    const quiet = [at(1, 20), at(5, 20.3)];
+    const segments = buildSegments(quiet, {
+      rangeMs: end - start,
+      start,
+      end,
+      gapMode: 'break',
+      maxGapMs: 2 * hour,
+    });
+    expect(segments).toHaveLength(1);
+
+    const outage = [at(1, 20), at(1.1, 20.1), at(1.2, null), at(4.5, 22)];
+    expect(
+      buildSegments(outage, {
+        rangeMs: end - start,
+        start,
+        end,
+        gapMode: 'break',
+        maxGapMs: 2 * hour,
+      })
+    ).toHaveLength(2);
   });
 
   it('never bridges an explicit unavailable stretch beyond maxGapMs', () => {
@@ -281,7 +359,9 @@ describe('segments with interpolation', () => {
   });
 
   it('splits a segment at bridged edges only', () => {
-    const samples = [at(1, 20), at(1.1, 20.2), at(2.6, 21), at(2.7, 21.1)];
+    // A bridged *outage* (null marker) is what may be drawn dashed later on;
+    // a quiet stretch is a known value and never splits the path.
+    const samples = [at(1, 20), at(1.1, 20.2), at(1.2, null), at(1.6, 21), at(1.7, 21.1)];
     const segments = buildSegments(samples, {
       rangeMs: end - start,
       start,
@@ -316,11 +396,30 @@ describe('segments with interpolation', () => {
       500
     );
     expect(prepared).toEqual([
+      // The state before the window is carried in at the window start.
+      { t: 0, v: 9 },
       { t: 100, v: 1 },
       { t: 200, v: 2 },
       { t: 300, v: 3 },
       { t: 400, v: null },
     ]);
+  });
+
+  it('carries the state before the window in, even without samples inside', () => {
+    // A quiet night: the only state is the one from before the window start.
+    const carried = prepareSamples([{ t: 1_000, v: 21.4 }, { t: 2_000, v: 21.5 }], 5_000, 9_000);
+    expect(carried).toEqual([{ t: 5_000, v: 21.5 }]);
+
+    // The newest state before the window wins …
+    const newest = prepareSamples([{ t: 1_000, v: 20 }, { t: 2_000, v: 21.5 }], 5_000);
+    expect(newest).toEqual([{ t: 5_000, v: 21.5 }]);
+    // … and an unavailable state must not silently become a value.
+    const unavailable = prepareSamples([{ t: 1_000, v: 20 }, { t: 2_000, v: null }], 5_000);
+    expect(unavailable).toEqual([{ t: 5_000, v: null }]);
+
+    // A sample exactly at the window start wins over the carry-in.
+    const exact = prepareSamples([{ t: 900, v: 20 }, { t: 5_000, v: 22 }], 5_000);
+    expect(exact).toEqual([{ t: 5_000, v: 22 }]);
   });
 
   it('handles empty input for prepareSamples', () => {

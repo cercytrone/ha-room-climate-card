@@ -11,6 +11,7 @@ import {
   areaPath,
   buildSegments,
   linearScale,
+  medianInterval,
   movingAverage,
   padDomain,
   projectRun,
@@ -245,12 +246,17 @@ function renderCard(options: CardOptions): string {
 
   const segmentOptions = { rangeMs, start, end, gapMode: 'connect' as const, maxGapMs: 120 * 60 * 1000 };
   const smooth = true;
-  const runsOf = (series?: ChartSample[]) =>
-    series
-      ? buildSegments(series, segmentOptions).map((segment) =>
-          movingAverage(segment.samples, smoothingWindow(segment.samples.length))
-        )
-      : [];
+  // Same order as the card: average first (time-guarded), then segment, so a
+  // quiet stretch stays a step instead of becoming a ramp.
+  const runsOf = (series?: ChartSample[]) => {
+    if (!series) return [];
+    const window = smoothingWindow(series.length);
+    const prepared =
+      window < 3
+        ? series
+        : movingAverage(series, window, { maxDeltaMs: Math.max(60_000, medianInterval(series) * 3) });
+    return buildSegments(prepared, segmentOptions).map((segment) => segment.samples);
+  };
 
   const temperatureRuns = temperatureVisible ? runsOf(options.series) : [];
   const humidityRuns = humidityVisible ? runsOf(options.humiditySeries) : [];
