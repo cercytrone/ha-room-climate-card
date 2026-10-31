@@ -1,4 +1,4 @@
-# Vollausbau: alle optionalen Bereiche aktiv, 12-h-Verlauf mit Legende.
+# Vollausbau: alle optionalen Bereiche aktiv, 12-h-Verlauf.
 type: custom:room-climate-card
 name: Wohnzimmer
 icon: mdi:sofa
@@ -41,10 +41,7 @@ chart_humidity_line_style: dotted  # Feuchtekurve punktiert (solid = durchgezoge
 chart_gap_mode: connect        # Lücken interpolieren (durchgehende Linie)
 chart_max_gap_minutes: 120     # längere Lücken bleiben offen
 chart_gap_style: solid         # interpolierte Abschnitte wie gemessene zeichnen
-chart_show_legend: true
 chart_show_grid: true
 chart_show_points: false
-
-temperature_cool_below: 19
-temperature_warm_above: 25
-temperature_hot_above: 28
+chart_show_tooltip: true       # Werte beim Überfahren (Standard: an)
+chart_show_extremes: true      # Minimum/Maximum an der Kurve (Standard: an)

@@ -678,6 +678,68 @@ export function decimateIndices(samples: ChartSample[], maxPoints: number): numb
 }
 
 /**
+ * Nearest *measured* sample to a timestamp.
+ *
+ * Hit-testing has to run on the measured series, never on the drawn support
+ * points: those are smoothed, decimated and can carry interpolated bridge
+ * samples. A tooltip that reports an invented value would be a lie.
+ * Gaps (`null`) are skipped, so the nearest real measurement wins.
+ */
+export function nearestSample(samples: ChartSample[], time: number): ChartSample | null {
+  const count = samples.length;
+  if (!count || !Number.isFinite(time)) return null;
+  // First index with `t >= time`.
+  let low = 0;
+  let high = count - 1;
+  let index = count;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    if (samples[middle].t >= time) {
+      index = middle;
+      high = middle - 1;
+    } else {
+      low = middle + 1;
+    }
+  }
+  let left = index - 1;
+  let right = index;
+  let leftSample: ChartSample | null = null;
+  let rightSample: ChartSample | null = null;
+  while (left >= 0) {
+    if (samples[left].v !== null) {
+      leftSample = samples[left];
+      break;
+    }
+    left--;
+  }
+  while (right < count) {
+    if (samples[right].v !== null) {
+      rightSample = samples[right];
+      break;
+    }
+    right++;
+  }
+  if (!leftSample) return rightSample;
+  if (!rightSample) return leftSample;
+  return Math.abs(leftSample.t - time) <= Math.abs(rightSample.t - time) ? leftSample : rightSample;
+}
+
+/** Lowest and highest measured sample of a series; `null` when nothing numeric is left. */
+export function seriesExtremes(
+  samples: ChartSample[]
+): { min: ChartSample; max: ChartSample } | null {
+  let min: ChartSample | null = null;
+  let max: ChartSample | null = null;
+  for (const sample of samples) {
+    const value = sample.v;
+    if (value === null || !Number.isFinite(value)) continue;
+    if (!min || (min.v as number) > value) min = sample;
+    if (!max || (max.v as number) < value) max = sample;
+  }
+  return min && max ? { min, max } : null;
+}
+
+/**
  * Reduces very long series to a manageable number of points while keeping the
  * first and last sample *and* the low/high of every bucket. Purely for
  * rendering performance.

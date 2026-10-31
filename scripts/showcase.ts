@@ -353,6 +353,121 @@ function renderCard(options: CardOptions): string {
         }">SOLL</text>`
       : '';
 
+  /*
+   * Quiet min/max marks, same rules as the web component: taken from the
+   * *measured* series (not from the smoothed runs that are drawn), only when
+   * there is room, and the minimum steps aside when both labels would collide.
+   */
+  const extremesOf = (series: ChartSample[] | undefined): { low: ChartSample; high: ChartSample } | null => {
+    let low: ChartSample | null = null;
+    let high: ChartSample | null = null;
+    for (const sample of series ?? []) {
+      if (sample.v === null) continue;
+      if (!low || (low.v as number) > sample.v) low = sample;
+      if (!high || (high.v as number) < sample.v) high = sample;
+    }
+    if (!low || !high || low.v === high.v) return null;
+    return { low, high };
+  };
+
+  const extremeMarks = (
+    series: ChartSample[] | undefined,
+    scale: ((value: number) => number) | null,
+    bandTop: number,
+    bandBottom: number,
+    color: string,
+    decimals: number
+  ): string => {
+    if (!scale || bandBottom - bandTop < 18) return '';
+    const extremes = extremesOf(series);
+    if (!extremes) return '';
+    const entries = [
+      { sample: extremes.high, isMax: true },
+      { sample: extremes.low, isMax: false },
+    ].map(({ sample, isMax }) => {
+      const cx = xScale(sample.t);
+      const cy = scale(sample.v as number);
+      // 9 px above (text bottom clear of the curve) or 15 px below; the dot sits
+      // on a local extremum, so the curve drops away on both sides.
+      const canAbove = cy - 11 >= bandTop;
+      const canBelow = cy + 17 <= bandBottom;
+      const above = canAbove ? cy - 9 : bandTop + 8;
+      const below = canBelow ? cy + 15 : bandBottom - 1;
+      let labelY = isMax ? (canAbove ? above : below) : canBelow ? below : above;
+      if (setpointY !== null && Math.abs(labelY - setpointY) < 9) {
+        const alternative = isMax ? below : above;
+        if (Math.abs(alternative - setpointY) >= 9) labelY = alternative;
+      }
+      return { cx, cy, labelY, isMax, value: sample.v as number };
+    });
+    const tooClose = (a: { labelY: number; cx: number }, b: { labelY: number; cx: number }) =>
+      Math.abs(a.labelY - b.labelY) < 9 && Math.abs(a.cx - b.cx) < 34;
+    let keep = [...entries];
+    if (keep.length === 2 && tooClose(keep[0], keep[1])) {
+      for (const entry of keep) {
+        entry.labelY = entry.isMax ? bandTop + 8 : bandBottom - 1;
+      }
+      if (tooClose(keep[0], keep[1])) keep = keep.filter((entry) => entry.isMax);
+    }
+    const captionX = captionRight ? right : left;
+    return keep
+      .map((entry) => {
+        const text = entry.value.toFixed(decimals).replace('.', ',');
+        const preferRight = entry.cx < (left + right) / 2;
+        let labelX = preferRight ? entry.cx + 6 : entry.cx - 6;
+        let anchor = preferRight ? 'start' : 'end';
+        if (anchor === 'start' && labelX + 26 > right - 2) {
+          labelX = entry.cx - 6;
+          anchor = 'end';
+        } else if (anchor === 'end' && labelX - 26 < left + 2) {
+          labelX = entry.cx + 6;
+          anchor = 'start';
+        }
+        const clashesAt = (x: number) =>
+          setpointY !== null &&
+          Math.abs(entry.labelY - (setpointY - 5)) < 9 &&
+          Math.abs(x - captionX) < 40;
+        if (clashesAt(labelX)) {
+          const flipped = anchor === 'start' ? entry.cx - 6 : entry.cx + 6;
+          if (!clashesAt(flipped)) {
+            labelX = flipped;
+            anchor = anchor === 'start' ? 'end' : 'start';
+          }
+        }
+        const dot = `<circle cx="${entry.cx.toFixed(1)}" cy="${entry.cy.toFixed(
+          1
+        )}" r="1.8" fill="${COLORS.card}" stroke="${color}" stroke-width="1.2" />`;
+        if (clashesAt(labelX)) return dot;
+        return `${dot}<text x="${labelX.toFixed(1)}" y="${entry.labelY.toFixed(
+          1
+        )}" ${font(9, 500)} ${TRACKING(0.02, 9)} fill="${COLORS.text}" fill-opacity="0.55" stroke="${
+          COLORS.card
+        }" stroke-width="1.4" paint-order="stroke" text-anchor="${anchor}">${text}</text>`;
+      })
+      .join('');
+  };
+
+  const temperatureExtremes = temperatureVisible
+    ? extremeMarks(
+        options.series,
+        tempScale,
+        temperatureBandTop,
+        chartBottom,
+        COLORS.accent,
+        1
+      )
+    : '';
+  const humidityExtremes = humidityVisible
+    ? extremeMarks(
+        options.humiditySeries,
+        humidityScale,
+        chartTop,
+        humidityBandBottom,
+        COLORS.secondary,
+        0
+      )
+    : '';
+
   const axis = timeTicks(start, end, 3)
     .map((tick, index) => {
       const isLast = index === 2;
@@ -558,6 +673,8 @@ function renderCard(options: CardOptions): string {
         COLORS.text
       }" stroke-opacity="0.1" />
       ${endDots}
+      ${humidityExtremes}
+      ${temperatureExtremes}
       ${axis}
     </g>
     ${motionBadge}

@@ -93,6 +93,9 @@ interface EditorText {
   gradientHelper: string;
   grid: string;
   points: string;
+  tooltip: string;
+  extremes: string;
+  comfortHelper: string;
   missingEntity: string;
   loading: string;
   generalHelper: string;
@@ -201,6 +204,10 @@ const TEXT: Record<'de' | 'en', EditorText> = {
       'Der dezente Flächenverlauf unter der Kurve. Aus bleibt die Kurve allein stehen – ideal für sehr flache Karten.',
     grid: 'Gitternetz',
     points: 'Datenpunkte',
+    tooltip: 'Werte beim Überfahren',
+    extremes: 'Minimum und Maximum markieren',
+    comfortHelper:
+      'Beim Zeigen auf die Kurve erscheinen Uhrzeit und die echten Messwerte. Minimum und Maximum stehen dauerhaft an der Kurve.',
     missingEntity: 'Bitte eine Entität auswählen.',
     loading: 'Editor wird geladen …',
     generalHelper: 'Alle Werte sind optional – die Karte funktioniert auch mit Teilkonfiguration.',
@@ -294,6 +301,10 @@ const TEXT: Record<'de' | 'en', EditorText> = {
       'The soft area fill below the curve. Off leaves the line on its own – useful for very flat cards.',
     grid: 'Grid lines',
     points: 'Data points',
+    tooltip: 'Values on hover',
+    extremes: 'Mark minimum and maximum',
+    comfortHelper:
+      'Pointing at the curve shows the time and the actual measurements. Minimum and maximum stay visible next to the curve.',
     missingEntity: 'Please select an entity.',
     loading: 'Loading editor …',
     generalHelper: 'Everything is optional – the card also works with a partial configuration.',
@@ -1096,7 +1107,20 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.points,
         value: this.rawBoolean('chart_show_points') ?? false,
         disabled: !anyChart,
-      })}`;
+      })}
+      ${this.renderSwitch({
+        key: 'chart_show_tooltip',
+        label: t.tooltip,
+        value: this.rawBoolean('chart_show_tooltip') ?? true,
+        disabled: !anyChart,
+      })}
+      ${this.renderSwitch({
+        key: 'chart_show_extremes',
+        label: t.extremes,
+        value: this.rawBoolean('chart_show_extremes') ?? true,
+        disabled: !anyChart,
+      })}
+      <p class="helper">${t.comfortHelper}</p>`;
   }
 
   static styles = css`

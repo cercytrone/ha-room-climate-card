@@ -1,4 +1,5 @@
 import { LitElement, css, html, nothing, svg, type TemplateResult } from 'lit';
+import { createRef, ref } from 'lit/directives/ref.js';
 import { MAX_CHART_POINTS } from '../const';
 import { formatNumber } from '../utils/format';
 import {
@@ -10,8 +11,10 @@ import {
   linearScale,
   medianInterval,
   movingAverage,
+  nearestSample,
   padDomain,
   projectRun,
+  seriesExtremes,
   seriesPath,
   smoothingWindow,
   type SmoothingLevel,
@@ -44,6 +47,9 @@ function decimateSegment(segment: SeriesSegment, maxPoints: number): SeriesSegme
 const FALLBACK_WIDTH = 320;
 const FALLBACK_HEIGHT = 112;
 
+/** How long a touch readout stays visible after the finger lifts. */
+const TOOLTIP_HOLD_MS = 4000;
+
 /** Plot geometry, in fractions of the usable height. */
 const HUMIDITY_BAND_HEIGHT = 0.3;
 const TEMPERATURE_BAND_TOP = 0.44;
@@ -61,6 +67,32 @@ const TEMPERATURE_DOMAIN = { minSpan: 0.4, padding: 0.15 } as const;
 const HUMIDITY_DOMAIN = { minSpan: 3, padding: 0.15 } as const;
 
 export type ChartSeriesKey = 'temperature' | 'humidity';
+
+/** One series as it is needed for hit-testing: measured samples plus the band. */
+interface HoverSeries {
+  samples: ChartSample[];
+  domain: [number, number];
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Plot geometry of the last render. The tooltip overlays the SVG with plain
+ * elements (crisper than SVG text at 1x, no re-render per pointer move), so it
+ * needs the same scales the curves were drawn with.
+ */
+interface HoverGeometry {
+  width: number;
+  height: number;
+  left: number;
+  right: number;
+  plotTop: number;
+  plotBottom: number;
+  start: number;
+  end: number;
+  temperature: HoverSeries | null;
+  humidity: HoverSeries | null;
+}
 
 let uidCounter = 0;
 
@@ -100,6 +132,12 @@ export class RoomClimateChart extends LitElement {
     showTemperatureArea: { attribute: false },
     showHumidityArea: { attribute: false },
     cornerRadius: { attribute: false },
+    showTooltip: { attribute: false },
+    showExtremes: { attribute: false },
+    temperatureUnit: { attribute: false },
+    humidityUnit: { attribute: false },
+    temperatureDecimals: { attribute: false },
+    humidityDecimals: { attribute: false },
     language: { attribute: false },
     timeZone: { attribute: false },
     hour12: { attribute: false },
@@ -214,6 +252,96 @@ export class RoomClimateChart extends LitElement {
       fill: var(--rcc-chart-label);
       text-transform: uppercase;
     }
+    /*
+     * Pointer layer. The pan-y touch action is the important part: a vertical swipe still
+     * scrolls the dashboard, only horizontal exploration belongs to the chart.
+     * Without it the chart would swallow every touch on a wall tablet.
+     */
+    .overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      touch-action: pan-y;
+      cursor: crosshair;
+    }
+    .hover {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .hover[hidden] {
+      display: none;
+    }
+    .crosshair {
+      position: absolute;
+      width: 1px;
+      background: var(--rcc-chart-rule);
+      opacity: 0.16;
+    }
+    .hover-dot {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      margin: -3.5px 0 0 -3.5px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1.5px var(--rcc-chart-point-fill);
+    }
+    .hover-dot[hidden] {
+      display: none;
+    }
+    .tooltip {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 4px 7px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--rcc-bg, #0e1013) 88%, transparent);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 6px 16px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(6px);
+      font-size: 10px;
+      line-height: 1.35;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum' 1;
+      color: var(--rcc-text);
+      white-space: nowrap;
+    }
+    .tooltip-time {
+      font-size: 9px;
+      letter-spacing: 0.02em;
+      opacity: 0.5;
+    }
+    .tooltip-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      opacity: 0.92;
+    }
+    .tooltip-row[hidden] {
+      display: none;
+    }
+    .tooltip-row i {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex: none;
+    }
+    /*
+     * The number sits next to the curve, so it needs a halo in the card colour
+     * – otherwise the line strikes through it.
+     */
+    .extreme-label {
+      font-size: 9px;
+      font-weight: 500;
+      fill: var(--rcc-text);
+      fill-opacity: 0.55;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      paint-order: stroke;
+      stroke: var(--rcc-chart-point-fill);
+      stroke-width: 1.4;
+      stroke-linejoin: round;
+    }
     @media (prefers-reduced-motion: reduce) {
       * {
         transition: none !important;
@@ -253,6 +381,16 @@ export class RoomClimateChart extends LitElement {
   showHumidityArea = true;
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 26;
+  /** Crosshair readout while the pointer is over the plot. */
+  showTooltip = true;
+  /** Quiet min/max marks of both visible series. */
+  showExtremes = true;
+  /** Unit of the temperature series; falls back to the setpoint unit. */
+  temperatureUnit?: string;
+  /** Unit of the humidity series (usually `%`). */
+  humidityUnit?: string;
+  temperatureDecimals = 1;
+  humidityDecimals = 1;
   language = 'de';
   /** IANA zone of the Home Assistant instance; empty = browser zone. */
   timeZone?: string;
@@ -276,6 +414,20 @@ export class RoomClimateChart extends LitElement {
   private width = 0;
   private height = 0;
   private resizeObserver?: ResizeObserver;
+  /** Set while rendering; the pointer handlers read it instead of re-measuring. */
+  private hoverGeometry?: HoverGeometry;
+  private hoverHideTimer?: ReturnType<typeof setTimeout>;
+  private lastPointerType = 'mouse';
+  private readonly hoverRef = createRef<HTMLElement>();
+  private readonly crosshairRef = createRef<HTMLElement>();
+  private readonly temperatureDotRef = createRef<HTMLElement>();
+  private readonly humidityDotRef = createRef<HTMLElement>();
+  private readonly tooltipRef = createRef<HTMLElement>();
+  private readonly tooltipTimeRef = createRef<HTMLElement>();
+  private readonly tooltipTemperatureRef = createRef<HTMLElement>();
+  private readonly tooltipHumidityRef = createRef<HTMLElement>();
+  private readonly tooltipTemperatureRowRef = createRef<HTMLElement>();
+  private readonly tooltipHumidityRowRef = createRef<HTMLElement>();
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -299,6 +451,7 @@ export class RoomClimateChart extends LitElement {
     super.disconnectedCallback();
     this.resizeObserver?.disconnect();
     this.resizeObserver = undefined;
+    this.clearHoverTimer();
   }
 
   private measure(): void {
@@ -370,10 +523,15 @@ export class RoomClimateChart extends LitElement {
 
     // Both series switched off: keep the box (no layout jump), draw only the
     // hairline baseline so the card does not look broken.
-    return html`<div class="wrap">${this.renderChart(width, height)}</div>`;
+    const { chart, geometry } = this.renderChart(width, height);
+    this.hoverGeometry = geometry;
+    return html`<div class="wrap">${chart}${this.renderOverlay(geometry)}</div>`;
   }
 
-  private renderChart(width: number, height: number): TemplateResult {
+  private renderChart(
+    width: number,
+    height: number
+  ): { chart: TemplateResult; geometry: HoverGeometry } {
     const chartHeight = height;
     const showAxis = chartHeight >= 62;
     const axisSpace = showAxis ? 20 : 2;
@@ -628,11 +786,188 @@ export class RoomClimateChart extends LitElement {
             this.setpointUnit ? ` ${this.setpointUnit}` : ''
           }`
         : '';
-    const ariaLabel = setpointText
-      ? `${this.labels.aria}. ${setpointText}`
-      : this.labels.aria;
+    // Lowest/highest of the shown window, spoken as a range. Pointer users get
+    // the same numbers next to the curve; without a pointer this is the only
+    // way to learn them.
+    const rangeText = (
+      label: string,
+      samples: ChartSample[],
+      unit: string | undefined,
+      decimals: number
+    ): string => {
+      const extremes = seriesExtremes(samples);
+      if (!extremes || extremes.min.v === extremes.max.v) return '';
+      const low = formatNumber(extremes.min.v as number, this.language, decimals);
+      const high = formatNumber(extremes.max.v as number, this.language, decimals);
+      return `${label} ${low}–${high}${unit ? ` ${unit}` : ''}`;
+    };
+    const temperatureUnit = this.temperatureUnit || this.setpointUnit;
+    const ariaLabel = [
+      this.labels.aria,
+      setpointText,
+      tempY ? rangeText(this.labels.temperature, tempSeries, temperatureUnit, this.temperatureDecimals) : '',
+      humidityY
+        ? rangeText(this.labels.humidity, humiditySeries, this.humidityUnit, this.humidityDecimals)
+        : '',
+    ]
+      .filter(Boolean)
+      .join('. ');
 
-    return svg`<svg
+    /*
+     * Min/max marks: the quiet answer to "how far did it go?". Only the number,
+     * no unit – the band and the colour already say which series it belongs to.
+     * Skipped on narrow or very flat charts, where labels would collide.
+     */
+    const extremeMarks: TemplateResult[] = [];
+    const addExtremeMarks = (
+      samples: ChartSample[],
+      projectY: (value: number) => number,
+      bandTop: number,
+      bandBottom: number,
+      color: string,
+      decimals: number
+    ): void => {
+      if (!this.showExtremes || width < 200 || bandBottom - bandTop < 18) return;
+      const extremes = seriesExtremes(samples);
+      if (!extremes || extremes.min.v === extremes.max.v) return;
+      if (samples.filter((sample) => sample.v !== null).length < 3) return;
+      const entries = [
+        { sample: extremes.max, isMax: true },
+        { sample: extremes.min, isMax: false },
+      ]
+        .map(({ sample, isMax }) => {
+          const cx = x(sample.t);
+          const cy = projectY(sample.v as number);
+          // Above the point if the band has room, otherwise below it – a label
+          // that has to be pushed into the curve is unreadable.
+          // 9 px above (text bottom clear of the curve) or 15 px below; the dot sits
+          // on a local extremum, so the curve drops away on both sides.
+          const canAbove = cy - 11 >= bandTop;
+          const canBelow = cy + 17 <= bandBottom;
+          const above = canAbove ? cy - 9 : bandTop + 8;
+          const below = canBelow ? cy + 15 : bandBottom - 1;
+          let labelY = isMax ? (canAbove ? above : below) : canBelow ? below : above;
+          // Never print the number on the dashed reference line.
+          if (showSetpoint && setpointY !== null && Math.abs(labelY - setpointY) < 9) {
+            const alternative = isMax ? below : above;
+            if (Math.abs(alternative - setpointY) >= 9) labelY = alternative;
+          }
+          return { sample, cx, cy, labelY, isMax };
+        })
+        .filter((entry) => Number.isFinite(entry.cx) && Number.isFinite(entry.cy))
+        .filter((entry) => entry.cy >= bandTop - 1 && entry.cy <= bandBottom + 1);
+
+      /*
+       * Two labels that end up on the same spot move to the corners of the band
+       * instead of one of them disappearing. Only when even that overlaps (a
+       * band shorter than a line) the minimum steps aside.
+       */
+      const tooClose = (
+        a: { labelY: number; cx: number },
+        b: { labelY: number; cx: number }
+      ): boolean => Math.abs(a.labelY - b.labelY) < 9 && Math.abs(a.cx - b.cx) < 34;
+      let keep = [...entries];
+      if (keep.length === 2 && tooClose(keep[0], keep[1])) {
+        for (const entry of keep) {
+          entry.labelY = entry.isMax ? bandTop + 8 : bandBottom - 1;
+        }
+        if (tooClose(keep[0], keep[1])) keep = keep.filter((entry) => entry.isMax);
+      }
+
+      for (const entry of keep) {
+        if (!entry) continue;
+        // Beside the dot, never on top of it: the ring would strike through the
+        // number. The free side is the one pointing into the plot.
+        const textWidth = 26;
+        const preferRight = entry.cx < (left + right) / 2;
+        let labelX = preferRight ? entry.cx + 6 : entry.cx - 6;
+        let anchor: 'start' | 'end' = preferRight ? 'start' : 'end';
+        if (anchor === 'start' && labelX + textWidth > right - 2) {
+          labelX = entry.cx - 6;
+          anchor = 'end';
+        } else if (anchor === 'end' && labelX - textWidth < left + 2) {
+          labelX = entry.cx + 6;
+          anchor = 'start';
+        }
+        // "Soll" lives at the very edge of the plot: step aside instead of
+        // printing two numbers on top of each other.
+        const captionX = captionOnRight ? right : left;
+        const captionClash = (x: number): boolean =>
+          showSetpoint &&
+          setpointY !== null &&
+          Math.abs(entry.labelY - (setpointY - 5)) < 9 &&
+          Math.abs(x - captionX) < 40;
+        if (captionClash(labelX)) {
+          const flipped = anchor === 'start' ? entry.cx - 6 : entry.cx + 6;
+          if (!captionClash(flipped)) {
+            labelX = flipped;
+            anchor = anchor === 'start' ? 'end' : 'start';
+          }
+        }
+        extremeMarks.push(
+          svg`<circle
+            class="extreme-dot"
+            r="1.8"
+            cx=${entry.cx}
+            cy=${entry.cy}
+            style=${`fill:var(--rcc-chart-point-fill);stroke:${color};stroke-width:1.2`}
+          />`
+        );
+        if (!captionClash(labelX)) {
+          extremeMarks.push(
+            svg`<text class="extreme-label" x=${labelX} y=${entry.labelY} text-anchor=${anchor}>${formatNumber(
+              entry.sample.v as number,
+              this.language,
+              decimals
+            )}</text>`
+          );
+        }
+      }
+    };
+
+    if (tempY) {
+      addExtremeMarks(
+        tempSeries,
+        tempY,
+        temperatureTop,
+        temperatureBottom,
+        this.accentColor,
+        this.temperatureDecimals
+      );
+    }
+    if (humidityY) {
+      addExtremeMarks(
+        humiditySeries,
+        humidityY,
+        humidityTop,
+        humidityBottom,
+        this.humidityColor,
+        this.humidityDecimals
+      );
+    }
+
+    const geometry: HoverGeometry = {
+      width,
+      height: chartHeight,
+      left,
+      right,
+      plotTop: top,
+      plotBottom: bottom,
+      start: this.start,
+      end: this.end,
+      // The *measured* series, not the smoothed or bridged one: hit-testing and
+      // the readout must never report an invented value.
+      temperature:
+        tempY && tempDomain
+          ? { samples: tempSeries, domain: tempDomain, top: temperatureTop, bottom: temperatureBottom }
+          : null,
+      humidity:
+        humidityY && humidityDomain
+          ? { samples: humiditySeries, domain: humidityDomain, top: humidityTop, bottom: humidityBottom }
+          : null,
+    };
+
+    const chart = svg`<svg
       width=${width}
       height=${chartHeight}
       viewBox="0 0 ${width} ${chartHeight}"
@@ -694,8 +1029,239 @@ export class RoomClimateChart extends LitElement {
             style="fill:${this.accentColor}"
           />`
         : nothing}
+      ${extremeMarks}
       ${axisLabels}
     </svg>`;
+
+    return { chart, geometry };
+  }
+
+  /**
+   * Pointer layer over the plot plus the readout it drives. Everything below is
+   * plain DOM: the SVG is expensive to rebuild (paths, decimation), and moving
+   * the crosshair 60 times a second must not rebuild it.
+   */
+  private renderOverlay(geometry: HoverGeometry): TemplateResult | typeof nothing {
+    if (!this.showTooltip) return nothing;
+    if (!geometry.temperature && !geometry.humidity) return nothing;
+    const top = Math.round(geometry.plotTop);
+    const height = Math.max(1, Math.round(geometry.plotBottom - geometry.plotTop));
+    return html`<div
+        class="overlay"
+        style=${`top:${top}px;height:${height}px`}
+        @pointerdown=${this.onPointerDown}
+        @pointermove=${this.onPointerMove}
+        @pointerup=${this.onPointerUp}
+        @pointercancel=${this.onPointerUp}
+        @pointerleave=${this.onPointerLeave}
+      ></div>
+      <div class="hover" ${ref(this.hoverRef)} hidden aria-hidden="true">
+        <div
+          class="crosshair"
+          ${ref(this.crosshairRef)}
+          style=${`top:${top}px;height:${height}px`}
+        ></div>
+        <div
+          class="hover-dot"
+          ${ref(this.temperatureDotRef)}
+          style=${`background:${this.accentColor}`}
+          hidden
+        ></div>
+        <div
+          class="hover-dot"
+          ${ref(this.humidityDotRef)}
+          style=${`background:${this.humidityColor}`}
+          hidden
+        ></div>
+        <div class="tooltip" ${ref(this.tooltipRef)}>
+          <span class="tooltip-time" ${ref(this.tooltipTimeRef)}></span>
+          <span class="tooltip-row" ${ref(this.tooltipTemperatureRowRef)}>
+            <i style=${`background:${this.accentColor}`}></i>
+            <span ${ref(this.tooltipTemperatureRef)}></span>
+          </span>
+          <span class="tooltip-row" ${ref(this.tooltipHumidityRowRef)}>
+            <i style=${`background:${this.humidityColor}`}></i>
+            <span ${ref(this.tooltipHumidityRef)}></span>
+          </span>
+        </div>
+      </div>`;
+  }
+
+  private onPointerDown = (event: PointerEvent | MouseEvent): void => {
+    if (!this.showTooltip) return;
+    this.lastPointerType = (event as PointerEvent).pointerType || 'mouse';
+    this.clearHoverTimer();
+    this.updateHoverAt(event);
+  };
+
+  private onPointerMove = (event: PointerEvent | MouseEvent): void => {
+    if (!this.showTooltip) return;
+    this.lastPointerType = (event as PointerEvent).pointerType || 'mouse';
+    this.clearHoverTimer();
+    this.updateHoverAt(event);
+  };
+
+  private onPointerUp = (event: PointerEvent | MouseEvent): void => {
+    const type = (event as PointerEvent).pointerType || this.lastPointerType;
+    if (type === 'mouse') return;
+    // A lifted finger must not take the reading with it – keep it for a moment.
+    this.clearHoverTimer();
+    this.hoverHideTimer = setTimeout(() => this.hideHover(), TOOLTIP_HOLD_MS);
+  };
+
+  private onPointerLeave = (event: PointerEvent | MouseEvent): void => {
+    const type = (event as PointerEvent).pointerType || this.lastPointerType;
+    if (type !== 'mouse') return;
+    this.hideHover();
+  };
+
+  private updateHoverAt(event: PointerEvent | MouseEvent): void {
+    const geometry = this.hoverGeometry;
+    if (!geometry) return;
+    const target = event.currentTarget as HTMLElement | null;
+    const rect = target?.getBoundingClientRect();
+    // jsdom and hidden tabs report a zero-size rect: fall back to the measured
+    // chart width so the maths stays honest.
+    const width = rect && rect.width > 0 ? rect.width : geometry.width;
+    if (!width) return;
+    const leftPx = rect ? rect.left : 0;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - leftPx) / width));
+    const time = geometry.start + ratio * (geometry.end - geometry.start);
+    this.showHoverAt(time);
+  }
+
+  private xForTime(time: number, geometry: HoverGeometry): number {
+    const span = Math.max(1, geometry.end - geometry.start);
+    return geometry.left + ((time - geometry.start) / span) * (geometry.right - geometry.left);
+  }
+
+  private yForValue(series: HoverSeries, value: number): number {
+    const [low, high] = series.domain;
+    const span = high - low || 1;
+    return series.bottom - ((value - low) / span) * (series.bottom - series.top);
+  }
+
+  private tooltipValue(value: number, unit: string | undefined, decimals: number): string {
+    const number = formatNumber(value, this.language, decimals);
+    return unit ? `${number} ${unit}` : number;
+  }
+
+  /**
+   * Snaps to the nearest *measured* sample and reports its value. The drawn
+   * curve is smoothed, decimated and may contain interpolated bridge points –
+   * none of those are measurements, so none of them may be shown here.
+   */
+  private showHoverAt(time: number): void {
+    const geometry = this.hoverGeometry;
+    const hover = this.hoverRef.value;
+    if (!geometry || !hover) return;
+
+    const nearestTemperature = geometry.temperature
+      ? nearestSample(geometry.temperature.samples, time)
+      : null;
+    const nearestHumidity = geometry.humidity
+      ? nearestSample(geometry.humidity.samples, time)
+      : null;
+    let anchor = nearestTemperature ?? nearestHumidity;
+    if (nearestTemperature && nearestHumidity) {
+      anchor =
+        Math.abs(nearestTemperature.t - time) <= Math.abs(nearestHumidity.t - time)
+          ? nearestTemperature
+          : nearestHumidity;
+    }
+    if (!anchor) {
+      this.hideHover();
+      return;
+    }
+
+    const anchorTime = anchor.t;
+    const crosshair = this.crosshairRef.value;
+    const xPx = this.xForTime(anchorTime, geometry);
+    if (crosshair) crosshair.style.left = `${xPx}px`;
+
+    // Both series are reported at the same instant; a HA state stays valid until
+    // it changes, so the last known value of the other series is the truth.
+    const temperatureSample = geometry.temperature
+      ? nearestSample(geometry.temperature.samples, anchorTime)
+      : null;
+    const humiditySample = geometry.humidity
+      ? nearestSample(geometry.humidity.samples, anchorTime)
+      : null;
+
+    this.placeDot(
+      this.temperatureDotRef.value,
+      geometry.temperature,
+      temperatureSample,
+      xPx
+    );
+    this.placeDot(this.humidityDotRef.value, geometry.humidity, humiditySample, xPx);
+
+    const tooltip = this.tooltipRef.value;
+    const timeNode = this.tooltipTimeRef.value;
+    const temperatureRow = this.tooltipTemperatureRowRef.value;
+    const humidityRow = this.tooltipHumidityRowRef.value;
+    const temperatureValue = this.tooltipTemperatureRef.value;
+    const humidityValue = this.tooltipHumidityRef.value;
+    const temperatureUnit = this.temperatureUnit || this.setpointUnit;
+
+    if (timeNode) timeNode.textContent = this.formatDayTime(anchorTime);
+    if (temperatureRow) temperatureRow.hidden = !temperatureSample;
+    if (humidityRow) humidityRow.hidden = !humiditySample;
+    if (temperatureValue && temperatureSample) {
+      temperatureValue.textContent = this.tooltipValue(
+        temperatureSample.v as number,
+        temperatureUnit,
+        this.temperatureDecimals
+      );
+    }
+    if (humidityValue && humiditySample) {
+      humidityValue.textContent = this.tooltipValue(
+        humiditySample.v as number,
+        this.humidityUnit,
+        this.humidityDecimals
+      );
+    }
+
+    if (tooltip) {
+      tooltip.dataset.time = String(anchorTime);
+      const boxWidth = tooltip.offsetWidth || 84;
+      const boxHeight = tooltip.offsetHeight || 38;
+      let left = xPx + 10;
+      if (left + boxWidth > geometry.width - 4) left = xPx - 10 - boxWidth;
+      left = Math.max(4, Math.min(left, Math.max(4, geometry.width - boxWidth - 4)));
+      const top = Math.max(2, Math.min(geometry.plotTop + 2, geometry.height - boxHeight - 2));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+
+    hover.hidden = false;
+  }
+
+  private placeDot(
+    dot: HTMLElement | undefined,
+    series: HoverSeries | null,
+    sample: ChartSample | null,
+    xPx: number
+  ): void {
+    if (!dot) return;
+    if (!series || !sample || sample.v === null) {
+      dot.hidden = true;
+      return;
+    }
+    dot.hidden = false;
+    dot.style.left = `${xPx}px`;
+    dot.style.top = `${this.yForValue(series, sample.v)}px`;
+  }
+
+  private hideHover(): void {
+    this.clearHoverTimer();
+    const hover = this.hoverRef.value;
+    if (hover) hover.hidden = true;
+  }
+
+  private clearHoverTimer(): void {
+    if (this.hoverHideTimer) clearTimeout(this.hoverHideTimer);
+    this.hoverHideTimer = undefined;
   }
 
   /**

@@ -290,6 +290,31 @@ describe('room climate card editor', () => {
     expect(emitted?.chart_humidity_gradient).toBe(false);
   });
 
+  it('offers switches for the readout and the min/max marks', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const tooltip = selectorByLabel(editor, 'Werte beim Überfahren');
+    const extremes = selectorByLabel(editor, 'Minimum und Maximum markieren');
+    // Both comfort features are on by default.
+    expect(tooltip.value).toBe(true);
+    expect(extremes.value).toBe(true);
+
+    tooltip.emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_show_tooltip).toBe(false);
+    expect(emitted?.chart_show_extremes).toBeUndefined();
+
+    openAll(editor);
+    selectorByLabel(editor, 'Minimum und Maximum markieren').emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_show_extremes).toBe(false);
+  });
+
   it('disables the gradient switches together with their series', async () => {
     const editor = await mountEditor({ ...baseConfig, show_humidity_chart: false });
     openAll(editor);

@@ -4,6 +4,40 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.6.0] – 2026-10-31
+
+### Hinzugefügt
+
+- **Wertanzeige im Chart.** Beim Zeigen auf die Fläche erscheint eine senkrechte Haarlinie mit
+  Uhrzeit und den Werten beider Reihen. Die Suche läuft über die **gemessenen** Punkte, nicht
+  über die gezeichneten Stützpunkte – die Kurve ist geglättet, dezimiert und enthält
+  interpolierte Brückenpunkte, und keiner davon ist eine Messung. Angezeigt wird deshalb der
+  echte Messwert mit der Einheit des Sensors. Die Ebene setzt `touch-action: pan-y`, damit ein
+  senkrechter Wisch weiterhin das Dashboard scrollt; nach dem Abheben eines Fingers bleibt die
+  Anzeige vier Sekunden stehen.
+- **Minimum und Maximum** der sichtbaren Kurven als dezente Zahlen neben der Kurve. Liegen
+  beide Zahlen auf demselben Fleck, rücken sie an die Ränder ihres Bandes, statt sich zu
+  überlappen; unter 200 px Breite entfallen sie. Für Screenreader stehen beide Werte zusätzlich
+  in der Beschreibung des Charts, zusammen mit dem Sollwert.
+- Beide Funktionen sind im Editor schaltbar (`chart_show_tooltip`, `chart_show_extremes`,
+  Standard jeweils an).
+
+### Geändert
+
+- **Beispiel-YAMLs aufgeräumt.** `examples/wohnzimmer.yaml` enthielt noch `chart_show_legend`
+  und die 2.0.0-entfernten Temperaturschwellen `temperature_cool_below`,
+  `temperature_warm_above`, `temperature_hot_above`; `examples/bad.yaml` ebenso die entfernten
+  Feuchteschwellen. Sie wurden still ignoriert (seit 2.5.0 mit Warnung) – jetzt sind sie weg.
+  Ein Test prüft die Beispiele gegen `KNOWN_CONFIG_KEYS`, damit das nicht zurückkommt.
+- Die Beschreibung des Charts nennt zusätzlich den gemessenen Bereich („Temperatur 18,2–23,4 °C“).
+
+### Nicht umgesetzt (geprüft)
+
+- **Fenster-Marker im Chart.** Die Abfrage wäre billig, aber bei Tado ist der Fensterzustand eine
+  Erkennung des Thermostats, keine gemessene Öffnung. Ein Marker würde diese Unsicherheit als
+  Zeitpunkt behaupten. Die Karte zeigt den Zustand weiterhin nur als Badge; die Begründung steht
+  in der README.
+
 ## [2.5.0] – 2026-10-31
 
 ### Behoben

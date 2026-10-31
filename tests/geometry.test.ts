@@ -13,7 +13,9 @@ import {
   medianInterval,
   DEFAULT_SMOOTHING,
   movingAverage,
+  nearestSample,
   padDomain,
+  seriesExtremes,
   seriesPath,
   smoothPath,
   SMOOTHING_LEVELS,
@@ -689,5 +691,38 @@ describe('axis helpers', () => {
     expect(result[0]).toBe(samples[0]);
     expect(result[result.length - 1]).toBe(samples[samples.length - 1]);
     expect(decimate(samples.slice(0, 10), 500)).toHaveLength(10);
+  });
+
+  it('finds the nearest measured sample and never a gap', () => {
+    const samples: ChartSample[] = [
+      { t: 0, v: 20 },
+      { t: 60_000, v: null },
+      { t: 120_000, v: 22 },
+      { t: 180_000, v: null },
+      { t: 240_000, v: 24 },
+    ];
+    expect(nearestSample(samples, 10_000)?.t).toBe(0);
+    expect(nearestSample(samples, 110_000)?.v).toBe(22);
+    // Between two gaps the closer real measurement wins.
+    expect(nearestSample(samples, 200_000)?.t).toBe(180_000 + 60_000);
+    expect(nearestSample(samples, 200_000)?.v).toBe(24);
+    expect(nearestSample(samples, -5000)?.t).toBe(0);
+    expect(nearestSample(samples, 999_999)?.t).toBe(240_000);
+    expect(nearestSample([], 1000)).toBeNull();
+    expect(nearestSample([{ t: 0, v: null }], 0)).toBeNull();
+  });
+
+  it('reports the lowest and highest measurement of a series', () => {
+    const extremes = seriesExtremes([
+      { t: 0, v: 20 },
+      { t: 60_000, v: null },
+      { t: 120_000, v: 23.4 },
+      { t: 180_000, v: 18.2 },
+    ]);
+    expect(extremes?.min.v).toBe(18.2);
+    expect(extremes?.max.v).toBe(23.4);
+    expect(extremes?.min.t).toBe(180_000);
+    expect(seriesExtremes([{ t: 0, v: null }])).toBeNull();
+    expect(seriesExtremes([])).toBeNull();
   });
 });
