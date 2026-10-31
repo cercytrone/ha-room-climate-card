@@ -4,6 +4,28 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.2.0] – 2026-10-31
+
+### Hinzugefügt
+
+- **Farbverlauf auch unter der Feuchtekurve.** Die Feuchte bekam bisher nur eine Linie; jetzt
+  liegt auch unter ihr ein Flächenverlauf in ihrer eigenen Farbe – ruhiger als der der
+  Temperatur (20 % → 7 % → 0 % statt 22 % → 8 % → 0 %), damit sie den Helden nicht überstrahlt.
+  Der Verlauf endet exakt an der Unterkante des Feuchtebandes und läuft nie in die
+  Temperaturhälfte.
+- **Beide Verläufe im Editor schaltbar:** `chart_temperature_gradient` und
+  `chart_humidity_gradient` (Standard jeweils `true`) unter *Verlauf*. Aus bleibt die Kurve
+  allein stehen – Fläche weg, Linie, Endpunkt und Soll-Referenz unverändert.
+
+### Geändert
+
+- **Mittelweg bei der Glättung.** Der zentrierte Mittelwert war zu breit (5/7/9 Punkte je nach
+  Dichte) und bügelte echte Ausschläge platt. Er ist jetzt auf **3 Punkte** reduziert (bei sehr
+  dichten Reihen 5): Das Sensor-Zittern verschwindet weiterhin, die Form der Messung bleibt aber
+  erkennbar – spürbar mehr Kontur als in 2.1.x, deutlich ruhiger als die Rohdaten.
+- README beschreibt die tatsächlichen Deckkraft-Werte der Verläufe (die alten 30 %/2 % waren
+  seit dem Redesign nicht mehr korrekt).
+
 ## [2.1.1] – 2026-10-30
 
 ### Geändert

@@ -473,15 +473,17 @@ export function movingAverage(samples: ChartSample[], window: number): ChartSamp
 }
 
 /**
- * Window length for a run of `count` samples: 3 points for short runs, up to 9
- * for dense ones. Always odd so the average is centred.
+ * Window length for a run of `count` samples.
+ *
+ * Deliberately short: 3 points for most runs, at most 5 for dense ones. The
+ * first version went up to 9 and ironed the curve flat – peaks and small dips
+ * disappeared. Half the previous window keeps the jitter away while the shape of
+ * the measurement stays recognisable. Always odd so the average is centred.
  */
 export function smoothingWindow(count: number): number {
   if (count < 5) return 1;
-  if (count < 20) return 3;
-  if (count < 60) return 5;
-  if (count < 160) return 7;
-  return 9;
+  if (count < 60) return 3;
+  return 5;
 }
 
 export function timeTicks(start: number, end: number, count: number): number[] {

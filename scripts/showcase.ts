@@ -271,6 +271,11 @@ function renderCard(options: CardOptions): string {
         .join('')
     : '';
 
+  const humidityArea = humidityScale
+    ? humidityRuns
+        .map((run) => areaPath(projectRun(run, xScale, humidityScale), humidityBandBottom, smooth))
+        .join(' ')
+    : '';
   const humidityLines = humidityScale
     ? humidityRuns
         .map((run) => {
@@ -501,13 +506,18 @@ function renderCard(options: CardOptions): string {
     </clipPath>
     <defs>
       <radialGradient id="${options.cardId}-light" cx="${x}" cy="${y}" r="${CARD_W * 1.2}" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#ffffff" stop-opacity="0.05" />
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.07" />
         <stop offset="0.55" stop-color="#ffffff" stop-opacity="0" />
       </radialGradient>
       <linearGradient id="${options.cardId}-area" gradientUnits="userSpaceOnUse" x1="0" y1="${temperatureBandTop}" x2="0" y2="${chartBottom}">
         <stop offset="0" stop-color="${COLORS.accent}" stop-opacity="0.22" />
         <stop offset="0.55" stop-color="${COLORS.accent}" stop-opacity="0.08" />
         <stop offset="1" stop-color="${COLORS.accent}" stop-opacity="0" />
+      </linearGradient>
+      <linearGradient id="${options.cardId}-area-humidity" gradientUnits="userSpaceOnUse" x1="0" y1="${chartTop}" x2="0" y2="${humidityBandBottom}">
+        <stop offset="0" stop-color="${COLORS.secondary}" stop-opacity="0.2" />
+        <stop offset="0.6" stop-color="${COLORS.secondary}" stop-opacity="0.07" />
+        <stop offset="1" stop-color="${COLORS.secondary}" stop-opacity="0" />
       </linearGradient>
     </defs>
     <g clip-path="url(#${options.cardId}-clip)">
@@ -534,6 +544,7 @@ function renderCard(options: CardOptions): string {
       ${gridLines}
       ${temperatureArea ? `<path d="${temperatureArea}" fill="url(#${options.cardId}-area)" />` : ''}
       ${setpointLine}
+      ${humidityArea ? `<path d="${humidityArea}" fill="url(#${options.cardId}-area-humidity)" />` : ''}
       ${humidityLines}
       ${temperatureLines}
       ${dots}

@@ -265,6 +265,38 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Chart-Höhe').disabled).toBe(true);
   });
 
+  it('offers a switch for each chart gradient', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const temperature = selectorByLabel(editor, 'Farbverlauf unter der Temperaturkurve');
+    const humidity = selectorByLabel(editor, 'Farbverlauf unter der Feuchtekurve');
+    expect(temperature.value).toBe(true);
+    expect(humidity.value).toBe(true);
+
+    temperature.emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_temperature_gradient).toBe(false);
+    // The other one stays untouched: two independent switches.
+    expect(emitted?.chart_humidity_gradient).toBeUndefined();
+
+    openAll(editor);
+    selectorByLabel(editor, 'Farbverlauf unter der Feuchtekurve').emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_humidity_gradient).toBe(false);
+  });
+
+  it('disables the gradient switches together with their series', async () => {
+    const editor = await mountEditor({ ...baseConfig, show_humidity_chart: false });
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Farbverlauf unter der Feuchtekurve').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Farbverlauf unter der Temperaturkurve').disabled).toBe(false);
+  });
+
   it('offers the data gap options and disables them in break mode', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

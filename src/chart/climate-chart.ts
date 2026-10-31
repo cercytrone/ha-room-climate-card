@@ -92,6 +92,8 @@ export class RoomClimateChart extends LitElement {
     maxGapMinutes: { attribute: false },
     gapStyle: { attribute: false },
     humidityLineStyle: { attribute: false },
+    showTemperatureArea: { attribute: false },
+    showHumidityArea: { attribute: false },
     cornerRadius: { attribute: false },
     language: { attribute: false },
     loading: { attribute: false },
@@ -236,6 +238,10 @@ export class RoomClimateChart extends LitElement {
   gapStyle: 'solid' | 'dashed' = 'solid';
   /** `dotted` renders the humidity curve as a row of dots. */
   humidityLineStyle: 'solid' | 'dotted' = 'solid';
+  /** Soft area under the temperature curve. */
+  showTemperatureArea = true;
+  /** Soft area under the humidity curve, kept inside its own band. */
+  showHumidityArea = true;
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 26;
   language = 'de';
@@ -434,6 +440,7 @@ export class RoomClimateChart extends LitElement {
     const smooth = this.curve === 'smooth';
     const prepare = (segments: SeriesSegment[]): SeriesSegment[] =>
       segments.map((segment) => {
+        // Short averaging window: no sawtooth, but real peaks survive.
         const averaged = smooth
           ? movingAverage(segment.samples, smoothingWindow(segment.samples.length))
           : segment.samples;
@@ -504,15 +511,31 @@ export class RoomClimateChart extends LitElement {
           seriesElement(segment, tempY!, this.accentColor, { color: this.accentColor })
         );
 
-    // A single, very restrained area fill – only under the accent series.
-    const mergedArea = (segmentsToDraw: SeriesSegment[], y: (value: number) => number): string =>
+    // Restrained area fills, one per series and each one inside its own band.
+    const mergedArea = (
+      segmentsToDraw: SeriesSegment[],
+      y: (value: number) => number,
+      base: number
+    ): string =>
       segmentsToDraw
         .filter((segment) => segment.samples.length > 1)
-        .map((segment) => areaPath(projectPoints(segment.samples, y), bottom, smooth))
+        .map((segment) => areaPath(projectPoints(segment.samples, y), base, smooth))
         .join(' ');
-    const tempAreaPath = tempY ? mergedArea(tempSegments, tempY) : '';
+    const tempAreaPath =
+      tempY && this.showTemperatureArea ? mergedArea(tempSegments, tempY, bottom) : '';
     const tempAreas = tempAreaPath
-      ? [svg`<path d=${tempAreaPath} style="fill:url(#${this.uid}-temp-fill)" />`]
+      ? [svg`<path class="series-area" d=${tempAreaPath} style="fill:url(#${this.uid}-temp-fill)" />`]
+      : [];
+    // The humidity fill stops at the bottom of its own band: it may never spill
+    // into the temperature half of the chart.
+    const humidityAreaPath =
+      humidityY && this.showHumidityArea
+        ? mergedArea(humiditySegments, humidityY, humidityBottom)
+        : '';
+    const humidityAreas = humidityAreaPath
+      ? [
+          svg`<path class="series-area" d=${humidityAreaPath} style="fill:url(#${this.uid}-humidity-fill)" />`,
+        ]
       : [];
 
     const humidityDotted = this.humidityLineStyle === 'dotted';
@@ -590,8 +613,14 @@ export class RoomClimateChart extends LitElement {
           <stop offset="0.55" stop-color=${this.accentColor} stop-opacity="0.08" />
           <stop offset="1" stop-color=${this.accentColor} stop-opacity="0" />
         </linearGradient>
+        <linearGradient id=${`${this.uid}-humidity-fill`} x1="0" y1=${humidityTop} x2="0" y2=${humidityBottom} gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color=${this.humidityColor} stop-opacity="0.2" />
+          <stop offset="0.6" stop-color=${this.humidityColor} stop-opacity="0.07" />
+          <stop offset="1" stop-color=${this.humidityColor} stop-opacity="0" />
+        </linearGradient>
       </defs>
       ${gridLines}
+      ${humidityAreas}
       ${tempAreas}
       ${showSetpoint
         ? svg`<line

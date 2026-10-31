@@ -417,13 +417,55 @@ describe('denoising', () => {
     expect(movingAverage(withNull, 3).map((s) => s.v)).toEqual([20, null, 24]);
   });
 
+  it('keeps the shape of the measurement with a short window', () => {
+    // Jitter on top of a real trend: the kind of data an HA sensor delivers.
+    const values = [
+      21.4, 21.8, 21.5, 22.1, 21.6, 22.4, 21.9, 22.6, 22.1, 21.7, 22.2, 21.8, 22.5, 21.9,
+      21.3, 21.7, 21.2, 21.6, 21.0, 20.8, 21.1, 20.7, 21.2, 20.9, 21.4, 21.8, 21.5,
+    ];
+    const input = series(values);
+    const directionChanges = (samples: ChartSample[]) => {
+      let flips = 0;
+      for (let i = 2; i < samples.length; i++) {
+        const before = Math.sign((samples[i - 1].v as number) - (samples[i - 2].v as number));
+        const after = Math.sign((samples[i].v as number) - (samples[i - 1].v as number));
+        if (before !== 0 && after !== 0 && before !== after) flips += 1;
+      }
+      return flips;
+    };
+    const amplitude = (samples: ChartSample[]) => {
+      const numbers = samples.map((sample) => sample.v as number);
+      return Math.max(...numbers) - Math.min(...numbers);
+    };
+
+    const raw = directionChanges(input);
+    const short = movingAverage(input, 3);
+    const long = movingAverage(input, 9);
+
+    // Short window: recognisably calmer than the raw signal…
+    expect(directionChanges(short)).toBeLessThan(raw / 2);
+    expect(directionChanges(short)).toBeGreaterThan(0);
+    // …but it keeps the amplitude of the measurement much better than the old
+    // 9-point window, which flattened the curve into a nearly straight line.
+    expect(amplitude(short)).toBeGreaterThan(amplitude(long));
+    expect(amplitude(short)).toBeLessThan(amplitude(input));
+    // And it stays within the measured range – no invented peak.
+    for (const sample of short) {
+      const value = sample.v as number;
+      expect(value).toBeGreaterThanOrEqual(Math.min(...values));
+      expect(value).toBeLessThanOrEqual(Math.max(...values));
+    }
+  });
+
   it('scales the window with the sample count and keeps it odd', () => {
     expect(smoothingWindow(3)).toBe(1);
     expect(smoothingWindow(10)).toBe(3);
-    expect(smoothingWindow(40)).toBe(5);
-    expect(smoothingWindow(100)).toBe(7);
-    expect(smoothingWindow(400)).toBe(9);
+    expect(smoothingWindow(40)).toBe(3);
+    expect(smoothingWindow(100)).toBe(5);
+    expect(smoothingWindow(400)).toBe(5);
+    // Never wider than five points: the old 7/9 windows ironed the curve flat.
     for (const count of [5, 20, 60, 160, 1000]) {
+      expect(smoothingWindow(count)).toBeLessThanOrEqual(5);
       expect(smoothingWindow(count) % 2).toBe(1);
     }
   });
