@@ -1057,22 +1057,31 @@ export class RoomClimateCard extends LitElement {
       flex: none;
       color: var(--rcc-tertiary);
     }
+    /*
+     * Icon height follows the capital letter of the title, not the line box.
+     * The capitals of the 15 px title are ~11 px; a 16 px icon box ends up at
+     * ~12.5–13 px of visible glyph (the paths do not fill their 24 px viewBox
+     * completely), so the icon overshoots by about a pixel top and bottom.
+     * 16 px also covers Material icons, which fill their viewBox more fully.
+     * It still fits the 20 px title line, so the header does not grow.
+     */
     .room-icon .icon {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
     }
     .room-icon ha-icon {
-      --mdc-icon-size: 14px;
+      --mdc-icon-size: 16px;
       color: var(--rcc-tertiary);
       display: inline-flex;
     }
+    /* The title is a caption, not a headline: same tone as the series labels. */
     .name {
       margin: 0;
       font-size: 15px;
       font-weight: 500;
       line-height: 20px;
       letter-spacing: -0.012em;
-      color: var(--rcc-text);
+      color: var(--rcc-muted);
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 2;

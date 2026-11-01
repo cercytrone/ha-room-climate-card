@@ -1319,6 +1319,29 @@ describe('room climate card', () => {
     expect(config.type).toBe('custom:room-climate-card');
   });
 
+  it('keeps the room icon on the height of the capital letter', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.room-icon')).not.toBeNull();
+    // 16 px box next to a 15 px title: the glyph ends up at the cap height,
+    // a pixel above and below it – two steps up from the old 14 px.
+    const css = String((card.constructor as unknown as { styles: { cssText: string } }).styles.cssText);
+    expect(css).toMatch(/\.room-icon ha-icon \{[^}]*--mdc-icon-size: 16px/);
+    expect(css).toMatch(/\.room-icon \.icon \{[^}]*width: 16px[^}]*height: 16px/);
+    // It still fits the 20 px title line, so the header does not move.
+    expect(css).toMatch(/\.name \{[^}]*line-height: 20px/);
+  });
+
+  it('draws the room name in the tone of the series captions', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const css = String((card.constructor as unknown as { styles: { cssText: string } }).styles.cssText);
+    // Name and caption share the same token, so a theme change cannot split them.
+    expect(css).toMatch(/\.name \{[^}]*color: var\(--rcc-muted\)/);
+    expect(css).toMatch(/\.series-label \{[^}]*color: var\(--rcc-muted\)/);
+    expect(q(card, '.series-label')).not.toBeNull();
+  });
+
   it('renders long room names without breaking the layout', async () => {
     const card = mount(
       { ...fullConfig, name: 'Wohnzimmer mit sehr langem Namen und Erker' },
