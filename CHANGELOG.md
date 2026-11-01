@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.7.1] – 2026-10-31
+
+### Geändert
+
+- **Raum-Icon größer.** Es stand mit 14 px deutlich unter der Kapitalhöhe des Raumnamens (rund
+  11 px bei 15 px Schrift). Jetzt sind es 16 px: Die Zeichen füllen ihre 24er-Zeichenfläche nicht
+  ganz, dadurch landet das sichtbare Icon bei etwa 12,5 px – also ungefähr auf Höhe des ersten
+  Buchstabens mit knapp einem Pixel Überstand nach oben und unten. Es passt weiterhin in die
+  20-px-Zeile, die Kopfzeile wächst also nicht und die Karte behält ihre Höhe.
+- **Raumname in der Farbe der Serien-Beschriftung.** Der Titel nutzt jetzt denselben Token
+  (`--rcc-muted`) wie „TEMPERATUR“ / „LUFTFEUCHTE“ statt der vollen Textfarbe – die Hierarchie
+  kommt damit aus Größe und Position, nicht aus Helligkeit.
+
 ## [2.7.0] – 2026-10-31
 
 ### Hinzugefügt

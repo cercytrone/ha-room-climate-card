@@ -98,7 +98,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.7.0`.
+  `ROOM-CLIMATE-CARD v2.7.1`.
 
 ---
 
@@ -569,7 +569,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 309 Tests in 12 Dateien aus (Stand 2.7.0):
+`npm test` führt 311 Tests in 12 Dateien aus (Stand 2.7.1):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

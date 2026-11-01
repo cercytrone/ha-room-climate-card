@@ -172,6 +172,12 @@ const windowIcon = {
   unknown: '<rect x="3.5" y="4" width="17" height="16" rx="2" stroke-dasharray="2 3" />',
 };
 
+const homeIcon =
+  '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1Z" />';
+
+/** Header icon box in px – mirrors `--mdc-icon-size` of the card. */
+const ROOM_ICON = 16;
+
 const motionIcon =
   '<circle cx="13" cy="4.4" r="1.9" /><path d="M10 21l2.6-5.6 3 1.9 2.2-4.6" /><path d="M7.4 13.4l3.4-2.7.9-3.4-3-1-2.8 3.6" />';
 
@@ -613,11 +619,26 @@ function renderCard(options: CardOptions): string {
         )
       : '';
 
+  /*
+   * Room icon: same box as the card (`--mdc-icon-size: 16px`). The paths do not
+   * fill the whole 24 px viewBox, so a 16 px box renders ~13 px of glyph –
+   * roughly the cap height of the title plus a pixel above and below.
+   */
+  const iconScale = ROOM_ICON / 24;
+  const capHeight = 0.729 * TYPE.title;
+  const titleBaseline = headerY + 19;
+  const iconTop =
+    titleBaseline - capHeight / 2 - (ROOM_ICON * (17 / 24)) / 2 - 4 * iconScale;
+  const roomIcon = `<g transform="translate(${left.toFixed(1)},${iconTop.toFixed(
+    1
+  )}) scale(${iconScale})" fill="none" stroke="${COLORS.tertiary}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${homeIcon}</g>`;
+
+  const titleX = left + ROOM_ICON + SPACE_1;
   // Inline after the title: a second header line would break the 4 px rhythm.
   const titleWidth = approxWidth(options.name, TYPE.title);
   const quietLabel = options.quiet
-    ? `<text x="${(left + titleWidth + SPACE_2 + 2).toFixed(1)}" y="${
-        headerY + 19 - 2
+    ? `<text x="${(titleX + titleWidth + SPACE_2 + 2).toFixed(1)}" y="${
+        titleBaseline - 2
       }" ${font(TYPE.label)} fill="${COLORS.tertiary}">${escapeXml(options.quiet)}</text>`
     : '';
 
@@ -651,10 +672,11 @@ function renderCard(options: CardOptions): string {
     }" rx="${RADIUS - 0.5}" fill="none" stroke="${COLORS.hairline}" />
 
     <g clip-path="url(#${options.cardId}-clip)">
-      <text x="${left}" y="${headerY + 19}" ${font(TYPE.title, 500)} ${TRACKING(
-        -0.012,
-        TYPE.title
-      )} fill="${COLORS.text}">${escapeXml(options.name)}</text>
+      ${roomIcon}
+      <text x="${titleX.toFixed(1)}" y="${titleBaseline}" ${font(
+        TYPE.title,
+        500
+      )} ${TRACKING(-0.012, TYPE.title)} fill="${COLORS.muted}">${escapeXml(options.name)}</text>
       ${quietLabel}
       ${temperatureLabel}
       ${humidityLabel}
