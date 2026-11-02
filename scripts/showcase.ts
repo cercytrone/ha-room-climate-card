@@ -1232,6 +1232,12 @@ export function renderEditor(palette: Palette): string {
         { label: 'Linienart Luftfeuchte', value: 'Durchgezogen', kind: 'select' },
         { label: 'Datenlücken', value: 'Kurze Ausfälle überbrücken', kind: 'select' },
         {
+          label: 'Soll-Linie im Verlauf',
+          kind: 'switch',
+          on: true,
+          helper: 'Gestrichelte Referenz auf die Solltemperatur samt Beschriftung.',
+        },
+        {
           label: 'Zeitangaben unter dem Verlauf',
           kind: 'switch',
           on: true,

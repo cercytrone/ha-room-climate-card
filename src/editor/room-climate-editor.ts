@@ -111,6 +111,8 @@ interface EditorText {
   grid: string;
   axis: string;
   axisHelper: string;
+  setpointLine: string;
+  setpointLineHelper: string;
   points: string;
   tooltip: string;
   extremes: string;
@@ -245,6 +247,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     bandTransitionHelper:
       '0 % = harte Stufen genau an den Grenzen, 100 % = die Farbe fließt über den ganzen Abstand zwischen zwei Grenzen. Dazwischen liegt jeder Zwischenwert.',
     grid: 'Gitternetz',
+    setpointLine: 'Soll-Linie im Verlauf',
+    setpointLineHelper:
+      'Die gestrichelte Referenz auf die Solltemperatur des Thermostats samt „Soll“-Beschriftung. Aus: der Verlauf zeigt nur die Messwerte, die Solltemperatur steht weiterhin in der Statuszeile.',
     axis: 'Zeitangaben unter dem Verlauf',
     axisHelper:
       'Die unterste Zeile mit Startzeit, Mitte und „Jetzt“. Ohne sie gehört der Platz den Kurven; die Zeit steht weiterhin im Tooltip und in der Beschreibung für Screenreader.',
@@ -368,6 +373,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     bandTransitionHelper:
       '0 % = hard steps exactly at the limits, 100 % = the colour flows across the whole gap between two limits. Anything in between is a valid setting.',
     grid: 'Grid lines',
+    setpointLine: 'Target line in the chart',
+    setpointLineHelper:
+      'The dashed reference at the thermostat’s target, including the “target” caption. Off: the chart shows only the measurements, the target temperature stays in the status row.',
     axis: 'Time labels below the chart',
     axisHelper:
       'The bottom row with the start time, the middle and “now”. Without it the space belongs to the curves; the time is still in the tooltip and in the screen-reader description.',
@@ -1286,6 +1294,13 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.grid,
         value: this.rawBoolean('chart_show_grid') ?? false,
         disabled: !anyChart,
+      })}
+      ${this.renderSwitch({
+        key: 'chart_show_setpoint',
+        label: t.setpointLine,
+        value: this.rawBoolean('chart_show_setpoint') ?? true,
+        disabled: !showTemperature,
+        helper: t.setpointLineHelper,
       })}
       ${this.renderSwitch({
         key: 'chart_show_axis',

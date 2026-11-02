@@ -968,6 +968,50 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelectorAll('.extreme-dot')).toHaveLength(4);
   });
 
+  it('prints one mark when the curve never moved instead of none', async () => {
+    // A well-regulated room: every reading is the same. Min and max are one value.
+    const chart = createChart({
+      temperature: samples([21.4, 21.4, 21.4, 21.4, 21.4]),
+    });
+    setSize(chart, 320, 130);
+    await chart.updateComplete;
+    const labels = [...chart.shadowRoot!.querySelectorAll('.extreme-label')].map((node) =>
+      node.textContent?.trim()
+    );
+    expect(labels).toEqual(['21,4']);
+    expect(chart.shadowRoot!.querySelectorAll('.extreme-dot')).toHaveLength(1);
+  });
+
+  it('draws the marks in small charts instead of dropping them', async () => {
+    const chart = createChart({
+      temperature: samples([19, 21, 23, 20]),
+      humidity: samples([44, 52, 47, 49]),
+      humidityDecimals: 0,
+    });
+    // 240 × 86: a compact card, both series – the bands are only ~15 px high.
+    setSize(chart, 240, 86);
+    await chart.updateComplete;
+    expect(chart.shadowRoot!.querySelectorAll('.extreme-dot').length).toBeGreaterThanOrEqual(2);
+    const labels = [...chart.shadowRoot!.querySelectorAll('.extreme-label')].map((node) =>
+      node.textContent?.trim()
+    );
+    expect(labels).toContain('23,0');
+  });
+
+  it('says why a mark is missing instead of staying silent', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      const chart = createChart({ temperature: samples([19, 21, 23, 20]) });
+      setSize(chart, 140, 130);
+      await chart.updateComplete;
+      expect(chart.shadowRoot!.querySelector('.extreme-dot')).toBeNull();
+      expect(info).toHaveBeenCalled();
+      expect(String(info.mock.calls[0][0])).toContain('ausgeblendet');
+    } finally {
+      info.mockRestore();
+    }
+  });
+
   it('leaves the extremes alone when they are switched off or space is tight', async () => {
     const off = createChart({
       temperature: samples([19, 21, 23, 20]),
@@ -977,10 +1021,40 @@ describe('climate chart', () => {
     await off.updateComplete;
     expect(off.shadowRoot!.querySelector('.extreme-label')).toBeNull();
 
+    // Narrower than the drawn minimum (150 px): no labels, and the reason is logged.
     const narrow = createChart({ temperature: samples([19, 21, 23, 20]) });
-    setSize(narrow, 180, 130);
+    setSize(narrow, 120, 130);
     await narrow.updateComplete;
     expect(narrow.shadowRoot!.querySelector('.extreme-label')).toBeNull();
+    // 180 px is fine now – the marks used to stop at 200 px.
+    const compact = createChart({ temperature: samples([19, 21, 23, 20]) });
+    setSize(compact, 180, 130);
+    await compact.updateComplete;
+    expect(compact.shadowRoot!.querySelectorAll('.extreme-label').length).toBeGreaterThan(0);
+  });
+
+  it('hides the target line and its caption on request', async () => {
+    const shown = createChart({ temperature: samples([19, 21, 23, 20]), setpoint: 22 });
+    setSize(shown, 320, 130);
+    await shown.updateComplete;
+    expect(shown.shadowRoot!.querySelector('.setpoint-line')).not.toBeNull();
+    expect(shown.shadowRoot!.querySelector('.setpoint-caption')).not.toBeNull();
+
+    document.body.replaceChildren();
+    const hidden = createChart({
+      temperature: samples([19, 21, 23, 20]),
+      setpoint: 22,
+      showSetpoint: false,
+    });
+    setSize(hidden, 320, 130);
+    await hidden.updateComplete;
+    expect(hidden.shadowRoot!.querySelector('.setpoint-line')).toBeNull();
+    expect(hidden.shadowRoot!.querySelector('.setpoint-caption')).toBeNull();
+    // The curves and the min/max marks stay untouched.
+    expect(hidden.shadowRoot!.querySelectorAll('.series-line').length).toBeGreaterThan(0);
+    expect(hidden.shadowRoot!.querySelectorAll('.extreme-label').length).toBeGreaterThan(0);
+    // Description and picture stay in sync: no line, no “target” in the spoken text.
+    expect(hidden.shadowRoot!.querySelector('svg')?.getAttribute('aria-label')).not.toContain('Soll');
   });
 
   it('speaks the measured range in the accessible description', async () => {
