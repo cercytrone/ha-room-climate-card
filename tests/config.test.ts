@@ -360,3 +360,103 @@ describe('resolveName', () => {
     expect(resolveName(normalizeConfig({}), undefined)).toBe('Raumklima');
   });
 });
+
+describe('curve opacity and temperature bands', () => {
+  it('defaults to full opacity and no bands – the accent stays the curve', () => {
+    const config = normalizeConfig({ temperature_entity: 'sensor.temp' });
+    expect(config.chart.opacity).toBe(1);
+    expect(config.chart.temperatureBands).toBe(false);
+    expect(config.chart.bandLimits).toEqual({ coldBelow: 18, warmAbove: 24, hotAbove: 27 });
+  });
+
+  it('turns a percentage into a factor and keeps it in range', () => {
+    expect(normalizeConfig({ chart_opacity: 45 }).chart.opacity).toBeCloseTo(0.45, 2);
+    expect(normalizeConfig({ chart_opacity: 1 }).chart.opacity).toBeCloseTo(0.15, 2);
+    expect(normalizeConfig({ chart_opacity: 500 }).chart.opacity).toBe(1);
+    expect(normalizeConfig({ chart_opacity: 'kaputt' }).chart.opacity).toBe(1);
+  });
+
+  it('sorts thresholds that were typed in the wrong order', () => {
+    const config = normalizeConfig({
+      chart_temperature_bands: true,
+      chart_band_cold_below: 27,
+      chart_band_warm_above: 24,
+      chart_band_hot_above: 18,
+    });
+    expect(config.chart.bandLimits).toEqual({ coldBelow: 18, warmAbove: 24, hotAbove: 27 });
+  });
+
+  it('accepts custom thresholds and clamps them to a usable range', () => {
+    const config = normalizeConfig({
+      chart_band_cold_below: 16.5,
+      chart_band_warm_above: 21,
+      chart_band_hot_above: 25,
+    });
+    expect(config.chart.bandLimits).toEqual({ coldBelow: 16.5, warmAbove: 21, hotAbove: 25 });
+    expect(normalizeConfig({ chart_band_hot_above: 999 }).chart.bandLimits.hotAbove).toBe(60);
+    expect(normalizeConfig({ chart_band_cold_below: -999 }).chart.bandLimits.coldBelow).toBe(-30);
+  });
+
+  it('only allows bands while the temperature curve is shown', () => {
+    const off = normalizeConfig({
+      chart_temperature_bands: true,
+      show_temperature_chart: false,
+      temperature_entity: 'sensor.temp',
+    });
+    expect(off.chart.temperatureBands).toBe(false);
+
+    const on = normalizeConfig({
+      chart_temperature_bands: true,
+      show_temperature_chart: true,
+      temperature_entity: 'sensor.temp',
+    });
+    expect(on.chart.temperatureBands).toBe(true);
+  });
+
+  it('knows the new keys and does not warn about them', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      resetUnknownKeyWarnings();
+      normalizeConfig({
+        chart_opacity: 60,
+        chart_temperature_bands: true,
+        chart_band_cold_below: 17,
+        chart_band_warm_above: 23,
+        chart_band_hot_above: 26,
+      });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe('area fill strength', () => {
+  it('defaults to the built-in gradient', () => {
+    const config = normalizeConfig({ temperature_entity: 'sensor.temp' });
+    expect(config.chart.temperatureAreaOpacity).toBe(1);
+    expect(config.chart.humidityAreaOpacity).toBe(1);
+  });
+
+  it('turns a percentage into a multiplier and keeps it in range', () => {
+    const config = normalizeConfig({
+      chart_temperature_area_opacity: 200,
+      chart_humidity_area_opacity: 50,
+    });
+    expect(config.chart.temperatureAreaOpacity).toBe(2);
+    expect(config.chart.humidityAreaOpacity).toBe(0.5);
+    expect(normalizeConfig({ chart_temperature_area_opacity: 1 }).chart.temperatureAreaOpacity).toBe(0.1);
+    expect(normalizeConfig({ chart_temperature_area_opacity: 999 }).chart.temperatureAreaOpacity).toBe(3);
+  });
+
+  it('knows the new keys and does not warn about them', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      resetUnknownKeyWarnings();
+      normalizeConfig({ chart_temperature_area_opacity: 150, chart_humidity_area_opacity: 80 });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

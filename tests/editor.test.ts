@@ -597,4 +597,111 @@ describe('room climate card editor', () => {
     expect(editor.shadowRoot!.querySelectorAll('.section').length).toBe(8);
     expect(editor.config.type).toBe('custom:room-climate-card');
   });
+  it('exposes the curve opacity as a percentage', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const opacity = selectorByLabel(editor, 'Deckkraft der Kurven');
+    expect(opacity.selector.number).toMatchObject({ min: 15, max: 100, step: 5 });
+    expect(opacity.value).toBe(100);
+
+    opacity.emit(60);
+    await editor.updateComplete;
+    expect(emitted?.chart_opacity).toBe(60);
+  });
+
+  it('keeps the band threshold fields disabled until the bands are on', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Kalt unter').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Warm ab').disabled).toBe(true);
+    expect(selectorByLabel(editor, 'Heiß ab').disabled).toBe(true);
+
+    selectorByLabel(
+      editor,
+      'Temperaturkurve nach Bereich einfärben (kalt / normal / warm / heiß)'
+    ).emit(true);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Kalt unter').disabled).toBe(false);
+    expect(selectorByLabel(editor, 'Kalt unter').value).toBe(18);
+    expect(selectorByLabel(editor, 'Warm ab').value).toBe(24);
+    expect(selectorByLabel(editor, 'Heiß ab').value).toBe(27);
+  });
+
+  it('writes the band thresholds as numbers and drops them back to the default', async () => {
+    const editor = await mountEditor({
+      ...baseConfig,
+      chart_temperature_bands: true,
+    });
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    selectorByLabel(editor, 'Warm ab').emit(21.5);
+    await editor.updateComplete;
+    expect(emitted?.chart_band_warm_above).toBe(21.5);
+    // The other thresholds are untouched.
+    expect(emitted?.chart_band_cold_below).toBeUndefined();
+
+    openAll(editor);
+    // Switching the bands off removes the switch value, so the default "off" applies.
+    selectorByLabel(
+      editor,
+      'Temperaturkurve nach Bereich einfärben (kalt / normal / warm / heiß)'
+    ).emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_temperature_bands).toBeUndefined();
+  });
+
+  it('disables the band fields when there is no temperature curve', async () => {
+    const editor = await mountEditor({
+      ...baseConfig,
+      show_temperature_chart: false,
+      chart_temperature_bands: true,
+    });
+    openAll(editor);
+    expect(
+      selectorByLabel(
+        editor,
+        'Temperaturkurve nach Bereich einfärben (kalt / normal / warm / heiß)'
+      ).disabled
+    ).toBe(true);
+    expect(selectorByLabel(editor, 'Kalt unter').disabled).toBe(true);
+  });
+
+  it('offers a strength field per area fill and follows its gradient switch', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const temperature = selectorByLabel(editor, 'Stärke des Flächenverlaufs (Temperatur)');
+    expect(temperature.selector.number).toMatchObject({ min: 10, max: 300, step: 10 });
+    expect(temperature.value).toBe(100);
+    expect(temperature.disabled).toBe(false);
+
+    temperature.emit(200);
+    await editor.updateComplete;
+    expect(emitted?.chart_temperature_area_opacity).toBe(200);
+    // The other fill keeps its own strength.
+    expect(emitted?.chart_humidity_area_opacity).toBeUndefined();
+
+    openAll(editor);
+    selectorByLabel(editor, 'Farbverlauf unter der Temperaturkurve').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Stärke des Flächenverlaufs (Temperatur)').disabled).toBe(true);
+    // The humidity field is independent and stays usable.
+    expect(selectorByLabel(editor, 'Stärke des Flächenverlaufs (Luftfeuchte)').disabled).toBe(false);
+  });
+
 });

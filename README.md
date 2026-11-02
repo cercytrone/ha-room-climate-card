@@ -10,10 +10,11 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 
 ![Vorschau der Karte](docs/images/showcase.png)
 
-> Das Bild oben ist eine **Design-Vorschau**, gerendert aus dem Chart-Modul der Karte mit
-> **simulierten Demo-Messwerten** (`dev/`, `scripts/showcase.ts`). Es sind keine Live-Daten.
-> Nach der Installation in Home Assistant zeigt die Karte ausschließlich echte Entitäts- und
-> Historienwerte.
+> Alle Bilder in dieser README sind **Design-Vorschauen**, gerendert mit
+> **simulierten Demo-Messwerten** (`scripts/showcase.ts`, `npm run showcase`) – keine
+> Screenshots einer Installation und keine Live-Daten. Die Editor-Abbildung ist ein Nachbau der
+> Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert.
+> Nach der Installation zeigt die Karte ausschließlich echte Entitäts- und Historienwerte.
 
 ---
 
@@ -29,7 +30,9 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 - [Optik](#optik)
 - [Visueller Editor](#visueller-editor)
 - [Verlaufs-Chart](#verlaufs-chart)
+- [Farbbereiche & Deckkraft](#farbbereiche--deckkraft)
 - [Kartenhöhe & responsive Darstellung](#kartenhöhe--responsive-darstellung)
+- [Auf Tablets & schlanken Geräten](#auf-tablets--schlanken-geräten)
 - [Heizstatus: was die Karte wirklich anzeigt](#heizstatus-was-die-karte-wirklich-anzeigt)
 - [Barrierefreiheit](#barrierefreiheit)
 - [Fehlerbehebung](#fehlerbehebung)
@@ -51,7 +54,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, weiche Übergänge) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -98,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.7.1`.
+  `ROOM-CLIMATE-CARD v2.8.0`.
 
 ---
 
@@ -269,14 +272,23 @@ Tastatur-Pendant wäre eine Falle.
 | `chart_gap_style` | `solid` \| `dashed` | `solid` | Überbrückte Abschnitte wie gemessene zeichnen oder gestrichelt markieren. |
 | `chart_temperature_gradient` | boolean | `true` | Sanfter Farbverlauf unter der Temperaturkurve. Aus = nur die Linie. |
 | `chart_humidity_gradient` | boolean | `true` | Sanfter Farbverlauf unter der Feuchtekurve, begrenzt auf deren eigenes Band. Aus = nur die Linie. |
+| `chart_temperature_area_opacity` | number | `100` | Stärke des Flächenverlaufs unter der Temperaturkurve in Prozent (10–300). 100 % ist der eingebaute Verlauf, höhere Werte machen die Fläche kräftiger. |
+| `chart_humidity_area_opacity` | number | `100` | Dasselbe für den Flächenverlauf unter der Feuchtekurve (10–300), unabhängig von der Temperatur. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
 | `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
 | `chart_show_extremes` | boolean | `true` | Minimum und Maximum der sichtbaren Kurven als dezente Zahlen neben der Kurve. |
+| `chart_opacity` | number | `100` | Deckkraft der Kurven in Prozent (15–100). Gilt für Linien, Flächen und Datenpunkte; darunter tritt der Verlauf ruhiger hinter die Messwerte zurück. |
+| `chart_temperature_bands` | boolean | `false` | Temperaturkurve nach Bereich einfärben: kalt / normal / warm / heiß, als ein weicher Verlauf. |
+| `chart_band_cold_below` | number | `18` | Grenze „kalt“ in °C. Darunter blau. |
+| `chart_band_warm_above` | number | `24` | Grenze „warm“ in °C. Darüber amber. |
+| `chart_band_hot_above` | number | `27` | Grenze „heiß“ in °C. Darüber das gedämpfte Rot der Flamme. |
 
 ---
 
 ## Visueller Editor
+
+![Der visuelle Editor mit Live-Vorschau](docs/images/editor.png)
 
 Der Editor ist in acht Abschnitte gegliedert und nutzt ausschließlich native
 Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zustand):
@@ -290,7 +302,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, **Tippen auf die Karte** (Thermostat-Dialog öffnen / nichts), Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -325,7 +337,13 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 - **Reduzierte Achse:** eine Haarlinie als Basis, drei Labels in 10,5 px bei 32 % Deckkraft –
   „Sa 05:40 · So 05:40 · Jetzt“.
 - **Hell und dunkel:** beide Varianten sind vollständig ausgestaltet und respektieren
-  `theme: auto` (HA-Theme).
+  `theme: auto` (HA-Theme). Die Akzentfarben bleiben in beiden Themes identisch – das
+  Erscheinungsbild ändert sich, die Bedeutung der Farben nicht.
+
+**Helle Darstellung (tagsüber):** weißes Blatt mit sehr weichem Verlauf statt Tiefschwarz,
+dieselbe Haarlinie, dieselben Akzente:
+
+![Helle Darstellung der Karte](docs/images/showcase-light.png)
 
 Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variablen
 (`--ha-card-background`, `--primary-text-color`, `--divider-color`) überschreiben.
@@ -449,6 +467,56 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 
 ---
 
+### Farbbereiche & Deckkraft
+
+Die Temperaturkurve trägt standardmäßig **eine** Farbe: den Akzent. Auf Wunsch
+(`chart_temperature_bands: true`, im Editor unter *Verlauf*) bekommt sie stattdessen einen
+**weichen, durchgehenden Farbverlauf nach Messwert**:
+
+![Temperaturkurve mit Farbbereichen, links volle Deckkraft, rechts 55 %](docs/images/showcase-bands.png)
+
+| Bereich | Farbe | Standardgrenze |
+| --- | --- | --- |
+| **kalt** | gedämpftes Blau `#7FA6D9` | unter 18 °C |
+| **normal** | der Akzent (Mint) der Karte | 18 – 24 °C |
+| **warm** | das Amber des Fenster-Badges `#EFB35F` | 24 – 27 °C |
+| **heiß** | das gedämpfte Rot der Flamme `#D16A62` | ab 27 °C |
+
+- **Ein Verlauf, keine Blöcke.** Die Farben liegen als senkrechter Verlauf über der ganzen
+  Temperaturfläche. Jeder Punkt der Kurve nimmt automatisch die Farbe seines eigenen Werts an;
+  zwischen den Bereichen rampt es über wenige Zehntel Grad, statt hart umzuschalten. Die Kurve
+  bleibt dabei **ein** SVG-Pfad – keine zusätzlichen Knoten, kein Sprung bei Aktualisierungen.
+- **Keine neuen Farben.** Blau, Amber und Rot sind bereits im Kartenbild vorhanden (Akzent,
+  Fenster-Badge, Flamme) – es kommt nur eine ruhige Blau-Nuance hinzu, die so leise ist wie das
+  Indigo der Feuchte.
+- **Grenzen frei wählbar.** `chart_band_cold_below`, `chart_band_warm_above` und
+  `chart_band_hot_above` (Editor: *Kalt unter*, *Warm ab*, *Heiß ab*). Wer die Werte vertauscht,
+  bekommt sie sortiert – die Reihenfolge kalt → normal → warm → heiß bleibt immer erhalten, und
+  eng gesetzte Grenzen werden auf mindestens 1 °C auseinandergezogen.
+- **Fahrenheit-Sensoren.** Die Grenzen sind in °C angegeben und werden für einen Sensor in °F
+  automatisch umgerechnet (18 °C → 64,4 °F), damit der Verlauf zur gezeichneten Kurve passt.
+- **Zugänglich.** Ein Farbverlauf allein sagt einem Screenreader nichts; deshalb steht der
+  Bereich in der Beschreibung des Charts: „Temperatur 16,9–28,9 °C (kalt – heiß)“.
+- **Ausschalten** entfernt den Verlauf vollständig: die Kurve ist wieder einfarbig im Akzent.
+
+**Deckkraft.** `chart_opacity` (Editor: *Deckkraft der Kurven*, 15–100 %) skaliert Linien,
+Flächen, Endpunkte und Datenpunkte gemeinsam. Die Flächenverläufe behalten dabei ihre relative
+Abstufung: 100 % ist der volle Auftritt, 60 % lässt den Verlauf ruhig hinter Messwert und
+Soll-Linie zurücktreten. Gitter, Achse und Soll-Linie bleiben unverändert – sie sind Orientierung,
+kein Datum.
+
+**Stärke der Flächenverläufe.** Die beiden Flächen lassen sich zusätzlich einzeln nachjustieren –
+`chart_temperature_area_opacity` und `chart_humidity_area_opacity` (Editor: *Stärke des
+Flächenverlaufs (Temperatur)* / *(Luftfeuchte)*, 10–300 %). 100 % ist genau der eingebaute
+Verlauf; 180–250 % machen die Fläche deutlich präsenter, 30 % lassen sie fast verschwinden.
+Die beiden Regler sind voneinander unabhängig, wirken aber **zusätzlich** zur Deckkraft der
+Kurven (Faktor × Faktor) – wer nur die Fläche kräftiger will, lässt die Kurven bei 100 %.
+Die Fläche bleibt dabei immer ein Hintergrund: der oberste Stop wird bei voller Deckung
+gekappt, damit aus dem Verlauf nie ein Farbblock wird. Ist der Farbverlauf einer Kurve
+abgeschaltet, ist auch ihr Stärke-Regler deaktiviert.
+
+---
+
 ## Kartenhöhe & responsive Darstellung
 
 - `height: auto` (Standard): Die Karte wächst mit ihrem Inhalt; `chart_height` bestimmt die
@@ -461,6 +529,60 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   - darüber voll.
 - `getGridOptions()` liefert sinnvolle Werte für das Sections-Layout (6 Spalten,
   Mindestbreite 4, Höhe abhängig von der Konfiguration).
+
+---
+
+## Auf Tablets & schlanken Geräten
+
+Gedacht ist die Karte unter anderem für ein **Fire HD 10 Plus mit Fully Kiosk Browser**, auf
+dem acht Karten gleichzeitig laufen. Die folgenden Werte sind **gemessen**, nicht geschätzt
+(Stand 2.7.2): Skriptzeit und DOM in `jsdom`, Speicher mit `process.memoryUsage()` nach
+erzwungener Speicherbereinigung. Ein Fire HD liegt bei Rechenleistung und Speicher deutlich
+unter einem Entwicklungsrechner – die **Größenordnungen** gelten, die Millisekunden nicht.
+Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich **nicht**.
+
+| Größe | Messwert | Bedeutung bei acht Karten |
+| --- | --- | --- |
+| Bundle | 164,1 kB, **46,3 kB gzip** | einmal geladen, nicht pro Karte |
+| DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
+| SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
+| Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
+| gespeicherte Messwerte | 80 Byte je Punkt – ~225 kB (6 h, 720 Punkte), höchstens ~375 kB je Karte | **2–3 MB für acht Karten** |
+| Neuzeichnen des Charts | ~7 ms Skriptzeit je Chart | bei einer Aktualisierung alle 5 Minuten nicht spürbar |
+| `hass`-Update ohne Wertänderung | **0,4 ms** für alle acht | die Karte rendert nur bei ihren eigenen Entitäten neu |
+| History-Anfragen beim Aufbau | **8** (jede Karte cacht für sich) | die sichtbare Wartezeit beim Öffnen |
+| laufende Timer | 1 × 5 Min. je Karte, optional 1 × 30 Sek. | 8–16 Intervalle, vernachlässigbar |
+
+### Was das im Alltag heißt
+
+- **Acht Karten sind kein Problem.** Wenige Megabyte Daten, ein paar Tausend DOM-Knoten und
+  Millisekunden Rechenzeit pro Aktualisierung. Der Fully-Kiosk-WebView mit dem
+  Home-Assistant-Frontend belegt ein Vielfaches davon.
+- **Der spürbare Moment ist der Aufbau.** Alle acht Karten fragen gleichzeitig Historie an.
+  Auf einem schwachen Home-Assistant-Server (Raspberry Pi, SD-Karte, große
+  Recorder-Datenbank) erscheint das Dashboard sofort, die Kurven aber zwei bis fünf Sekunden
+  später. Danach ist Ruhe.
+- **Unsichtbare Karten fragen nicht.** Ein `IntersectionObserver` hält das Polling an, solange
+  die Karte nicht im Sichtfeld ist; beim Zurückscrollen wird einmal nachgeladen.
+- **Der größere Hebel liegt außerhalb der Karte:** ein über Wochen gewachsener WebView-Speicher
+  und ein alter WebView machen mehr aus als alle acht Karten zusammen.
+
+### Empfehlungen
+
+1. **`chart_hours: 6`** (Standard) beibehalten. `24` und `168` bringen ein Vielfaches an
+   Messwerten für keinen sichtbaren Gewinn – gezeichnet werden ohnehin höchstens 1 200 Punkte.
+2. **`chart_show_points: false`** lassen (Standard). Datenpunkte verdoppeln die SVG-Knoten je
+   Chart.
+3. **Fully Kiosk:** „Reload on Screen On“ oder ein nächtliches Neuladen einschalten – der
+   wirksamste Schutz gegen einen fett gewordenen WebView, unabhängig von dieser Karte.
+4. **Android System WebView aktuell halten** (Amazon App Store). Das Bundle zielt auf ES2022,
+   die Karte nutzt aber keine der ganz neuen Laufzeit-APIs (`Object.hasOwn`, `.at()`,
+   `structuredClone` kommen nicht vor). Ein zwei Jahre alter WebView ist das größere Risiko.
+5. **Bewegungs-Timer bewusst einsetzen:** Mit `motion` und „Ruhe-Dauer anzeigen“ wacht jede
+   Karte alle 30 Sekunden auf. Für die CPU unkritisch – es verhindert nur, dass der WebView
+   zur Ruhe kommt. Auf einem dauerhaft sichtbaren Dashboard ist genau das gewollt.
+6. **Nicht nötig:** Karten virtualisieren, Charts abschalten, Historie kürzen. Offscreen
+   pausiert die Karte bereits selbst, und die Punktzahl ist gedeckelt.
 
 ---
 
@@ -557,7 +679,7 @@ npm run dev        # Entwicklungsumgebung mit simulierten Testdaten (http://loca
 npm run typecheck  # TypeScript
 npm test           # Vitest (jsdom)
 npm run build      # erzeugt dist/ha-room-climate-card.js (+ Sourcemap)
-npm run showcase   # rendert docs/images/showcase.{svg,png} neu
+npm run showcase   # rendert showcase.{svg,png} (dunkel), showcase-light.* und editor.*
 ```
 
 Die Entwicklungsumgebung in `dev/` ist ein reiner Mock: `dev/mock-hass.ts` erzeugt
@@ -569,7 +691,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 311 Tests in 12 Dateien aus (Stand 2.7.1):
+`npm test` führt 349 Tests in 13 Dateien aus (Stand 2.8.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
@@ -577,7 +699,8 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung mit erhaltenem Minimum/Maximum, Suche nach dem nächsten Messwert (lückenüberspringend), Reihen-Extrema |
-| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert und Messbereich im `aria-label`, Punkte, Gitter, Wertanzeige auf den echten Messwerten, Verhalten bei Berührung, Min/Max-Marken |
+| `tests/bands.test.ts` | Sortieren und Auseinanderziehen der Bereichsgrenzen, Farbwahl je Wert, Gradientverlauf (Reihenfolge, Abdeckung aller Stufen, schmale Übergänge), Randfälle ohne Spannweite |
+| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert und Messbereich im `aria-label`, Punkte, Gitter, Wertanzeige auf den echten Messwerten, Verhalten bei Berührung, Min/Max-Marken, einfarbige vs. bereichsgefärbte Kurve, Deckkraft für Linie/Fläche/Punkt, Stärke je Fläche (und ihre Multiplikation mit der Deckkraft), Bereichsnamen im `aria-label` |
 | `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, gemerkte Serien-Auswahl, Sollwert-Umrechnung, Einheiten und Nachkommastellen für die Wertanzeige, Öffnen des Thermostat-Dialogs (Tippen, Tastatur, abschaltbar) |
 | `tests/editor.test.ts` | Abschnitte, Selektoren (inkl. Linienart Feuchte), Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
@@ -608,7 +731,7 @@ src/
   utils/format.ts          Zahlen-/Zeitformatierung, Farb-Helfer
 dev/                       Entwicklungsumgebung mit MOCK-Daten (nicht im Bundle)
 tests/                     Vitest-Tests
-scripts/                   Showcase-Renderer (SVG/PNG für die README)
+scripts/                   Showcase-Renderer (drei SVG/PNG-Paare für die README)
 dist/                      Gebautes Bundle (HACS-Download)
 ```
 
@@ -631,7 +754,8 @@ dist/                      Gebautes Bundle (HACS-Download)
   Badge, ohne ihn in den Verlauf zu zeichnen.
 - HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
   `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
-- Die README-Vorschau ist gerendert (Demo-Daten), kein Screenshot einer echten Installation.
+- Die README-Bilder sind gerendert (Demo-Daten), keine Screenshots einer echten Installation;
+  die Editor-Abbildung ist ein Nachbau der Oberfläche.
 
 ---
 

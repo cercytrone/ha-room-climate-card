@@ -95,6 +95,17 @@ interface EditorText {
   temperatureGradient: string;
   humidityGradient: string;
   gradientHelper: string;
+  chartOpacity: string;
+  chartOpacityHelper: string;
+  temperatureAreaOpacity: string;
+  humidityAreaOpacity: string;
+  areaOpacityHelper: string;
+  temperatureBands: string;
+  temperatureBandsHelper: string;
+  bandCold: string;
+  bandWarm: string;
+  bandHot: string;
+  bandHelper: string;
   grid: string;
   points: string;
   tooltip: string;
@@ -211,6 +222,21 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityGradient: 'Farbverlauf unter der Feuchtekurve',
     gradientHelper:
       'Der dezente Flächenverlauf unter der Kurve. Aus bleibt die Kurve allein stehen – ideal für sehr flache Karten.',
+    temperatureAreaOpacity: 'Stärke des Flächenverlaufs (Temperatur)',
+    humidityAreaOpacity: 'Stärke des Flächenverlaufs (Luftfeuchte)',
+    areaOpacityHelper:
+      '100 % ist der eingebaute Verlauf. Höhere Werte machen die Fläche unter der Kurve kräftiger (bis 300 %), niedrigere lassen sie fast verschwinden. Die Deckkraft der Kurven wirkt zusätzlich.',
+    chartOpacity: 'Deckkraft der Kurven',
+    chartOpacityHelper:
+      'Gilt für Linien, Flächen und Datenpunkte. 100 % ist die volle Darstellung; darunter tritt der Verlauf ruhiger hinter die Messwerte zurück.',
+    temperatureBands: 'Temperaturkurve nach Bereich einfärben (kalt / normal / warm / heiß)',
+    temperatureBandsHelper:
+      'Die Kurve bekommt einen sehr weichen Farbverlauf: Blau unter „kalt“, Mint im Normalbereich, Amber ab „warm“, das gedämpfte Rot ab „heiß“. Die Übergänge sind fließend, keine harten Kanten.',
+    bandCold: 'Kalt unter',
+    bandWarm: 'Warm ab',
+    bandHot: 'Heiß ab',
+    bandHelper:
+      'Grenzen in °C. Sie werden automatisch sortiert, falls „warm“ unter „kalt“ liegt – die Reihenfolge kalt → normal → warm → heiß bleibt immer erhalten.',
     grid: 'Gitternetz',
     points: 'Datenpunkte',
     tooltip: 'Werte beim Überfahren',
@@ -313,6 +339,21 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityGradient: 'Gradient under the humidity curve',
     gradientHelper:
       'The soft area fill below the curve. Off leaves the line on its own – useful for very flat cards.',
+    temperatureAreaOpacity: 'Area fill strength (temperature)',
+    humidityAreaOpacity: 'Area fill strength (humidity)',
+    areaOpacityHelper:
+      '100 % is the built-in gradient. Higher values make the area under the curve stronger (up to 300 %), lower ones let it almost vanish. The curve opacity applies on top.',
+    chartOpacity: 'Curve opacity',
+    chartOpacityHelper:
+      'Applies to lines, areas and data points. 100 % is the full rendering; below that the history steps back behind the readings.',
+    temperatureBands: 'Colour the temperature curve by band (cold / normal / warm / hot)',
+    temperatureBandsHelper:
+      'Adds a very soft gradient: blue below “cold”, mint in the normal range, amber from “warm” and the damped red from “hot”. Transitions are continuous, never hard edges.',
+    bandCold: 'Cold below',
+    bandWarm: 'Warm from',
+    bandHot: 'Hot from',
+    bandHelper:
+      'Limits in °C. They are sorted automatically if “warm” sits below “cold” – the order cold → normal → warm → hot is always kept.',
     grid: 'Grid lines',
     points: 'Data points',
     tooltip: 'Values on hover',
@@ -639,6 +680,15 @@ export class RoomClimateCardEditor extends LitElement {
         }
       },
     });
+  }
+
+  /** The area strength only means something while its fill is switched on. */
+  private temperatureGradientOn(): boolean {
+    return this.rawBoolean('chart_temperature_gradient') ?? true;
+  }
+
+  private humidityGradientOn(): boolean {
+    return this.rawBoolean('chart_humidity_gradient') ?? true;
   }
 
   private renderSection(id: SectionId, title: string, content: TemplateResult): TemplateResult {
@@ -986,6 +1036,9 @@ export class RoomClimateCardEditor extends LitElement {
     const showTemperature = this.showFlag('show_temperature_chart', 'temperature_entity');
     const showHumidity = this.showFlag('show_humidity_chart', 'humidity_entity');
     const anyChart = showTemperature || showHumidity;
+    // The band thresholds only mean something while the bands are switched on.
+    const bandsOn =
+      showTemperature && (this.rawBoolean('chart_temperature_bands') ?? false);
     const hourOptions = [3, 6, 12, 24, 48].map((hours) => ({ value: String(hours), label: `${hours} h` }));
     return html`${this.renderSwitch({
         key: 'show_temperature_chart',
@@ -1066,6 +1119,78 @@ export class RoomClimateCardEditor extends LitElement {
         value: this.rawBoolean('chart_humidity_gradient') ?? true,
         disabled: !showHumidity,
         helper: t.gradientHelper,
+      })}
+      ${this.renderNumber({
+        key: 'chart_temperature_area_opacity',
+        label: t.temperatureAreaOpacity,
+        min: 10,
+        max: 300,
+        step: 10,
+        unit: '%',
+        fallback: 100,
+        disabled: !showTemperature || !this.temperatureGradientOn(),
+        helper: t.areaOpacityHelper,
+      })}
+      ${this.renderNumber({
+        key: 'chart_humidity_area_opacity',
+        label: t.humidityAreaOpacity,
+        min: 10,
+        max: 300,
+        step: 10,
+        unit: '%',
+        fallback: 100,
+        disabled: !showHumidity || !this.humidityGradientOn(),
+      })}
+      ${this.renderNumber({
+        key: 'chart_opacity',
+        label: t.chartOpacity,
+        min: 15,
+        max: 100,
+        step: 5,
+        unit: '%',
+        fallback: 100,
+        disabled: !anyChart,
+        helper: t.chartOpacityHelper,
+      })}
+      ${this.renderSwitch({
+        key: 'chart_temperature_bands',
+        label: t.temperatureBands,
+        value: this.rawBoolean('chart_temperature_bands') ?? false,
+        disabled: !showTemperature,
+        helper: t.temperatureBandsHelper,
+        onChange: (value) =>
+          this.patch({ chart_temperature_bands: value ? true : undefined }),
+      })}
+      ${this.renderNumber({
+        key: 'chart_band_cold_below',
+        label: t.bandCold,
+        min: -30,
+        max: 60,
+        step: 0.5,
+        unit: '°C',
+        fallback: 18,
+        disabled: !showTemperature || !bandsOn,
+      })}
+      ${this.renderNumber({
+        key: 'chart_band_warm_above',
+        label: t.bandWarm,
+        min: -30,
+        max: 60,
+        step: 0.5,
+        unit: '°C',
+        fallback: 24,
+        disabled: !showTemperature || !bandsOn,
+      })}
+      ${this.renderNumber({
+        key: 'chart_band_hot_above',
+        label: t.bandHot,
+        min: -30,
+        max: 60,
+        step: 0.5,
+        unit: '°C',
+        fallback: 27,
+        disabled: !showTemperature || !bandsOn,
+        helper: t.bandHelper,
       })}
       ${this.renderField({
         key: 'chart_humidity_line_style',
