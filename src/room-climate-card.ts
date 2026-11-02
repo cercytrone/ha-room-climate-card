@@ -6,6 +6,7 @@ import {
   EDITOR_TAG,
 } from './const';
 import {
+  chartSlotMargin,
   configEntityIds,
   hasChart,
   hasStatusRow,
@@ -905,11 +906,16 @@ export class RoomClimateCard extends LitElement {
 
     // With the readout switched off the chart area belongs to the card tap.
     const chartTappable = Boolean(this.tapTarget) && !config.chart.showTooltip;
+    /*
+     * The chart's horizontal extent is a number, not a CSS trick: full bleed
+     * cancels the inset, otherwise the chart shares the text edge. Written as an
+     * inline style so the value can be asserted (jsdom has no layout engine).
+     */
+    const chartMargin = chartSlotMargin(config);
 
     return html`<div
-      class="chart-slot ${chartTappable ? 'is-tappable' : ''} ${config.chart.fullBleed
-        ? 'is-full-bleed'
-        : ''}"
+      class="chart-slot ${chartTappable ? 'is-tappable' : ''}"
+      style="margin-left:${chartMargin}px;margin-right:${chartMargin}px"
     >
       <room-climate-chart
         .temperature=${temperatureSamples}
@@ -1350,17 +1356,6 @@ export class RoomClimateCard extends LitElement {
       flex-direction: column;
       margin-top: var(--rcc-space-3);
       min-height: 0;
-    }
-    /*
-     * Full bleed (default): the chart cancels the card inset horizontally, so
-     * the curves and their area fills touch the outer edge instead of ending in
-     * a gutter. Only the (textual) axis row keeps its distance, and the card's
-     * overflow:hidden clips the corners. Switched off, the chart shares the
-     * text edge.
-     */
-    .chart-slot.is-full-bleed {
-      margin-left: calc(var(--rcc-inset, 10px) * -1);
-      margin-right: calc(var(--rcc-inset, 10px) * -1);
     }
     .chart-slot > room-climate-chart {
       flex: 1 1 auto;

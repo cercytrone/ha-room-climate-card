@@ -4,6 +4,27 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.16.1] – 2026-11-02
+
+### Intern
+
+- **Die Breite des bündigen Charts ist jetzt eine prüfbare Zahl statt einer CSS-Regel:**
+  `chartSlotMargin()` in `src/config.ts` liefert `-card_padding` (bündig) oder `0` (im Text), die
+  Karte schreibt den Wert als Inline-Rand auf den Chart-Slot. Damit lässt sich die Geometrie ohne
+  Layout-Engine nachrechnen: bündig = Kartenbreite − 2 px Haarlinie, nicht bündig = Breite des
+  Textblocks. Die CSS-Regel `.chart-slot.is-full-bleed` ist entfallen.
+- **Test für den Abstand nach unten mit Zeitangabe:** Achsen-Baseline liegt 6 px über der
+  Chart-Unterkante, die Unterlängen der 10,5-px-Schrift bleiben im Kasten, die Zeitzeile sitzt
+  unterhalb der Plotfläche (Plot endet 20 px über der Kante). Ohne Zeitangabe bekommt die
+  Plotfläche diese 20 px zurück (Unterkante 2 px).
+
+### Geprüft (Zahlen, Standard-Innenabstand 10 px)
+
+- Abstand Kurvenende → Kartenunterkante: **2 px** (Chart) + 10 px (Innenabstand) = 12 px.
+- Abstand Achsen-Baseline → Kartenunterkante: **6 px** + 10 px = **16 px**, tiefster
+  Schriftpunkt ≈ **13,7 px**.
+- Bei `card_padding: 0` bleiben davon 6 px bzw. 3,7 px – deshalb warnt der Editor unter 8 px.
+
 ## [2.16.0] – 2026-11-02
 
 ### Hinzugefügt

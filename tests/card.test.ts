@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../src/main';
 import type { RoomClimateCard } from '../src/room-climate-card';
+import { chartSlotMargin, normalizeConfig } from '../src/config';
 import type { RoomClimateCardConfig } from '../src/config';
 import type { HomeAssistant } from '../src/types';
 import { createHass, entity, flush, resizeTo, setVisible, type EntityInit } from './helpers';
@@ -547,10 +548,8 @@ describe('room climate card', () => {
     // One inset for the text; adjustable, default 10 px.
     expect(styleText).toMatch(/\.card\s*\{[^}]*padding:\s*var\(--rcc-inset,\s*10px\)/);
     expect(styleText).toMatch(/--rcc-inset:\s*10px/);
-    // The chart cancels that inset horizontally while full bleed is on.
-    expect(styleText).toMatch(
-      /\.chart-slot\.is-full-bleed\s*\{[^}]*margin-left:\s*calc\(var\(--rcc-inset[^;]*;\s*margin-right:\s*calc\(var\(--rcc-inset/
-    );
+    // The chart's horizontal extent is an inline number, not a CSS rule.
+    expect(styleText).not.toMatch(/\.chart-slot[^{]*\{[^}]*margin-left:/);
     // Every gap and margin is a multiple of 4 px – except the inset itself,
     // which the user may set to any pixel value between 0 and 32.
     const lengths = Array.from(
@@ -598,17 +597,50 @@ describe('room climate card', () => {
     expect((q(flush, '.card') as HTMLElement).getAttribute('style')).toContain('--rcc-inset:0px');
   });
 
-  it('puts the chart on the card edge only while full bleed is on', async () => {
-    const card = mount(fullConfig, createHass({ states: baseStates() }));
-    await card.updateComplete;
-    expect(q(card, '.chart-slot')?.classList.contains('is-full-bleed')).toBe(true);
+  it('gives the chart the card edge with full bleed and the text edge without', async () => {
+    /*
+     * jsdom has no layout engine, so the box model is asserted the honest way:
+     * the card writes the horizontal margin as a number onto the slot, and the
+     * resulting width is arithmetic on the known card width (1 px hairline on
+     * each side plus the inset on each side).
+     */
+    const cardWidth = 400;
+    const widthOf = (padding: number, fullBleed: boolean): { slot: number; text: number; margin: number } => {
+      const config = normalizeConfig({
+        ...fullConfig,
+        card_padding: padding,
+        chart_full_bleed: fullBleed,
+      });
+      const margin = chartSlotMargin(config);
+      // Text block = card minus the 1 px hairline on both sides and the inset.
+      const text = cardWidth - 2 - 2 * padding;
+      // A negative horizontal margin grows the slot out of the padding box.
+      return { slot: text - 2 * margin, text, margin };
+    };
+
+    // Full bleed: the slot fills the card inside the hairline, corners clipped.
+    expect(widthOf(10, true)).toEqual({ slot: cardWidth - 2, text: cardWidth - 22, margin: -10 });
+    expect(widthOf(24, true).slot).toBe(cardWidth - 2);
+    expect(widthOf(0, true).slot).toBe(cardWidth - 2);
+    // Contained: exactly as wide as the text block (title, readings, row).
+    expect(widthOf(10, false)).toEqual({ slot: cardWidth - 22, text: cardWidth - 22, margin: 0 });
+    expect(widthOf(24, false).slot).toBe(cardWidth - 50);
+
+    // …and the card really writes that margin onto the slot element.
+    const flush = mount({ ...fullConfig, card_padding: 24 }, createHass({ states: baseStates() }));
+    await flush.updateComplete;
+    const flushSlot = q(flush, '.chart-slot') as HTMLElement;
+    expect(flushSlot.style.marginLeft).toBe('-24px');
+    expect(flushSlot.style.marginRight).toBe('-24px');
 
     const contained = mount(
-      { ...fullConfig, chart_full_bleed: false },
+      { ...fullConfig, card_padding: 24, chart_full_bleed: false },
       createHass({ states: baseStates() })
     );
     await contained.updateComplete;
-    expect(q(contained, '.chart-slot')?.classList.contains('is-full-bleed')).toBe(false);
+    const containedSlot = q(contained, '.chart-slot') as HTMLElement;
+    expect(containedSlot.style.marginLeft).toBe('0px');
+    expect(containedSlot.style.marginRight).toBe('0px');
   });
 
   it('applies a fixed height and density classes', async () => {
