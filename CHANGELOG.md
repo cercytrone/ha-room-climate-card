@@ -4,6 +4,35 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.0] – 2026-11-02
+
+### Geändert
+
+- **Weichere Übergänge – Farbe und Kurve.** Die Farbbereiche der Temperaturkurve hatten an jeder
+  Grenze nur eine schmale Rampe (rund ein Zehntel der Bandhöhe, gemessen 1,2–1,6 °C): optisch
+  eine Kante. Jetzt teilen sich zwei benachbarte Bereiche den ganzen Abstand zwischen ihren
+  Grenzen – der kältere reicht bis zur Mitte hinauf, der wärmere bis zur Mitte hinunter –, sodass
+  bei voller Weichheit **kein Plateau und keine Kante** mehr übrig bleibt und die Farbe über die
+  gesamte Fläche fließt. Die äußeren Ränder bleiben rein (unter „kalt“ blau, über „heiß“ rot),
+  damit keine der vier Farben verschwindet.
+- **Kurvenform geglättet, ohne Spitzen zu bügeln.** Die Kubik setzte an jedem Wendepunkt die
+  Steigung hart auf null; bei dichten Messreihen wurde daraus eine Kette flacher Stellen – der
+  „harte“ Eindruck der Linie. Jetzt ist die Steigung der gedämpfte Mittelwert der beiden
+  Nachbarsteigungen, zusätzlich einmal leicht über die Nachbarn gemittelt. Die Kurve darf die
+  Messwerte dabei um höchstens 1 px verlassen: Ecken werden rund, echte Peaks, Sprünge und jeder
+  einzelne Messpunkt bleiben exakt erhalten.
+- **Bereichsfarben an den Achsenrändern.** Zeigt der Chart nur einen Ausschnitt (etwa nur warme
+  Tage), beginnt der Verlauf mit der Farbe, die dort wirklich gilt – vorher konnte der untere
+  Rand kaltblau eingefärbt sein, obwohl jeder sichtbare Wert im warmen Bereich lag.
+
+### Hinzugefügt
+
+- **`chart_band_transition`** (0–100 %, Standard 100) – im Editor unter *Verlauf* als Regler
+  **Übergang zwischen den Bereichen**, nur aktiv, wenn die Farbbereiche eingeschaltet sind.
+  `0` zeichnet harte Stufen genau an den Grenzen, `100` den durchgehenden Verlauf; jeder Wert
+  dazwischen ist ein echter Zwischenzustand. Die Grenzen selbst bleiben unverändert die
+  Einstellung dafür, *wo* ein Bereich beginnt.
+
 ## [2.8.0] – 2026-11-02
 
 ### Hinzugefügt

@@ -631,6 +631,33 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Kalt unter').value).toBe(18);
     expect(selectorByLabel(editor, 'Warm ab').value).toBe(24);
     expect(selectorByLabel(editor, 'Heiß ab').value).toBe(27);
+    // The blend width is a slider from hard steps to a continuous ramp.
+    const transition = selectorByLabel(editor, 'Übergang zwischen den Bereichen');
+    expect(transition.disabled).toBe(false);
+    expect(transition.value).toBe(100);
+    expect(transition.selector.number.mode).toBe('slider');
+    expect(transition.selector.number.min).toBe(0);
+    expect(transition.selector.number.max).toBe(100);
+  });
+
+  it('writes the band transition and keeps the slider off without bands', async () => {
+    const editor = await mountEditor({
+      ...baseConfig,
+      chart_temperature_bands: true,
+    });
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    selectorByLabel(editor, 'Übergang zwischen den Bereichen').emit(60);
+    await editor.updateComplete;
+    expect(emitted?.chart_band_transition).toBe(60);
+
+    const plain = await mountEditor({ ...baseConfig });
+    openAll(plain);
+    expect(selectorByLabel(plain, 'Übergang zwischen den Bereichen').disabled).toBe(true);
   });
 
   it('writes the band thresholds as numbers and drops them back to the default', async () => {

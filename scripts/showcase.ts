@@ -974,12 +974,14 @@ const EDITOR = {
 interface EditorField {
   label: string;
   value?: string;
-  kind?: 'text' | 'select' | 'number' | 'switch' | 'color';
+  kind?: 'text' | 'select' | 'number' | 'switch' | 'color' | 'slider';
   on?: boolean;
   disabled?: boolean;
   helper?: string;
   unit?: string;
   swatch?: string;
+  /** Position of the handle for `kind: 'slider'`, 0…1. */
+  ratio?: number;
 }
 
 interface EditorSection {
@@ -1032,6 +1034,48 @@ function editorField(field: EditorField, y: number, width: number, opacity = 1):
     }" />
   </g>`;
     return { svg, height: 26 + lines.length * 16 };
+  }
+
+  if (field.kind === 'slider') {
+    const labelLines = wrapText(field.label, width, 12.5);
+    const ratio = Math.min(1, Math.max(0, field.ratio ?? 1));
+    const trackWidth = width - 52;
+    const trackX = 0;
+    const trackY = 23 + labelLines.length * 16;
+    const knobX = trackX + trackWidth * ratio;
+    const svg = `${grouped}
+    ${labelLines
+      .map(
+        (line, index) =>
+          `<text x="0" y="${19 + index * 16}" ${font(12.5)} fill="${EDITOR.muted}">${escapeXml(
+            line
+          )}</text>`
+      )
+      .join('')}
+    <rect x="${trackX}" y="${trackY}" width="${trackWidth}" height="4" rx="2" fill="${
+      EDITOR.switchOff
+    }" />
+    <rect x="${trackX}" y="${trackY}" width="${trackWidth * ratio}" height="4" rx="2" fill="${
+      EDITOR.switchOn
+    }" />
+    <circle cx="${knobX}" cy="${trackY + 2}" r="7" fill="${EDITOR.switchOn}" stroke="#ffffff" stroke-width="1.5" />
+    <text x="${width}" y="${trackY + 7}" ${font(11)} fill="${EDITOR.faint}" text-anchor="end">${escapeXml(
+      field.unit ?? ''
+    )}</text>
+  </g>`;
+    const helperLines = field.helper ? wrapText(field.helper, width - 4, 10.5) : [];
+    const helper = helperLines
+      .map(
+        (line, index) =>
+          `<text x="1" y="${trackY + 26 + index * 13}" ${font(10.5)} fill="${
+            EDITOR.helper
+          }">${escapeXml(line)}</text>`
+      )
+      .join('');
+    return {
+      svg: `${svg}${helper}`,
+      height: trackY + 30 + helperLines.length * 13,
+    };
   }
 
   const boxH = 38;
@@ -1174,6 +1218,14 @@ export function renderEditor(palette: Palette): string {
         { label: 'Kalt unter', value: '18', unit: '°C', kind: 'number' },
         { label: 'Warm ab', value: '24', unit: '°C', kind: 'number' },
         { label: 'Heiß ab', value: '27', unit: '°C', kind: 'number' },
+        {
+          label: 'Übergang zwischen den Bereichen',
+          kind: 'slider',
+          ratio: 1,
+          unit: '100 %',
+          helper:
+            '0 % = harte Stufen, 100 % = die Farbe fließt über den ganzen Abstand zwischen zwei Grenzen.',
+        },
         { label: 'Linienart Luftfeuchte', value: 'Durchgezogen', kind: 'select' },
         { label: 'Datenlücken', value: 'Kurze Ausfälle überbrücken', kind: 'select' },
         { label: 'Datenpunkte', kind: 'switch', on: false },

@@ -54,7 +54,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, weiche Übergänge) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, Übergang stufenlos von hart bis durchgehend) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.8.0`.
+  `ROOM-CLIMATE-CARD v2.9.0`.
 
 ---
 
@@ -283,6 +283,7 @@ Tastatur-Pendant wäre eine Falle.
 | `chart_band_cold_below` | number | `18` | Grenze „kalt“ in °C. Darunter blau. |
 | `chart_band_warm_above` | number | `24` | Grenze „warm“ in °C. Darüber amber. |
 | `chart_band_hot_above` | number | `27` | Grenze „heiß“ in °C. Darüber das gedämpfte Rot der Flamme. |
+| `chart_band_transition` | number | `100` | Weichheit des Übergangs zwischen zwei Bereichen in Prozent (0–100). `0` = harte Stufen an den Grenzen, `100` = durchgehender Verlauf. |
 
 ---
 
@@ -302,7 +303,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, **Tippen auf die Karte** (Thermostat-Dialog öffnen / nichts), Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -406,10 +407,14 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   | `medium` | 5 / 9 Punkte | deutlich ruhiger |
   | `strong` | 9 / 15 Punkte | für sehr unruhige Sensoren |
 
-  Danach interpoliert eine monotone kubische Kurve (Fritsch–Carlson), die nicht überschwingt und
-  innerhalb der Messwerte bleibt. Kurven unter fünf Punkten werden nie gemittelt – dort gäbe es
-  keinen Nachbarn, nur einen erfundenen Wert. Mit `chart_curve: linear` ist die Stufe wirkungslos
-  und im Editor ausgegraut.
+  Danach zeichnet eine kubische Kurve durch alle Messpunkte. Ihre Steigung an jedem Punkt ist der
+  gedämpfte Mittelwert der beiden Nachbarsteigungen – eine Ecke bei jedem Wendepunkt (die alte
+  Variante setzte dort die Steigung auf null) gibt es nicht mehr, dadurch läuft die Linie ruhig
+  durch kleinere Schwankungen, ohne ihre Form zu verlieren. Die Kurve darf die Messwerte um
+  höchstens **1 px** verlassen: genug, um Ecken zu runden, zu wenig, um einen Peak zu erfinden –
+  echte Spitzen und echte Sprünge bleiben stehen, weil jeder Messpunkt exakt getroffen wird.
+  Kurven unter fünf Punkten werden nie gemittelt – dort gäbe es keinen Nachbarn, nur einen
+  erfundenen Wert. Mit `chart_curve: linear` ist die Stufe wirkungslos und im Editor ausgegraut.
 - **Ausschlag statt gerader Linie:** Das vertikale Fenster war früher großzügig (mindestens
   0,8 °C bzw. 6 %), wodurch ein ruhiger Raum zur fast geraden Linie wurde. Jetzt sind es
   0,4 °C bzw. 3 % – kleine echte Schwankungen nutzen das Band sichtbar. Zusätzlich rundet der
@@ -484,8 +489,14 @@ Die Temperaturkurve trägt standardmäßig **eine** Farbe: den Akzent. Auf Wunsc
 
 - **Ein Verlauf, keine Blöcke.** Die Farben liegen als senkrechter Verlauf über der ganzen
   Temperaturfläche. Jeder Punkt der Kurve nimmt automatisch die Farbe seines eigenen Werts an;
-  zwischen den Bereichen rampt es über wenige Zehntel Grad, statt hart umzuschalten. Die Kurve
-  bleibt dabei **ein** SVG-Pfad – keine zusätzlichen Knoten, kein Sprung bei Aktualisierungen.
+  die Farbe fließt über den **ganzen Abstand zwischen zwei Grenzen**, statt an der Grenze
+  umzuschalten. Die Kurve bleibt dabei **ein** SVG-Pfad – keine zusätzlichen Knoten, kein Sprung
+  bei Aktualisierungen.
+- **Übergang regelbar.** `chart_band_transition` (Editor: *Verlauf* → **Übergang zwischen den
+  Bereichen**, ein Schieberegler) stellt ein, wie weich der Wechsel ist: `0` zeichnet harte
+  Stufen genau an den Grenzen, `100` (Standard) lässt die Farbe durchgehend fließen, jeder Wert
+  dazwischen ist ein echter Zwischenzustand. Die Ränder bleiben dabei rein: unterhalb „kalt“
+  ist die Kurve blau, oberhalb „heiß“ rot – auch bei 100 %.
 - **Keine neuen Farben.** Blau, Amber und Rot sind bereits im Kartenbild vorhanden (Akzent,
   Fenster-Badge, Flamme) – es kommt nur eine ruhige Blau-Nuance hinzu, die so leise ist wie das
   Indigo der Feuchte.
@@ -543,7 +554,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 164,1 kB, **46,3 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 166,1 kB, **46,8 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -691,7 +702,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 349 Tests in 13 Dateien aus (Stand 2.8.0):
+`npm test` führt 359 Tests in 13 Dateien aus (Stand 2.9.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

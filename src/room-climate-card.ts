@@ -954,6 +954,7 @@ export class RoomClimateCard extends LitElement {
         .bandCold=${bandValue(config.chart.bandLimits.coldBelow, temperatureUnitOfSensor)}
         .bandWarm=${bandValue(config.chart.bandLimits.warmAbove, temperatureUnitOfSensor)}
         .bandHot=${bandValue(config.chart.bandLimits.hotAbove, temperatureUnitOfSensor)}
+        .bandTransition=${Math.round(config.chart.bandTransition * 100)}
         .temperatureScale=${temperatureScale(temperatureUnitOfSensor) ?? 'C'}
         .cornerRadius=${config.borderRadius}
         .language=${language}

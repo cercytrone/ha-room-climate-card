@@ -147,6 +147,7 @@ export class RoomClimateChart extends LitElement {
     bandCold: { attribute: false },
     bandWarm: { attribute: false },
     bandHot: { attribute: false },
+    bandTransition: { attribute: false },
     temperatureScale: { attribute: false },
     cornerRadius: { attribute: false },
     showTooltip: { attribute: false },
@@ -411,6 +412,8 @@ export class RoomClimateChart extends LitElement {
   bandCold = 18;
   bandWarm = 24;
   bandHot = 27;
+  /** Width of the blend between two bands in percent (100 = fully continuous). */
+  bandTransition = 100;
   /** Scale of the plotted values – only used for the numbers in `aria-label`. */
   temperatureScale: 'C' | 'F' = 'C';
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
@@ -628,7 +631,8 @@ export class RoomClimateChart extends LitElement {
         ? bandStops(
             tempDomain,
             { coldBelow: this.bandCold, warmAbove: this.bandWarm, hotAbove: this.bandHot },
-            { cold: BAND_COLD, normal: this.accentColor, warm: BAND_WARM, hot: BAND_HOT }
+            { cold: BAND_COLD, normal: this.accentColor, warm: BAND_WARM, hot: BAND_HOT },
+            this.bandTransition
           )
         : null;
     const temperatureColor = bandGradient ? `url(#${this.uid}-temp-stroke)` : this.accentColor;

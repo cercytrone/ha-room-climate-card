@@ -17,6 +17,7 @@ import {
   padDomain,
   seriesExtremes,
   seriesPath,
+  MAX_OVERSHOOT,
   smoothPath,
   SMOOTHING_LEVELS,
   smoothingWindow,
@@ -458,21 +459,51 @@ describe('paths', () => {
     expect((path.match(/C/g) ?? []).length).toBe(points.length - 1);
   });
 
-  it('never overshoots the measured values (monotone interpolation)', () => {
+  it('leaves the measured values by at most a hair, so corners round without invented peaks', () => {
     const spiky: Point[] = [
       { x: 0, y: 100 },
-      { x: 10, y: 10 },
+      { x: 10, y: 30 },
       { x: 20, y: 100 },
-      { x: 30, y: 10 },
+      { x: 30, y: 30 },
       { x: 40, y: 100 },
     ];
     const samples = samplePath(smoothPath(spiky));
     const min = Math.min(...spiky.map((point) => point.y));
     const max = Math.max(...spiky.map((point) => point.y));
     for (const sample of samples) {
-      expect(sample.y).toBeGreaterThanOrEqual(min - 1e-6);
-      expect(sample.y).toBeLessThanOrEqual(max + 1e-6);
+      expect(sample.y).toBeGreaterThanOrEqual(min - MAX_OVERSHOOT - 0.05);
+      expect(sample.y).toBeLessThanOrEqual(max + MAX_OVERSHOOT + 0.05);
     }
+  });
+
+  it('still passes through every measured point', () => {
+    const wiggly: Point[] = [
+      { x: 0, y: 60 },
+      { x: 8, y: 40 },
+      { x: 16, y: 62 },
+      { x: 24, y: 38 },
+      { x: 32, y: 58 },
+    ];
+    const path = smoothPath(wiggly);
+    for (const point of wiggly.slice(1)) {
+      expect(path).toContain(`${point.x} ${point.y}`);
+    }
+  });
+
+  it('keeps a real step: rounded corners never smear a jump into a ramp', () => {
+    const step: Point[] = [
+      { x: 0, y: 80 },
+      { x: 10, y: 80 },
+      { x: 20, y: 80 },
+      { x: 30, y: 20 },
+      { x: 40, y: 20 },
+      { x: 50, y: 20 },
+    ];
+    const samples = samplePath(smoothPath(step));
+    // Away from the step the curve stays on its level – the rounding only
+    // affects the immediate neighbourhood of the jump.
+    expect(samples.filter((s) => s.x <= 14).every((s) => s.y > 70)).toBe(true);
+    expect(samples.filter((s) => s.x >= 46).every((s) => s.y < 30)).toBe(true);
   });
 
   it('handles degenerate inputs', () => {

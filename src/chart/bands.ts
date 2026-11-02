@@ -51,6 +51,17 @@ export const DEFAULT_BAND_LIMITS: BandLimits = {
 /** Smallest distance between two thresholds, in °C. */
 export const MIN_BAND_GAP = 1;
 
+/**
+ * Width of the change between two stages, in percent of the distance between
+ * their thresholds.
+ *
+ * 100 % = the colour blends across the whole gap, so the curve flows from cold
+ * to warm without a visible edge (the look of the weather card's temperature
+ * ramp). 0 % keeps hard steps at the thresholds. The default is deliberately the
+ * soft end: the bands are a reading aid, not a hard classification.
+ */
+export const DEFAULT_BAND_SOFTNESS = 100;
+
 function toNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -88,52 +99,65 @@ export function bandColorAt(value: number, limits: BandLimits, colors: BandColor
 /**
  * Gradient stops for the temperature band, ordered by offset.
  *
- * `domain` is the padded value range the chart draws (`[min, max]`). Each
- * threshold becomes a short ramp instead of a hard edge, which is what makes the
- * result look like one flowing colour change rather than four blocks.
+ * `domain` is the padded value range the chart draws (`[min, max]`). Instead of
+ * an edge at every threshold, the colour blends across the whole gap between two
+ * thresholds, so the chart reads as one flowing ramp rather than four blocks.
+ * `softness` (0…100) scales that blending width.
  */
 export function bandStops(
   domain: readonly [number, number],
   limits: BandLimits,
-  colors: BandColors
+  colors: BandColors,
+  softness: number = DEFAULT_BAND_SOFTNESS
 ): BandStop[] {
   const [min, max] = domain;
   const span = max - min;
   if (!(span > 0) || !Number.isFinite(span)) return [{ offset: 0, color: colors.normal }];
 
-  const gap = Math.min(
-    Math.max(limits.warmAbove - limits.coldBelow, MIN_BAND_GAP),
-    Math.max(limits.hotAbove - limits.warmAbove, MIN_BAND_GAP)
-  );
-  // Half the transition width: at most a quarter of the tighter gap, so the
-  // plateaus always stay visible, and at most 6 % of the drawn range, so the
-  // change looks like one flowing colour instead of a cut.
-  const half = Math.max(0.05, Math.min(gap / 4, span * 0.06));
+  const strength = Math.min(1, Math.max(0, (Number.isFinite(softness) ? softness : 100) / 100));
+  // Each gap between two thresholds is shared by both of them: the cooler stage
+  // reaches up by half the gap, the warmer one reaches down by the same amount.
+  // At 100 % the two ramps meet exactly on the middle of the gap – the gradient
+  // then runs without a single plateau, which is what makes the curve flow.
+  // The outer sides stay pure, so blue and red keep their full presence.
+  const lowerGap = Math.max(limits.warmAbove - limits.coldBelow, MIN_BAND_GAP);
+  const upperGap = Math.max(limits.hotAbove - limits.warmAbove, MIN_BAND_GAP);
+  const lowerRamp = (strength * lowerGap) / 2;
+  const upperRamp = (strength * upperGap) / 2;
+
+  // Stage of one value – used for the two ends of the visible axis, so a chart
+  // that only ever shows warm values is not painted cold at its lower edge.
+  const stageAt = (value: number): string =>
+    value < limits.coldBelow
+      ? colors.cold
+      : value < limits.warmAbove
+        ? colors.normal
+        : value < limits.hotAbove
+          ? colors.warm
+          : colors.hot;
 
   const edges: Array<{ value: number; color: string }> = [
-    { value: min, color: colors.cold },
-    { value: limits.coldBelow - half, color: colors.cold },
-    { value: limits.coldBelow + half, color: colors.normal },
-    { value: limits.warmAbove - half, color: colors.normal },
-    { value: limits.warmAbove + half, color: colors.warm },
-    { value: limits.hotAbove - half, color: colors.warm },
-    { value: limits.hotAbove + half, color: colors.hot },
-    { value: max, color: colors.hot },
+    { value: limits.coldBelow, color: colors.cold },
+    { value: limits.coldBelow + lowerRamp, color: colors.normal },
+    { value: limits.warmAbove - lowerRamp, color: colors.normal },
+    { value: limits.warmAbove + upperRamp, color: colors.warm },
+    { value: limits.hotAbove - upperRamp, color: colors.warm },
+    { value: limits.hotAbove, color: colors.hot },
   ]
-    .map((entry) => ({
-      value: Math.min(max, Math.max(min, entry.value)),
-      color: entry.color,
-    }))
+    // Ramps that start or end outside the drawn range have no visible edge.
+    .filter((edge) => edge.value > min && edge.value < max)
+    .concat([
+      { value: min, color: stageAt(min) },
+      { value: max, color: stageAt(max) },
+    ])
     .sort((a, b) => a.value - b.value);
 
   const stops: BandStop[] = [];
   for (const edge of edges) {
     const offset = Number(((max - edge.value) / span).toFixed(4));
     const previous = stops[stops.length - 1];
-    if (previous && Math.abs(previous.offset - offset) < 0.0005) {
-      // Two stops on the same spot: the later one wins, so a ramp keeps its
-      // end colour instead of adding a duplicate stop.
-      previous.color = edge.color;
+    if (previous && Math.abs(previous.offset - offset) < 0.0005 && previous.color === edge.color) {
+      // Same spot, same colour: one stop is enough.
       continue;
     }
     stops.push({ offset, color: edge.color });
