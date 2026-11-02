@@ -4,6 +4,23 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.11.0] – 2026-11-02
+
+### Geändert
+
+- **Eine einzelne Kurve nutzt jetzt die ganze Plotfläche.** Die Bänder waren feste Anteile der
+  Höhe – Feuchte oberes Drittel, Temperatur untere Hälfte –, auch wenn eine der beiden Reihen gar
+  nicht gezeichnet wurde. Bei Chart-Höhe 112 px blieben so **44 % der Fläche leer**, und die
+  Temperatur bewegte sich in nur 48 von 86 px. Jetzt gilt: ist nur eine Reihe sichtbar, bekommt
+  sie `top … bottom`, also das ganze Band; ihr Ausschlag wächst um rund 80 %. Sind beide Reihen
+  an, bleibt die Aufteilung unverändert. Das gilt symmetrisch für Temperatur und Luftfeuchte.
+- **Entschieden wird an der Konfiguration, nicht an den Daten.** Maßgeblich sind die
+  Serien-Schalter (Tippen auf das Label, `show_temperature_chart` / `show_humidity_chart`) und
+  nicht, ob gerade Werte vorliegen. Ein Sensor, der kurz `unavailable` meldet, lässt das Layout
+  stehen – der Chart springt nicht bei jedem Ausfall um.
+- Soll-Linie, Min/Max-Marken, Flächenverläufe, die Farbbereiche der Temperatur und die
+  Trefferfläche des Tooltips hängen an denselben Bändern und wandern automatisch mit.
+
 ## [2.10.0] – 2026-11-02
 
 ### Hinzugefügt

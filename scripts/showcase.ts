@@ -280,13 +280,16 @@ function renderCard(options: CardOptions): string {
   const start = end - rangeMs;
   const xScale = linearScale([start, end], [left, right]);
 
-  // --- geometry: humidity owns the upper third, temperature the lower half ---
-  const plotHeight = chartBottom - chartTop;
-  const humidityBandBottom = chartTop + plotHeight * 0.3;
-  const temperatureBandTop = chartTop + plotHeight * 0.44;
-
   const temperatureVisible = !hidden.includes('temperature');
   const humidityVisible = !hidden.includes('humidity') && Boolean(options.humiditySeries);
+
+  // --- geometry: with both series the humidity owns the upper third and the
+  // temperature the lower half; a single series gets the whole plot (same rule
+  // as the card itself, decided by the configuration, not by the data) ---
+  const plotHeight = chartBottom - chartTop;
+  const singleSeries = temperatureVisible !== humidityVisible;
+  const humidityBandBottom = chartTop + plotHeight * (singleSeries ? 1 : 0.3);
+  const temperatureBandTop = chartTop + plotHeight * (singleSeries ? 0 : 0.44);
 
   const valueOf = (sample: ChartSample) => sample.v as number;
   const extentOf = (series?: ChartSample[]) => {

@@ -54,7 +54,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, Übergang stufenlos von hart bis durchgehend) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel, gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, Übergang stufenlos von hart bis durchgehend) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel (allein gezeichnet: volle Höhe), gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.10.0`.
+  `ROOM-CLIMATE-CARD v2.11.0`.
 
 ---
 
@@ -335,7 +335,7 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 - **Ruhiger Verlauf:** gleitender Mittelwert in vier wählbaren Stufen (Standard: leicht) plus
   monotone Glättung, 1,9 px Linie ohne Leuchten, je ein sehr dezenter Flächenverlauf für beide
   Kurven; die Feuchte bekommt ein eigenes Band im oberen Drittel, statt die Temperaturkurve zu
-  kreuzen.
+  kreuzen – und eine allein gezeichnete Kurve nutzt die ganze Höhe.
 - **Reduzierte Achse:** eine Haarlinie als Basis, drei Labels in 10,5 px bei 32 % Deckkraft –
   „Sa 05:40 · So 05:40 · Jetzt“. Abschaltbar: `chart_show_axis: false` (Editor: *Verlauf* →
   **Zeitangaben unter dem Verlauf**) entfernt die unterste Zeile vollständig; die Kurven nutzen
@@ -441,6 +441,14 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 - **Skalierung:** Beide Reihen werden unabhängig skaliert, damit unterschiedliche Wertebereiche
   lesbar bleiben – die Feuchte lebt im oberen Drittel, die Temperatur in der unteren Hälfte.
   Die beiden Kurven kreuzen sich dadurch nie.
+- **Ein Band allein nutzt die ganze Höhe:** Wird nur eine Reihe gezeichnet – weil die Feuchte im
+  Editor bzw. per `show_humidity_chart: false` abgeschaltet ist oder weil ihr Messwert in der
+  Karte angetippt wurde –, bekommt die verbleibende Kurve die ganze Plotfläche statt der halben.
+  Gemessen bei Chart-Höhe 112 px: Temperaturband 48 px → **86 px**, der Ausschlag wächst also um
+  80 %, ohne dass sich die Kartenhöhe ändert. Entschieden wird das an der **Konfiguration**, nicht
+  an den Daten: ein Feuchtesensor, der kurz nichts liefert, lässt das Layout stehen, statt die
+  Kurve springen zu lassen. Soll-Linie, Min/Max-Zahlen, Farbverläufe und die Trefferfläche des
+  Tooltips wandern automatisch mit.
 - **Responsiv:** Die Chart zeichnet neu auf Basis der gemessenen Pixelgröße
   (`ResizeObserver`), Achsenbeschriftungen entfallen bei zu wenig Platz, unter
   40 × 34 px wird nichts gezeichnet statt zu verzerren. Die Zeitbeschriftung wird um den
@@ -568,7 +576,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 167,2 kB, **47,2 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 167,4 kB, **47,3 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -716,7 +724,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 367 Tests in 13 Dateien aus (Stand 2.10.0):
+`npm test` führt 371 Tests in 13 Dateien aus (Stand 2.11.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
