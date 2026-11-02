@@ -1228,6 +1228,13 @@ export function renderEditor(palette: Palette): string {
         },
         { label: 'Linienart Luftfeuchte', value: 'Durchgezogen', kind: 'select' },
         { label: 'Datenlücken', value: 'Kurze Ausfälle überbrücken', kind: 'select' },
+        {
+          label: 'Zeitangaben unter dem Verlauf',
+          kind: 'switch',
+          on: true,
+          helper:
+            'Die unterste Zeile mit Startzeit, Mitte und „Jetzt“. Ohne sie gehört der Platz den Kurven.',
+        },
         { label: 'Datenpunkte', kind: 'switch', on: false },
         { label: 'Werte beim Überfahren', kind: 'switch', on: true },
         { label: 'Minimum/Maximum im Chart anzeigen', kind: 'switch', on: true },

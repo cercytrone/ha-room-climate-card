@@ -341,6 +341,33 @@ describe('room climate card editor', () => {
     expect(emitted?.chart_show_extremes).toBe(false);
   });
 
+  it('offers a switch for the time row under the chart', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const axis = selectorByLabel(editor, 'Zeitangaben unter dem Verlauf');
+    // Visible by default, and switchable while a chart is drawn.
+    expect(axis.value).toBe(true);
+    expect(axis.disabled).toBe(false);
+
+    axis.emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_show_axis).toBe(false);
+
+    // Without any chart there is nothing to label.
+    const empty = await mountEditor({
+      ...baseConfig,
+      show_temperature_chart: false,
+      show_humidity_chart: false,
+    });
+    openAll(empty);
+    expect(selectorByLabel(empty, 'Zeitangaben unter dem Verlauf').disabled).toBe(true);
+  });
+
   it('disables the gradient switches together with their series', async () => {
     const editor = await mountEditor({ ...baseConfig, show_humidity_chart: false });
     openAll(editor);

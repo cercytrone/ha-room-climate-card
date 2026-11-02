@@ -1406,6 +1406,21 @@ describe('room climate card', () => {
     expect(fChart.bandHot).toBeCloseTo(80.6, 1);
   });
 
+  it('hands the time-row switch to the chart', async () => {
+    const withAxis = mount(fullConfig, createHass({ states: baseStates() }));
+    await withAxis.updateComplete;
+    const shown = q(withAxis, 'room-climate-chart') as HTMLElement & { showAxis: boolean };
+    expect(shown.showAxis).toBe(true);
+
+    const withoutAxis = mount(
+      { ...fullConfig, chart_show_axis: false },
+      createHass({ states: baseStates() })
+    );
+    await withoutAxis.updateComplete;
+    const hidden = q(withoutAxis, 'room-climate-chart') as HTMLElement & { showAxis: boolean };
+    expect(hidden.showAxis).toBe(false);
+  });
+
   it('keeps the bands quiet when they are not configured', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;

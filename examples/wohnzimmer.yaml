@@ -42,6 +42,7 @@ chart_gap_mode: connect        # Lücken interpolieren (durchgehende Linie)
 chart_max_gap_minutes: 120     # längere Lücken bleiben offen
 chart_gap_style: solid         # interpolierte Abschnitte wie gemessene zeichnen
 chart_show_grid: true
+chart_show_axis: true          # Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt)
 chart_show_points: false
 chart_show_tooltip: true       # Werte beim Überfahren (Standard: an)
 chart_show_extremes: true      # Minimum/Maximum an der Kurve (Standard: an)

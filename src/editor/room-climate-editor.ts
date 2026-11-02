@@ -109,6 +109,8 @@ interface EditorText {
   bandTransition: string;
   bandTransitionHelper: string;
   grid: string;
+  axis: string;
+  axisHelper: string;
   points: string;
   tooltip: string;
   extremes: string;
@@ -243,6 +245,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     bandTransitionHelper:
       '0 % = harte Stufen genau an den Grenzen, 100 % = die Farbe fließt über den ganzen Abstand zwischen zwei Grenzen. Dazwischen liegt jeder Zwischenwert.',
     grid: 'Gitternetz',
+    axis: 'Zeitangaben unter dem Verlauf',
+    axisHelper:
+      'Die unterste Zeile mit Startzeit, Mitte und „Jetzt“. Ohne sie gehört der Platz den Kurven; die Zeit steht weiterhin im Tooltip und in der Beschreibung für Screenreader.',
     points: 'Datenpunkte',
     tooltip: 'Werte beim Überfahren',
     extremes: 'Minimum/Maximum im Chart anzeigen',
@@ -363,6 +368,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     bandTransitionHelper:
       '0 % = hard steps exactly at the limits, 100 % = the colour flows across the whole gap between two limits. Anything in between is a valid setting.',
     grid: 'Grid lines',
+    axis: 'Time labels below the chart',
+    axisHelper:
+      'The bottom row with the start time, the middle and “now”. Without it the space belongs to the curves; the time is still in the tooltip and in the screen-reader description.',
     points: 'Data points',
     tooltip: 'Values on hover',
     extremes: 'Show minimum/maximum in the chart',
@@ -1278,6 +1286,13 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.grid,
         value: this.rawBoolean('chart_show_grid') ?? false,
         disabled: !anyChart,
+      })}
+      ${this.renderSwitch({
+        key: 'chart_show_axis',
+        label: t.axis,
+        value: this.rawBoolean('chart_show_axis') ?? true,
+        disabled: !anyChart,
+        helper: t.axisHelper,
       })}
       ${this.renderSwitch({
         key: 'chart_show_points',

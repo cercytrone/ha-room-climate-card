@@ -715,6 +715,31 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelector('.wrap')).toBeNull();
   });
 
+  it('drops the time row on request and gives the space to the curves', async () => {
+    const withAxis = createChart({ temperature: samples([20, 21, 22, 23]) });
+    setSize(withAxis, 320, 112);
+    await withAxis.updateComplete;
+    const labels = withAxis.shadowRoot!.querySelectorAll('.axis-label');
+    expect(labels.length).toBeGreaterThan(0);
+    const baselineWith = Number(
+      withAxis.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')
+    );
+
+    document.body.replaceChildren();
+    const withoutAxis = createChart({ temperature: samples([20, 21, 22, 23]), showAxis: false });
+    setSize(withoutAxis, 320, 112);
+    await withoutAxis.updateComplete;
+    expect(withoutAxis.shadowRoot!.querySelectorAll('.axis-label')).toHaveLength(0);
+    // The plot now reaches down to the bottom edge instead of stopping 20 px above it.
+    const baselineWithout = Number(
+      withoutAxis.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')
+    );
+    expect(baselineWithout).toBeGreaterThan(baselineWith + 10);
+    // Data and interaction stay untouched.
+    expect(withoutAxis.shadowRoot!.querySelectorAll('.series-line').length).toBeGreaterThan(0);
+    expect(withoutAxis.shadowRoot!.querySelectorAll('.end-dot').length).toBeGreaterThan(0);
+  });
+
   it('hides axis labels when there is not enough height', async () => {
     const chart = createChart({ temperature: samples([20, 21, 22]) });
     setSize(chart, 320, 55);
