@@ -177,7 +177,9 @@ describe('room climate card', () => {
 
     expect(text(card, '.reading.temperature .reading-value')).toBe('–');
     expect(text(card, '.reading.humidity .reading-value')).toBe('–');
-    expect(q(card, '.reading.temperature')?.getAttribute('aria-label')).toContain('Nicht verfügbar');
+    expect(q(card, '.reading.temperature .reading-number')?.getAttribute('aria-label')).toContain(
+      'Nicht verfügbar'
+    );
     expect(q(card, '.badge.window')?.getAttribute('aria-label')).toBe('Nicht verfügbar');
     // The row is a button now, so its name says what it does as well.
     expect(q(card, '.climate-row')?.getAttribute('aria-label')).toBe(
@@ -600,86 +602,22 @@ describe('room climate card', () => {
     expect(q(card, '.card')?.classList.contains('theme-light')).toBe(true);
   });
 
-  it('toggles a series by clicking its value', async () => {
+  it('renders the readings as text, not as chart switches', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
 
-    const chart = () => q(card, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] };
-    const temperature = q(card, '.reading.temperature') as HTMLButtonElement;
-    const humidity = q(card, '.reading.humidity') as HTMLButtonElement;
-
-    // Both series are visible and announced as pressed.
-    expect(temperature.tagName).toBe('BUTTON');
-    expect(temperature.getAttribute('aria-pressed')).toBe('true');
-    expect(chart().hiddenSeries).toEqual([]);
-    // The name describes the current state and the title the action.
-    expect(temperature.getAttribute('aria-label')).toContain('Serie eingeblendet');
-    expect(temperature.getAttribute('title')).toBe('Serie ausblenden');
-
-    temperature.click();
-    await card.updateComplete;
-    expect(temperature.getAttribute('aria-pressed')).toBe('false');
-    expect(temperature.classList.contains('is-hidden')).toBe(true);
-    // Was swapped before: a hidden series announced itself as "shown".
-    expect(temperature.getAttribute('aria-label')).toContain('Serie ausgeblendet');
-    expect(temperature.getAttribute('aria-label')).not.toContain('Serie eingeblendet');
-    expect(temperature.getAttribute('title')).toBe('Serie einblenden');
-    expect(chart().hiddenSeries).toEqual(['temperature']);
-    // The caption dot of that series dims with it.
-    expect(q(card, '.reading-labels .series-label')?.classList.contains('is-hidden')).toBe(true);
-
-    humidity.click();
-    await card.updateComplete;
-    expect(chart().hiddenSeries).toEqual(['temperature', 'humidity']);
-
-    temperature.click();
-    await card.updateComplete;
-    expect(chart().hiddenSeries).toEqual(['humidity']);
-    expect(temperature.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('remembers switched-off series across mounts', async () => {
-    const hass = createHass({ states: baseStates() });
-    const first = mount(fullConfig, hass);
-    await first.updateComplete;
-    (q(first, '.reading.temperature') as HTMLButtonElement).click();
-    await first.updateComplete;
-    expect((q(first, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries)
-      .toEqual(['temperature']);
-
-    // New card instance, same entities: the preference survives a reload.
-    const second = mount(fullConfig, hass);
-    await second.updateComplete;
-    expect(
-      (q(second, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries
-    ).toEqual(['temperature']);
-    expect((q(second, '.reading.temperature') as HTMLButtonElement).getAttribute('aria-pressed'))
-      .toBe('false');
-
-    // Switching it back on clears the stored entry.
-    (q(second, '.reading.temperature') as HTMLButtonElement).click();
-    await second.updateComplete;
-    expect(window.localStorage.length).toBe(0);
-
-    // Another room keeps its own state.
-    const other = mount(
-      { ...fullConfig, temperature_entity: 'sensor.temp_b', humidity_entity: 'sensor.humidity_b' },
-      hass
-    );
-    await other.updateComplete;
-    expect(
-      (q(other, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries
-    ).toEqual([]);
-  });
-
-  it('offers no toggle when the series is not drawn in the chart', async () => {
-    const card = mount(
-      { ...fullConfig, show_temperature_chart: false, show_humidity_chart: false },
-      createHass({ states: baseStates() })
-    );
-    await card.updateComplete;
+    for (const selector of ['.reading.temperature', '.reading.humidity']) {
+      const reading = q(card, selector) as HTMLElement;
+      expect(reading.tagName).toBe('SPAN');
+      expect(reading.getAttribute('aria-pressed')).toBeNull();
+      expect(reading.getAttribute('title')).toBeNull();
+      // The accessible name carries the value only – no state, no action.
+      const number = reading.querySelector('.reading-number') as HTMLElement;
+      expect(number.getAttribute('aria-label')).not.toContain('Serie');
+    }
     expect(q(card, 'button.reading')).toBeNull();
-    expect(q(card, '.reading.temperature')?.tagName).toBe('SPAN');
+    // Nothing is persisted for a card any more.
+    expect(window.localStorage.length).toBe(0);
   });
 
   it('loads real history through the websocket API', async () => {
@@ -1070,7 +1008,7 @@ describe('room climate card', () => {
     expect(events).toEqual(['climate.thermostat']);
   });
 
-  it('leaves the card\'s own controls alone', async () => {
+  it('opens the dialog from the readings but leaves the chart alone', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
     const events: string[] = [];
@@ -1078,16 +1016,33 @@ describe('room climate card', () => {
       events.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
     );
 
-    // A tap on a reading toggles its series instead.
-    (q(card, '.reading.temperature') as HTMLButtonElement).click();
-    await card.updateComplete;
-    expect(events).toEqual([]);
-    expect((q(card, 'room-climate-chart') as HTMLElement & { hiddenSeries: string[] }).hiddenSeries)
-      .toEqual(['temperature']);
+    // The readings are part of the tile: a tap there opens the thermostat.
+    (q(card, '.reading.temperature') as HTMLElement).click();
+    expect(events).toEqual(['climate.thermostat']);
+    (q(card, '.reading.humidity') as HTMLElement).click();
+    expect(events).toEqual(['climate.thermostat', 'climate.thermostat']);
 
-    // The chart owns its taps (readout/crosshair).
+    // The chart owns its taps while it shows the readout.
+    expect(q(card, '.chart-slot')?.classList.contains('is-tappable')).toBe(false);
     (q(card, '.chart-slot') as HTMLElement).click();
-    expect(events).toEqual([]);
+    expect(events).toEqual(['climate.thermostat', 'climate.thermostat']);
+  });
+
+  it('gives the chart area to the tap when the readout is switched off', async () => {
+    const card = mount(
+      { ...fullConfig, chart_show_tooltip: false },
+      createHass({ states: baseStates() })
+    );
+    await card.updateComplete;
+    const events: string[] = [];
+    card.addEventListener('hass-more-info', (event) =>
+      events.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+    );
+
+    // Nothing happens in the chart itself any more, so the tile keeps its tap.
+    expect(q(card, '.chart-slot')?.classList.contains('is-tappable')).toBe(true);
+    (q(card, '.chart-slot') as HTMLElement).click();
+    expect(events).toEqual(['climate.thermostat']);
   });
 
   it('offers no tap target when there is nothing to open', async () => {
@@ -1117,14 +1072,39 @@ describe('room climate card', () => {
     expect(events).toEqual([]);
   });
 
-  it('does not offer a pointer-only target while the status row is hidden', async () => {
+  it('keeps the tap and the keyboard path while the status row is hidden', async () => {
     const card = mount(
       { ...fullConfig, show_climate_row: false },
       createHass({ states: baseStates() })
     );
     await card.updateComplete;
+    const events: string[] = [];
+    card.addEventListener('hass-more-info', (event) =>
+      events.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+    );
+
     expect(q(card, '.climate-row')).toBeNull();
-    expect(q(card, '.card')?.classList.contains('is-tappable')).toBe(false);
+    const shell = q(card, '.card') as HTMLElement;
+    expect(shell.classList.contains('is-tappable')).toBe(true);
+
+    shell.click();
+    expect(events).toEqual(['climate.thermostat']);
+
+    // Without the row the card itself is the focusable target.
+    expect(shell.getAttribute('role')).toBe('button');
+    expect(shell.getAttribute('tabindex')).toBe('0');
+    expect(shell.getAttribute('aria-label')).toContain('Thermostat öffnen');
+    shell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(events).toEqual(['climate.thermostat', 'climate.thermostat']);
+    shell.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    expect(events).toHaveLength(3);
+
+    // The visible row stays the keyboard path when it is there – no second one.
+    const withRow = mount(fullConfig, createHass({ states: baseStates() }));
+    await withRow.updateComplete;
+    const shellWithRow = q(withRow, '.card') as HTMLElement;
+    expect(shellWithRow.getAttribute('role')).toBe('group');
+    expect(shellWithRow.hasAttribute('tabindex')).toBe(false);
   });
 
   it('feeds the readout with the sensor units and the configured decimals', async () => {

@@ -4,6 +4,35 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.13.0] – 2026-11-02
+
+### Behoben
+
+- **Ein Tippen auf die Kachel öffnet wieder den Thermostat-Dialog.** Die beiden Messwerte waren
+  `<button>`s und fingen den Klick ab, bevor er die Karte erreichte – ausgerechnet dort, wo man
+  auf eine Kachel tippt. Sie sind jetzt reiner Text, ein Tipp darauf gehört der Karte. Zwei
+  weitere Stellen waren aus demselben Grund tot:
+  - **Chart mit ausgeschalteter Wertanzeige.** Ohne `chart_show_tooltip` hat der Chart keine
+    eigene Berührung mehr; bisher blieb die Fläche trotzdem ein totes Feld. Jetzt öffnet sie den
+    Dialog. Mit eingeschalteter Wertanzeige behält der Chart seinen Tipp (Messwert ablesen).
+  - **Ausgeblendete Statuszeile.** Ohne Statuszeile (`show_climate_row: false`) gab es **gar kein**
+    Tippziel – wer die Zeile ausblendete, verlor den Dialog. Jetzt bleibt der Tipp bestehen; die
+    Karte selbst wird zum Tastaturziel (`role="button"`, `tabindex="0"`, Enter/Leertaste), damit
+    die Aktion nicht zeiger-only ist.
+  - Dasselbe gilt, wenn alle drei Teile der Zeile (Sollwert, Statuswort, Modus) abgeschaltet sind
+    und die Zeile deshalb nicht gerendert wird.
+
+### Entfernt
+
+- **Serie per Klick auf den Messwert aus- und einblenden.** Die Funktion war laut Rückmeldung
+  nicht nötig und ist ersatzlos entfallen: kein `<button>` mehr, kein `aria-pressed`, kein
+  Ausblenden per `localStorage` (die Datei `data/hidden-series.ts` und die Eigenschaft
+  `hiddenSeries` des Charts sind gelöscht). Welche Kurven erscheinen, entscheiden weiterhin
+  `show_temperature_chart` / `show_humidity_chart` – die Einzelkurve bekommt dabei wie seit
+  2.11.0 die ganze Plotfläche. Ein Tipp auf den Wert öffnet den Thermostat-Dialog.
+- Die Showcase-Vorschau zeigte eine per Klick ausgeblendete Feuchtekurve – dieses Beispiel ist
+  entfallen, die Bilder sind neu gerendert.
+
 ## [2.12.0] – 2026-11-02
 
 ### Behoben

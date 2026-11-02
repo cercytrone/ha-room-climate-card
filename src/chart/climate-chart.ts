@@ -91,8 +91,6 @@ const TEMPERATURE_BAND_TOP = 0.44;
 const TEMPERATURE_DOMAIN = { minSpan: 0.4, padding: 0.15 } as const;
 const HUMIDITY_DOMAIN = { minSpan: 3, padding: 0.15 } as const;
 
-export type ChartSeriesKey = 'temperature' | 'humidity';
-
 /** One series as it is needed for hit-testing: measured samples plus the band. */
 interface HoverSeries {
   samples: ChartSample[];
@@ -151,7 +149,6 @@ export class RoomClimateChart extends LitElement {
     humidityColor: { attribute: false },
     setpoint: { attribute: false },
     setpointUnit: { attribute: false },
-    hiddenSeries: { attribute: false },
     start: { attribute: false },
     end: { attribute: false },
     showPoints: { attribute: false },
@@ -408,8 +405,6 @@ export class RoomClimateChart extends LitElement {
   /** Target temperature, drawn as a dashed reference line. */
   setpoint: number | null = null;
   setpointUnit = '°C';
-  /** Series switched off with a click on the matching reading. */
-  hiddenSeries: ChartSeriesKey[] = [];
   start = Date.now() - 6 * 3600 * 1000;
   end = Date.now();
   showPoints = false;
@@ -563,16 +558,12 @@ export class RoomClimateChart extends LitElement {
     </div>`;
   }
 
-  private isVisible(key: ChartSeriesKey): boolean {
-    return !(this.hiddenSeries ?? []).includes(key);
-  }
-
   private get temperatureVisible(): boolean {
-    return this.isVisible('temperature') && Boolean(this.temperature?.some((s) => s.v !== null));
+    return Boolean(this.temperature?.some((s) => s.v !== null));
   }
 
   private get humidityVisible(): boolean {
-    return this.isVisible('humidity') && Boolean(this.humidity?.some((s) => s.v !== null));
+    return Boolean(this.humidity?.some((s) => s.v !== null));
   }
 
   private get hasData(): boolean {
@@ -630,11 +621,11 @@ export class RoomClimateChart extends LitElement {
      *
      * The decision looks at the *configuration*, not at the data: a humidity
      * sensor that briefly reports nothing must not make the chart jump. Only a
-     * hidden series (switch in the card or `show_humidity_chart: false`) frees
+     * series the card does not hand over (`show_humidity_chart: false`) frees
      * the space.
      */
-    const temperatureSeriesOn = this.isVisible('temperature') && this.temperature !== undefined;
-    const humiditySeriesOn = this.isVisible('humidity') && this.humidity !== undefined;
+    const temperatureSeriesOn = this.temperature !== undefined;
+    const humiditySeriesOn = this.humidity !== undefined;
     const singleSeries = temperatureSeriesOn !== humiditySeriesOn;
     const humidityTop = top;
     const humidityBottom = singleSeries ? bottom : top + plotHeight * HUMIDITY_BAND_HEIGHT;

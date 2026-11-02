@@ -25,11 +25,6 @@ import {
   type ThermostatReading,
 } from './data/states';
 import { HistoryRepository, type HistoryMap } from './data/history';
-import {
-  hiddenSeriesStorageKey,
-  loadHiddenSeries,
-  saveHiddenSeries,
-} from './data/hidden-series';
 import { createTranslator, type Translator } from './localize';
 import type { HomeAssistant } from './types';
 import {
@@ -42,7 +37,6 @@ import {
 } from './utils/format';
 import { icons } from './ui/icons';
 import './chart/climate-chart';
-import type { ChartSeriesKey } from './chart/climate-chart';
 import type { ChartSample } from './chart/geometry';
 import './editor/room-climate-editor';
 
@@ -67,7 +61,6 @@ export class RoomClimateCard extends LitElement {
     _now: { state: true },
     _historyWindow: { state: true },
     _haIconReady: { state: true },
-    _hiddenSeries: { state: true },
   };
 
   hass?: HomeAssistant;
@@ -76,8 +69,6 @@ export class RoomClimateCard extends LitElement {
   _history: HistoryMap = {};
   _historyLoading = false;
   _historyError?: string;
-  /** Series the user switched off by clicking the matching reading. */
-  _hiddenSeries: ChartSeriesKey[] = [];
   _density: Density = 'md';
   _now = Date.now();
   _historyWindow: { start: number; end: number } = {
@@ -90,8 +81,6 @@ export class RoomClimateCard extends LitElement {
   private tickTimer?: ReturnType<typeof setInterval>;
   private resizeObserver?: ResizeObserver;
   private historyKey = '';
-  /** Storage slot of the current card; empty until a config has been applied. */
-  private hiddenSeriesKey = '';
   private historyFetchedAt = 0;
   private pendingLoad?: ReturnType<typeof setTimeout>;
   private lastConnected = true;
@@ -194,15 +183,6 @@ export class RoomClimateCard extends LitElement {
   setConfig(config: unknown): void {
     const resolved = normalizeConfig(config);
     this._config = resolved;
-    // Restore the toggled-off series for exactly this pair of entities.
-    const hiddenKey = hiddenSeriesStorageKey(
-      resolved.temperatureEntity,
-      resolved.humidityEntity
-    );
-    if (hiddenKey !== this.hiddenSeriesKey) {
-      this.hiddenSeriesKey = hiddenKey;
-      this._hiddenSeries = loadHiddenSeries(hiddenKey);
-    }
     const key = this.historyKeyFor(resolved);
     if (key !== this.historyKey) {
       this.historyKey = '';
@@ -468,15 +448,27 @@ export class RoomClimateCard extends LitElement {
       .filter(Boolean)
       .join(';');
 
+    const tapTarget = this.tapTarget;
+    const climateRow = this.renderClimateRow(config, t);
+    /*
+     * Without a rendered status row the card has to carry the keyboard path
+     * itself, otherwise the tap would be reachable with a pointer only.
+     */
+    const cardIsButton = Boolean(tapTarget) && climateRow === nothing;
+
     return html`<div
-      class="card ${themeClass} density-${this._density} ${config.height ? 'fixed-height' : 'auto-height'} ${this.tapTarget ? 'is-tappable' : ''}"
+      class="card ${themeClass} density-${this._density} ${config.height ? 'fixed-height' : 'auto-height'} ${tapTarget ? 'is-tappable' : ''}"
       style="${style}"
-      role="group"
-      aria-label="${this.cellAriaLabel(config, t)}"
+      role=${cardIsButton ? 'button' : 'group'}
+      tabindex=${cardIsButton ? '0' : nothing}
+      aria-label=${cardIsButton
+        ? `${this.cellAriaLabel(config, t)} – ${t.t('openThermostat')}`
+        : this.cellAriaLabel(config, t)}
       @click=${this.handleCardClick}
+      @keydown=${cardIsButton ? this.handleCardKeydown : nothing}
     >
       ${this.renderHeader(config, t)} ${this.renderReadings(config, t)}
-      ${this.renderClimateRow(config, t)} ${this.renderChart(config, t)}
+      ${climateRow} ${this.renderChart(config, t)}
       ${!this.hasAnyEntity(config) ? this.renderEmpty(t) : nothing}
     </div>`;
   }
@@ -609,15 +601,13 @@ export class RoomClimateCard extends LitElement {
       ${showLabels
         ? html`<div class="reading-labels" aria-hidden="true">
         ${showTemperature
-          ? html`<span
-              class="series-label ${this._hiddenSeries.includes('temperature') ? 'is-hidden' : ''}"
+          ? html`<span class="series-label"
               ><span class="series-dot" style="background:${config.accentColor}"></span
               >${t.t('temperature')}</span
             >`
           : nothing}
         ${showHumidity
-          ? html`<span
-              class="series-label ${this._hiddenSeries.includes('humidity') ? 'is-hidden' : ''}"
+          ? html`<span class="series-label"
               ><span class="series-dot" style="background:${config.humidity.color}"></span
               >${t.t('humidity')}</span
             >`
@@ -627,7 +617,6 @@ export class RoomClimateCard extends LitElement {
       <div class="reading-values">
         ${showTemperature
           ? this.renderReading({
-              key: 'temperature',
               className: 'temperature',
               value: temperature.value,
               unit: temperature.unit,
@@ -640,13 +629,10 @@ export class RoomClimateCard extends LitElement {
                 t
               )}`,
               color: config.accentColor,
-              toggleable: config.chart.showTemperature,
-              t,
             })
           : nothing}
         ${showHumidity
           ? this.renderReading({
-              key: 'humidity',
               className: 'humidity',
               value: humidity.value,
               unit: humidity.unit,
@@ -659,17 +645,18 @@ export class RoomClimateCard extends LitElement {
                 t
               )}`,
               color: config.humidity.color,
-              toggleable: config.chart.showHumidity,
-              t,
             })
           : nothing}
       </div>
     </div>`;
   }
 
-  /** One measured value; the accent dot of the caption row marks its series. */
+  /**
+   * One measured value; the accent dot of the caption row marks its series.
+   * Deliberately not a button: a tap on the value belongs to the card, which
+   * opens the thermostat dialog.
+   */
   private renderReading(options: {
-    key: ChartSeriesKey;
     className: string;
     value: number | null;
     unit: string;
@@ -677,44 +664,18 @@ export class RoomClimateCard extends LitElement {
     language: string;
     ariaLabel: string;
     color: string;
-    toggleable: boolean;
-    t: Translator;
   }): TemplateResult {
-    const hidden = this._hiddenSeries.includes(options.key);
-    const t = options.t;
     const text =
       options.value !== null
         ? formatNumber(options.value, options.language, options.decimals)
         : '–';
-    const content = html`<span class="reading-value">${text}</span
-      ><span class="reading-unit">${options.unit}</span>`;
 
-    if (!options.toggleable) {
-      return html`<span class="reading ${options.className}" style="--series-color:${options.color}">
-        <span class="reading-number" role="text" aria-label="${options.ariaLabel}">${content}</span>
-      </span>`;
-    }
-
-    // A click on the value hides or shows its curve. The state is announced via
-    // aria-pressed and mirrored by the dimmed type and the hollow series dot.
-    return html`<button
-      type="button"
-      class="reading ${options.className} ${hidden ? 'is-hidden' : ''}"
-      style="--series-color:${options.color}"
-      aria-pressed=${!hidden}
-      aria-label="${options.ariaLabel} – ${hidden ? t.t('seriesHidden') : t.t('seriesShown')}"
-      title="${hidden ? t.t('showSeries') : t.t('hideSeries')}"
-      @click=${() => this.toggleSeries(options.key)}
-    >
-      <span class="reading-number">${content}</span>
-    </button>`;
-  }
-
-  private toggleSeries(key: ChartSeriesKey): void {
-    this._hiddenSeries = this._hiddenSeries.includes(key)
-      ? this._hiddenSeries.filter((item) => item !== key)
-      : [...this._hiddenSeries, key];
-    if (this.hiddenSeriesKey) saveHiddenSeries(this.hiddenSeriesKey, this._hiddenSeries);
+    return html`<span class="reading ${options.className}" style="--series-color:${options.color}">
+      <span class="reading-number" role="text" aria-label="${options.ariaLabel}"
+        ><span class="reading-value">${text}</span
+        ><span class="reading-unit">${options.unit}</span></span
+      >
+    </span>`;
   }
 
   private sensorAria(
@@ -728,14 +689,16 @@ export class RoomClimateCard extends LitElement {
   }
 
   /**
-   * Entity a tap on the card opens. Only offered while the status row is
-   * visible, because that row is the keyboard path to the same action – a
-   * pointer-only target would be a trap.
+   * Entity a tap on the card opens. Offered whenever a thermostat row is
+   * configured – independently of whether that row is displayed, because
+   * hiding the row is a visual choice and must not silently kill the tap. The
+   * keyboard path is the row while it is visible and the card itself while it
+   * is not (see `render()`), so the action is never pointer-only.
    */
   private get tapTarget(): string | undefined {
     const config = this._config;
     if (!config || config.tapAction === 'none') return undefined;
-    if (!hasStatusRow(config)) return undefined;
+    if (!config.thermostat.enabled) return undefined;
     return config.thermostat.entity;
   }
 
@@ -756,16 +719,35 @@ export class RoomClimateCard extends LitElement {
 
   /**
    * A tap anywhere on the card opens the thermostat – except on the elements
-   * that do something themselves (readings toggle a series, the chart shows its
-   * readout, links and form fields keep their meaning).
+   * that do something themselves (the status row and links handle their own
+   * action). The readings deliberately have no handler of their own any more,
+   * and the chart only keeps its taps while it shows the value readout; with
+   * the readout switched off the chart area opens the dialog as well.
    */
   private handleCardClick = (event: MouseEvent): void => {
     const entityId = this.tapTarget;
     if (!entityId) return;
     const target = event.target as HTMLElement | null;
-    if (target?.closest('button, a, input, select, textarea, .chart-slot, room-climate-chart')) {
+    const insideChart = Boolean(target?.closest('.chart-slot, room-climate-chart'));
+    if (insideChart) {
+      if (this._config?.chart.showTooltip) return;
+    } else if (target?.closest('button, a, input, select, textarea')) {
       return;
     }
+    this.openMoreInfo(entityId);
+  };
+
+  /**
+   * Keyboard twin of the card tap, used while the status row (which normally
+   * carries that path) is not rendered. Only keys landing on the card itself
+   * count – inner controls keep their own behaviour.
+   */
+  private handleCardKeydown = (event: KeyboardEvent): void => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const entityId = this.tapTarget;
+    if (!entityId) return;
+    event.preventDefault();
     this.openMoreInfo(entityId);
   };
 
@@ -920,7 +902,10 @@ export class RoomClimateCard extends LitElement {
       bandHotText: t.t('bandHot'),
     };
 
-    return html`<div class="chart-slot">
+    // With the readout switched off the chart area belongs to the card tap.
+    const chartTappable = Boolean(this.tapTarget) && !config.chart.showTooltip;
+
+    return html`<div class="chart-slot ${chartTappable ? 'is-tappable' : ''}">
       <room-climate-chart
         .temperature=${temperatureSamples}
         .humidity=${humiditySamples}
@@ -928,7 +913,6 @@ export class RoomClimateCard extends LitElement {
         .humidityColor=${config.humidity.color}
         .setpoint=${setpoint}
         .setpointUnit=${temperatureUnitOfSensor}
-        .hiddenSeries=${this._hiddenSeries}
         .start=${start}
         .end=${end}
         .showPoints=${config.chart.showPoints}
@@ -1208,12 +1192,6 @@ export class RoomClimateCard extends LitElement {
       flex: none;
       transition: opacity 0.18s ease;
     }
-    .series-label.is-hidden {
-      color: var(--rcc-tertiary);
-    }
-    .series-label.is-hidden .series-dot {
-      opacity: 0.3;
-    }
 
     .reading-values {
       display: flex;
@@ -1226,24 +1204,8 @@ export class RoomClimateCard extends LitElement {
       display: inline-flex;
       align-items: baseline;
       min-width: 0;
-      border: 0;
-      background: none;
-      /* 8 px of symmetric padding lifts the 20 px humidity value to a 36 px
-         tap target; the negative margin cancels it visually, so the shared
-         baseline of both values is untouched. */
-      padding: 8px 0;
-      margin: -8px 0;
       color: inherit;
       font: inherit;
-      border-radius: 8px;
-    }
-    button.reading {
-      cursor: pointer;
-      transition: opacity 0.18s ease;
-    }
-    button.reading:focus-visible {
-      outline: 2px solid var(--rcc-accent);
-      outline-offset: 2px;
     }
     .reading.temperature {
       font-size: var(--rcc-temp-size);
@@ -1278,10 +1240,6 @@ export class RoomClimateCard extends LitElement {
     }
     .reading.humidity .reading-unit {
       font-size: 0.5em;
-    }
-    .reading.is-hidden .reading-number,
-    .reading.is-hidden .reading-unit {
-      color: var(--rcc-tertiary);
     }
 
     /* --------------------------------------------------------- heating row */
@@ -1329,6 +1287,14 @@ export class RoomClimateCard extends LitElement {
     }
     .card.is-tappable .chart-slot {
       cursor: default;
+    }
+    /* The chart only keeps its own cursor while it owns the tap (readout). */
+    .card.is-tappable .chart-slot.is-tappable {
+      cursor: pointer;
+    }
+    .card[role='button']:focus-visible {
+      outline: 2px solid var(--rcc-accent);
+      outline-offset: 2px;
     }
     .flame {
       display: inline-flex;

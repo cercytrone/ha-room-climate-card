@@ -189,8 +189,6 @@ export interface CardOptions {
   temperature: string;
   unit: string;
   humidity?: string;
-  /** Series switched off with a click – shown dimmed in the preview. */
-  hidden?: Array<'temperature' | 'humidity'>;
   window?: 'closed' | 'open' | 'unknown';
   motion?: 'active' | 'idle' | 'none';
   quiet?: string;
@@ -263,7 +261,6 @@ function renderCard(options: CardOptions): string {
   const fade = alpha < 1 ? ` stroke-opacity="${alpha}"` : '';
   const left = x + INSET;
   const right = x + cardW - INSET;
-  const hidden = options.hidden ?? [];
 
   const headerY = y + INSET;
   const labelsY = headerY + HEADER_H + SPACE_3;
@@ -280,8 +277,8 @@ function renderCard(options: CardOptions): string {
   const start = end - rangeMs;
   const xScale = linearScale([start, end], [left, right]);
 
-  const temperatureVisible = !hidden.includes('temperature');
-  const humidityVisible = !hidden.includes('humidity') && Boolean(options.humiditySeries);
+  const temperatureVisible = true;
+  const humidityVisible = Boolean(options.humiditySeries);
 
   // --- geometry: with both series the humidity owns the upper third and the
   // temperature the lower half; a single series gets the whole plot (same rule
@@ -586,40 +583,34 @@ function renderCard(options: CardOptions): string {
   }`;
 
   // --- readings: caption row with the colour dots, then one baseline row ---
-  const temperatureDim = hidden.includes('temperature');
-  const humidityDim = hidden.includes('humidity');
-  const labelColor = (dimmed: boolean) => (dimmed ? C.tertiary : C.muted);
-
-  const temperatureLabel = `<g opacity="${temperatureDim ? 0.45 : 1}">
+  const temperatureLabel = `<g>
     <circle cx="${left + 3}" cy="${labelsY + 8}" r="3" fill="${C.accent}" />
     <text x="${left + 12}" y="${capBaseline(labelsY + 8, TYPE.label)}" ${font(
       TYPE.label,
       500
-    )} ${TRACKING(0.09, TYPE.label)} fill="${labelColor(temperatureDim)}">TEMPERATUR</text>
+    )} ${TRACKING(0.09, TYPE.label)} fill="${C.muted}">TEMPERATUR</text>
   </g>`;
 
   const humidityLabelWidth = upperWidth('LUFTFEUCHTE', TYPE.label, 0.09);
   const humidityTextX = right;
   const humidityLabel = options.humidity
-    ? `<g opacity="${humidityDim ? 0.45 : 1}">
+    ? `<g>
         <circle cx="${(humidityTextX - humidityLabelWidth - SPACE_2).toFixed(
           1
         )}" cy="${labelsY + 8}" r="3" fill="${C.secondary}" />
         <text x="${humidityTextX}" y="${capBaseline(labelsY + 8, TYPE.label)}" ${font(
           TYPE.label,
           500
-        )} ${TRACKING(0.09, TYPE.label)} fill="${labelColor(
-          humidityDim
-        )}" text-anchor="end">LUFTFEUCHTE</text>
+        )} ${TRACKING(0.09, TYPE.label)} fill="${C.muted}" text-anchor="end">LUFTFEUCHTE</text>
       </g>`
     : '';
 
   const heroWidth = approxWidth(options.temperature, TYPE.hero);
-  const hero = `<g opacity="${temperatureDim ? 0.45 : 1}">
+  const hero = `<g>
     <text x="${left}" y="${heroBaseline}" ${font(TYPE.hero, 500)} ${TRACKING(
       -0.035,
       TYPE.hero
-    )} fill="${temperatureDim ? C.tertiary : C.text}">${escapeXml(options.temperature)}</text>
+    )} fill="${C.text}">${escapeXml(options.temperature)}</text>
     <text x="${(left + heroWidth + 6).toFixed(1)}" y="${heroBaseline}" ${font(
       TYPE.hero * 0.34
     )} fill="${C.muted}">${escapeXml(options.unit)}</text>
@@ -629,12 +620,12 @@ function renderCard(options: CardOptions): string {
   const humidityUnitWidth = approxWidth('%', secondarySize * 0.5);
   const humidityValueWidth = approxWidth(options.humidity ?? '', secondarySize);
   const humidity = options.humidity
-    ? `<g opacity="${humidityDim ? 0.45 : 1}">
+    ? `<g>
         <text x="${(right - humidityUnitWidth - 2).toFixed(1)}" y="${heroBaseline}" ${font(
           secondarySize,
           500
         )} ${TRACKING(-0.02, secondarySize)} fill="${
-          humidityDim ? C.tertiary : C.text
+          C.text
         }" text-anchor="end">${escapeXml(options.humidity)}</text>
         <text x="${right}" y="${heroBaseline}" ${font(secondarySize * 0.5)} fill="${
           C.muted
@@ -905,8 +896,6 @@ function cardSpecs(): CardSpec[] {
       hvacKey: 'unknown',
       series: samples(18.7, 0.6, 6),
       humiditySeries: samples(44, 2, 5),
-      // Klick auf den Wert: die Feuchteserie ist ausgeblendet.
-      hidden: ['humidity'],
     },
   ];
 }
