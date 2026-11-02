@@ -4,6 +4,30 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.15.0] – 2026-11-02
+
+### Geändert
+
+- **Der Verlauf schließt bündig mit der Außenkante ab.** Der Chart hebt den Innenabstand
+  (`card_padding`) links und rechts auf, statt in einem 10-px-Rand zu enden: Kurven,
+  Flächenverläufe und Grundlinie laufen bis an die Kante der Karte, die Rundung beschneidet sie.
+  Titel, Messwerte und Heizzeile behalten ihren Innenabstand.
+- **Die „Jetzt“-Marke bleibt vollständig sichtbar.** Sie saß am rechten Rand der Plotfläche und
+  wäre mit dem bündigen Chart zur Hälfte in der Außenkante verschwunden. Die Plotfläche endet
+  jetzt einen Markenradius (2,8 px) vor der Kante – die Marke sitzt weiterhin exakt auf dem
+  gezeichneten Endpunkt (Variante A aus 2.9.1 bleibt gewahrt), beide Reihen teilen sich dieselbe
+  x-Position.
+- **„Soll“-Beschriftung mit Luft zur Kante:** Sie ist Text und rückt 3 px von der Außenkante ab,
+  damit sie nicht am Rand klebt; die Kollisionsprüfung mit den Min/Max-Zahlen nutzt denselben
+  Anker.
+- Die Zeitachse behält ihren Sicherheitsabstand zum Eckenradius (28 px), damit auch bei
+  `card_padding: 0` kein Achsenlabel in der Rundung verschwindet.
+
+### Behoben
+
+- Die Showcase-Vorschau zeichnete die Soll-Linie unter den Flächenverlauf (die Beschriftung wirkte
+  dadurch abgeschnitten). Reihenfolge entspricht jetzt der Karte: Flächen, Soll-Linie, Kurven.
+
 ## [2.14.0] – 2026-11-02
 
 ### Geändert

@@ -261,6 +261,13 @@ function renderCard(options: CardOptions): string {
   const fade = alpha < 1 ? ` stroke-opacity="${alpha}"` : '';
   const left = x + INSET;
   const right = x + cardW - INSET;
+  /*
+   * The chart is flush with the card edge (the card cancels its inset for the
+   * chart) and keeps one dot radius free on the right, so the "now" dot stays
+   * whole – same numbers as the web component.
+   */
+  const chartLeft = x + 1;
+  const chartRight = x + cardW - 1 - 2.8;
 
   const headerY = y + INSET;
   const labelsY = headerY + HEADER_H + SPACE_3;
@@ -275,7 +282,9 @@ function renderCard(options: CardOptions): string {
   const rangeMs = 6 * 3600 * 1000;
   const end = Date.now();
   const start = end - rangeMs;
-  const xScale = linearScale([start, end], [left, right]);
+  const xScale = linearScale([start, end], [chartLeft, chartRight]);
+  // Text on the time axis keeps its distance to the rounded corners.
+  const labelScale = linearScale([start, end], [chartLeft + 28, chartRight - 28]);
 
   const temperatureVisible = true;
   const humidityVisible = Boolean(options.humiditySeries);
@@ -391,7 +400,7 @@ function renderCard(options: CardOptions): string {
     ? [1, 2]
         .map((index) => {
           const lineY = chartTop + (plotHeight * index) / 3;
-          return `<line x1="${left}" x2="${right}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(
+          return `<line x1="${chartLeft}" x2="${chartRight}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(
             1
           )}" stroke="${C.text}" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="2 6" />`;
         })
@@ -419,10 +428,10 @@ function renderCard(options: CardOptions): string {
     setpointY !== null &&
     setpointY >= temperatureBandTop - 0.5 &&
     setpointY <= chartBottom + 0.5
-      ? `<line x1="${left}" x2="${right}" y1="${setpointY.toFixed(1)}" y2="${setpointY.toFixed(
+      ? `<line x1="${chartLeft}" x2="${chartRight}" y1="${setpointY.toFixed(1)}" y2="${setpointY.toFixed(
           1
         )}" stroke="${C.accent}" stroke-opacity="0.42" stroke-width="1" stroke-dasharray="3 4" />
-        <text x="${captionRight ? right : left}" y="${(setpointY - 5).toFixed(
+        <text x="${captionRight ? chartRight - 3 : chartLeft + 3}" y="${(setpointY - 5).toFixed(
           1
         )}" ${font(9, 500)} ${TRACKING(0.09, 9)} fill="${C.tertiary}" text-anchor="${
           captionRight ? 'end' : 'start'
@@ -485,17 +494,17 @@ function renderCard(options: CardOptions): string {
       }
       if (tooClose(keep[0], keep[1])) keep = keep.filter((entry) => entry.isMax);
     }
-    const captionX = captionRight ? right : left;
+    const captionX = captionRight ? chartRight - 3 : chartLeft + 3;
     return keep
       .map((entry) => {
         const text = entry.value.toFixed(decimals).replace('.', ',');
-        const preferRight = entry.cx < (left + right) / 2;
+        const preferRight = entry.cx < (chartLeft + chartRight) / 2;
         let labelX = preferRight ? entry.cx + 6 : entry.cx - 6;
         let anchor = preferRight ? 'start' : 'end';
-        if (anchor === 'start' && labelX + 26 > right - 2) {
+        if (anchor === 'start' && labelX + 26 > chartRight - 2) {
           labelX = entry.cx - 6;
           anchor = 'end';
-        } else if (anchor === 'end' && labelX - 26 < left + 2) {
+        } else if (anchor === 'end' && labelX - 26 < chartLeft + 2) {
           labelX = entry.cx + 6;
           anchor = 'start';
         }
@@ -549,7 +558,7 @@ function renderCard(options: CardOptions): string {
       const isLast = index === 2;
       const anchor = index === 0 ? 'start' : isLast ? 'end' : 'middle';
       const label = isLast ? 'Jetzt' : dayTime(tick);
-      return `<text x="${xScale(tick).toFixed(1)}" y="${axisBaseline}" ${font(
+      return `<text x="${labelScale(tick).toFixed(1)}" y="${axisBaseline}" ${font(
         TYPE.axis
       )} fill="${C.tertiary}" text-anchor="${anchor}">${label}</text>`;
     })
@@ -788,12 +797,13 @@ function renderCard(options: CardOptions): string {
 
       ${gridLines}
       ${temperatureArea ? `<path d="${temperatureArea}" fill="url(#${options.cardId}-area)" />` : ''}
-      ${setpointLine}
       ${humidityArea ? `<path d="${humidityArea}" fill="url(#${options.cardId}-area-humidity)" />` : ''}
+      ${/* The reference line sits above the fills but below the curves – same order as the card. */ ''}
+      ${setpointLine}
       ${humidityLines}
       ${temperatureLines}
       ${dots}
-      <line x1="${left}" x2="${right}" y1="${chartBottom}" y2="${chartBottom}" stroke="${
+      <line x1="${chartLeft}" x2="${chartRight}" y1="${chartBottom}" y2="${chartBottom}" stroke="${
         C.text
       }" stroke-opacity="0.1" />
       ${endDots}

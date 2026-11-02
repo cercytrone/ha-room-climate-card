@@ -664,9 +664,14 @@ describe('climate chart', () => {
     const startX = numbers[0];
     const endX = numbers[numbers.length - 2];
     const xs = numbers.filter((_, index) => index % 2 === 0);
+    /*
+     * The chart is drawn edge to edge inside the card, with one dot radius kept
+     * free on the right so the "now" dot is not cut by the outer edge.
+     */
+    const rightBound = 320 - 1 - 2.8;
     expect(startX).toBeLessThanOrEqual(2);
-    expect(endX).toBeGreaterThanOrEqual(318);
-    expect(Math.max(...xs)).toBeGreaterThanOrEqual(318);
+    expect(endX).toBeGreaterThanOrEqual(rightBound - 0.5);
+    expect(Math.max(...xs)).toBeGreaterThanOrEqual(rightBound - 0.5);
   });
 
   it('renders data point markers when enabled', async () => {
@@ -773,6 +778,70 @@ describe('climate chart', () => {
     // Data and interaction stay untouched.
     expect(withoutAxis.shadowRoot!.querySelectorAll('.series-line').length).toBeGreaterThan(0);
     expect(withoutAxis.shadowRoot!.querySelectorAll('.end-dot').length).toBeGreaterThan(0);
+  });
+
+  it('runs the curve to the edge yet keeps the last dot whole', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 23]),
+      humidity: samples([45, 46, 47, 48]),
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+
+    const svg = chart.shadowRoot!.querySelector('svg[role="img"]')!;
+    const width = Number(svg.getAttribute('viewBox')!.split(/\s+/)[2]);
+
+    // The line itself ends on the very edge – no gutter.
+    const longest = Array.from(chart.shadowRoot!.querySelectorAll('path.series-line'))
+      .map((path) => path.getAttribute('d') ?? '')
+      .sort((a, b) => b.length - a.length)[0];
+    const numbers = (longest.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    // One dot radius is reserved at the edge – the curve ends right before it.
+    expect(numbers[numbers.length - 2]).toBeCloseTo(width - 1 - 2.8, 1);
+
+    // Both end dots stay completely inside the chart area, right at the edge.
+    const dots = Array.from(chart.shadowRoot!.querySelectorAll('.end-dot')) as SVGCircleElement[];
+    expect(dots).toHaveLength(2);
+    for (const dot of dots) {
+      const cx = Number(dot.getAttribute('cx'));
+      const r = Number(dot.getAttribute('r'));
+      expect(cx + r).toBeLessThanOrEqual(width);
+      expect(width - (cx + r)).toBeLessThan(1.5);
+    }
+
+    // The "Jetzt" label keeps its distance to the rounded corner.
+    const axisLabels = Array.from(
+      chart.shadowRoot!.querySelectorAll('.axis-label')
+    ) as SVGTextElement[];
+    const last = axisLabels[axisLabels.length - 1];
+    expect(last.textContent?.trim()).toBe('Jetzt');
+    expect(Number(last.getAttribute('x'))).toBeLessThanOrEqual(width - 26);
+  });
+
+  it('keeps the "Soll" caption clear of the outer edge on both sides', async () => {
+    const captionOf = async (setpoint: number): Promise<SVGTextElement> => {
+      document.body.replaceChildren();
+      const chart = createChart({
+        temperature: samples([20, 21, 22]),
+        setpoint,
+        showSetpoint: true,
+      });
+      setSize(chart, 320, 130);
+      await chart.updateComplete;
+      return chart.shadowRoot!.querySelector('.setpoint-caption') as SVGTextElement;
+    };
+
+    // Reference below the curve: the caption sits at the right end.
+    const right = await captionOf(19);
+    const rightX = Number(right.getAttribute('x'));
+    expect(right.getAttribute('text-anchor')).toBe('end');
+    expect(rightX).toBeLessThanOrEqual(320 - 3);
+
+    // Reference above the curve: the caption sits at the left end.
+    const left = await captionOf(23);
+    const leftX = Number(left.getAttribute('x'));
+    expect(left.getAttribute('text-anchor')).toBe('start');
+    expect(leftX).toBeGreaterThanOrEqual(3);
   });
 
   it('hides axis labels when there is not enough height', async () => {
