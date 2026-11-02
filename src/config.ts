@@ -606,6 +606,18 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
   };
 }
 
+/**
+ * Horizontal margin of the chart inside the card, in pixels.
+ *
+ * Negative by the configured inset while full bleed is on, so the chart grows
+ * out of the padding box and touches the card's outer edge. Zero keeps it on
+ * the same edge as the text. Kept here (instead of in CSS) so the box model is
+ * a plain number that can be asserted in tests.
+ */
+export function chartSlotMargin(config: ResolvedConfig): number {
+  return config.chart.fullBleed ? -config.padding : 0;
+}
+
 /** All entity ids this configuration listens to. */
 export function configEntityIds(config: ResolvedConfig): string[] {
   const ids = [

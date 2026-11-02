@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.16.0`.
+  `ROOM-CLIMATE-CARD v2.16.1`.
 
 ---
 
@@ -601,7 +601,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 169,8 kB, **48,2 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 169,4 kB, **48,1 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -749,7 +749,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 383 Tests in 13 Dateien aus (Stand 2.16.0):
+`npm test` führt 384 Tests in 13 Dateien aus (Stand 2.16.1):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

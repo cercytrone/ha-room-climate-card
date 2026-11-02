@@ -844,6 +844,47 @@ describe('climate chart', () => {
     expect(leftX).toBeGreaterThanOrEqual(3);
   });
 
+  it('keeps the axis row inside the chart and clear of the bottom edge', async () => {
+    /*
+     * The chart is flush with the card's side edges, so the only bottom air is
+     * the card inset plus what the SVG reserves itself. These numbers are what
+     * that reserve is made of.
+     */
+    const chart = createChart({ temperature: samples([20, 21, 22, 21]) });
+    setSize(chart, 340, 112);
+    await chart.updateComplete;
+
+    const svg = chart.shadowRoot!.querySelector('svg[role="img"]')!;
+    const height = Number(svg.getAttribute('viewBox')!.split(/\s+/)[3]);
+    const labels = Array.from(chart.shadowRoot!.querySelectorAll('.axis-label')) as SVGTextElement[];
+    expect(labels).toHaveLength(3);
+
+    // Baseline 6 px above the chart's bottom …
+    const baseline = Math.max(...labels.map((label) => Number(label.getAttribute('y'))));
+    expect(baseline).toBe(height - 6);
+    // … and the descenders of the 10.5 px type still fit inside the box.
+    expect(baseline + 10.5 * 0.22).toBeLessThanOrEqual(height - 1);
+
+    // The row sits below the plotted area, not on the curve.
+    const plotBottom = Number(
+      (chart.shadowRoot!.querySelector('.baseline') as SVGLineElement).getAttribute('y1')
+    );
+    expect(plotBottom).toBe(height - 20);
+    expect(baseline).toBeGreaterThan(plotBottom + 6);
+
+    // Switching the axis off hands that room to the plot.
+    document.body.replaceChildren();
+    const withoutAxis = createChart({ temperature: samples([20, 21, 22, 21]), showAxis: false });
+    setSize(withoutAxis, 340, 112);
+    await withoutAxis.updateComplete;
+    expect(withoutAxis.shadowRoot!.querySelectorAll('.axis-label')).toHaveLength(0);
+    expect(
+      Number(
+        (withoutAxis.shadowRoot!.querySelector('.baseline') as SVGLineElement).getAttribute('y1')
+      )
+    ).toBe(height - 2);
+  });
+
   it('hides axis labels when there is not enough height', async () => {
     const chart = createChart({ temperature: samples([20, 21, 22]) });
     setSize(chart, 320, 55);
