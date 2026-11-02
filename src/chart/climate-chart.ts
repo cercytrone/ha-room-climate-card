@@ -871,8 +871,25 @@ export class RoomClimateChart extends LitElement {
       value === null || setpointValue === null ? 0 : Math.abs(value - setpointValue);
     const captionOnRight = distance(lastTempValue) >= distance(firstTempValue);
 
-    const lastTemp = [...tempSeries].reverse().find((sample) => sample.v !== null);
-    const lastHumidity = [...humiditySeries].reverse().find((sample) => sample.v !== null);
+    /*
+     * The end dot has to sit *on* the curve, so it is taken from the drawn
+     * segments instead of the raw measurements. With smoothing on, the newest
+     * plotted value is the average of its neighbours: on a rising room that is
+     * up to 0.2 °C below the last measurement – the dot used to float clearly
+     * above the line (0.2 °C ≈ 17 px), and below it while the room cooled down.
+     * Data points and the min/max marks already come from the drawn series.
+     */
+    const lastPlotted = (segments: SeriesSegment[]): ChartSample | undefined => {
+      for (let index = segments.length - 1; index >= 0; index -= 1) {
+        const run = segments[index].samples;
+        for (let sampleIndex = run.length - 1; sampleIndex >= 0; sampleIndex -= 1) {
+          if (run[sampleIndex].v !== null) return run[sampleIndex];
+        }
+      }
+      return undefined;
+    };
+    const lastTemp = lastPlotted(tempSegments);
+    const lastHumidity = lastPlotted(humiditySegments);
 
     // The dashed reference is invisible to screen readers, so its value and unit
     // are part of the accessible name.
