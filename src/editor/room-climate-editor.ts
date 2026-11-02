@@ -205,7 +205,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     smoothingMedium: 'Mittel',
     smoothingStrong: 'Stark – für sehr unruhige Sensoren',
     smoothingHelper:
-      'Je ruhiger die Stufe, desto flacher wirkt der Verlauf. „Aus“ zeigt jede gemessene Bewegung, „Leicht“ nimmt nur das Sensor-Zittern, „Mittel“ und „Stark“ bügeln bewusst mehr aus.',
+      'Gemittelt wird über einen Zeitraum, nicht über eine Punktzahl: „Leicht“ über rund ±10 Minuten, „Mittel“ über ±30, „Stark“ über ±60. „Aus“ zeigt jede gemessene Bewegung; lange Pausen ohne Messwert werden nie überbrückt.',
     gapMode: 'Datenlücken',
     gapConnect: 'Kurze Ausfälle überbrücken',
     gapBreak: 'Ausfälle sichtbar unterbrechen',
@@ -325,7 +325,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     smoothingMedium: 'Medium',
     smoothingStrong: 'Strong – for very noisy sensors',
     smoothingHelper:
-      'The calmer the level, the flatter the curve looks. “Off” shows every measured move, “Light” only removes the sensor jitter, “Medium” and “Strong” deliberately iron out more.',
+      'Averaging works over a time span, not a point count: “Light” over roughly ±10 minutes, “Medium” over ±30, “Strong” over ±60. “Off” shows every measured move; long pauses without a reading are never bridged.',
     gapMode: 'Data gaps',
     gapConnect: 'Bridge short outages',
     gapBreak: 'Show outages as broken',

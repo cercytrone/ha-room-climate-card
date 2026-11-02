@@ -1012,6 +1012,45 @@ describe('climate chart', () => {
     expect(dot.style.fill).toBe('#D16A62');
   });
 
+  it('draws a visibly different curve for every smoothing level', async () => {
+    // 24 h of five-minute values: a slow sine plus sensor jitter.
+    const values = Array.from({ length: 288 }, (_, i) =>
+      Math.round((21 + Math.sin(i / 40) * 0.8 + (((i * 37) % 7) - 3) * 0.03) * 10) / 10
+    );
+    const paths: Record<string, string> = {};
+    for (const level of ['none', 'light', 'medium', 'strong'] as const) {
+      document.body.replaceChildren();
+      const chart = createChart({
+        temperature: samples(values),
+        smoothing: level,
+        curve: 'smooth',
+      });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      paths[level] = chart.shadowRoot!.querySelector('path.series-line')?.getAttribute('d') ?? '';
+    }
+    expect(paths.none.length).toBeGreaterThan(0);
+    expect(paths.light).not.toBe(paths.none);
+    expect(paths.medium).not.toBe(paths.light);
+    expect(paths.strong).not.toBe(paths.medium);
+
+    // And they calm down in the right order. Total variation of the drawn
+    // vertices is the honest measure: every wiggle adds to it, a straight line
+    // has none – this is what "ruhiger" means visually.
+    const variation = (path: string): number => {
+      const numbers = (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+      const ys: number[] = [];
+      for (let index = 0; index + 1 < numbers.length; index += 6) ys.push(numbers[index + 1]);
+      ys.push(numbers[numbers.length - 1]);
+      let total = 0;
+      for (let index = 1; index < ys.length; index++) total += Math.abs(ys[index] - ys[index - 1]);
+      return total;
+    };
+    expect(variation(paths.light)).toBeLessThan(variation(paths.none) * 0.75);
+    expect(variation(paths.medium)).toBeLessThan(variation(paths.light) * 0.85);
+    expect(variation(paths.strong)).toBeLessThan(variation(paths.medium));
+  });
+
   it('puts the end dot on the drawn curve, not on the raw measurement', async () => {
     // 6 h at five-minute resolution: "strong" averages 15 samples, so the last
     // drawn value differs clearly from the last measurement (rising room).

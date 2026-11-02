@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.9.1`.
+  `ROOM-CLIMATE-CARD v2.9.2`.
 
 ---
 
@@ -265,7 +265,7 @@ Tastatur-Pendant wäre eine Falle.
 | `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48). |
 | `chart_height` | number | `112` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
 | `chart_curve` | `smooth` \| `linear` | `smooth` | Geglättete (überschwingungsfreie) oder direkt verbundene Linien. |
-| `chart_smoothing` | `none` \| `light` \| `medium` \| `strong` | `light` | Stufe der Kurvenglättung. `none` zeichnet jeden Messwert, `light` nimmt nur das Sensor-Zittern, `medium`/`strong` beruhigen sehr unruhige Sensoren. Wirkt nur bei `chart_curve: smooth`. |
+| `chart_smoothing` | `none` \| `light` \| `medium` \| `strong` | `light` | Stufe der Kurvenglättung, als Zeitfenster: `light` ±10, `medium` ±30, `strong` ±60 Minuten, `none` zeichnet jeden Messwert. Wirkt nur bei `chart_curve: smooth`. |
 | `chart_humidity_line_style` | `solid` \| `dotted` | `solid` | Feuchtekurve durchgezogen oder **gepunktet** zeichnen. Betrifft nur die Feuchte; Fläche, Endpunkt und Farben bleiben. |
 | `chart_gap_mode` | `connect` \| `break` | `connect` | Echte Ausfälle (`unavailable`/`unknown`) überbrücken oder sichtbar unterbrechen. Konstante Phasen ohne HA-Samples werden **immer** durchgehend gezeichnet. |
 | `chart_max_gap_minutes` | number | `120` | Längste **echte** Ausfallzeit (Minuten), die noch überbrückt wird; längere bleiben offen. Ruhige Phasen ohne Samples zählen nicht mit. |
@@ -403,9 +403,20 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   | Stufe | Mittelwertfenster | Charakter |
   | --- | --- | --- |
   | `none` (Aus) | keins | jeder Messwert, volle Kontur – auch jedes Zittern |
-  | `light` (Standard) | 3 Punkte, bei dichten Reihen 5 | Sensor-Zittern weg, Form bleibt |
-  | `medium` | 5 / 9 Punkte | deutlich ruhiger |
-  | `strong` | 9 / 15 Punkte | für sehr unruhige Sensoren |
+  | `light` (Standard) | ±10 Minuten | Sensor-Zittern weg, Form bleibt |
+  | `medium` | ±30 Minuten | deutlich ruhiger |
+  | `strong` | ±60 Minuten | für sehr unruhige Sensoren |
+
+  Das Fenster ist in **Zeit** angegeben, nicht in Punkten: Home Assistant speichert nur
+  Änderungen, ein „15-Punkte-Fenster“ wäre bei einem geschwätzigen Sensor 15 Minuten und bei einem
+  ruhigen zwei Stunden – die Stufen fühlten sich dadurch je nach Chart identisch oder viel zu
+  stark an. Aus dem Zeitfenster wird pro Reihe die passende Punktzahl (immer ungerade, also
+  zentriert); meldet ein Sensor nur alle 20 Minuten, bleibt mindestens der direkte Nachbar im
+  Fenster. Nach oben ist bei 121 Punkten Schluss, unten bei zwei Minuten.
+  Zwei Dinge sichern das Ergebnis ab: Der Mittelwert behält **zwei Nachkommastellen** (auf die
+  0,1er-Raster des Sensors gerundet fielen die Stufen wieder zusammen), und ein echter Stillstand
+  beendet das Mitteln – der Abstand zum Nachbarn darf höchstens das Doppelte des Fensters und
+  nie mehr als 90 Minuten betragen. Ein gemessener Sprung wird also nicht zur Rampe.
 
   Danach zeichnet eine kubische Kurve durch alle Messpunkte. Ihre Steigung an jedem Punkt ist der
   gedämpfte Mittelwert der beiden Nachbarsteigungen – eine Ecke bei jedem Wendepunkt (die alte
@@ -554,7 +565,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 166,2 kB, **46,9 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 166,3 kB, **46,9 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -702,7 +713,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 361 Tests in 13 Dateien aus (Stand 2.9.1):
+`npm test` führt 363 Tests in 13 Dateien aus (Stand 2.9.2):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

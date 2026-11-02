@@ -20,6 +20,7 @@ import {
   MAX_OVERSHOOT,
   smoothPath,
   SMOOTHING_LEVELS,
+  smoothingGuard,
   smoothingWindow,
   tickCountForWidth,
   timeTicks,
@@ -528,10 +529,10 @@ describe('denoising', () => {
     const jagged = series([20, 22, 20, 22, 20, 22, 20]);
     const smoothed = movingAverage(jagged, 3);
     expect(smoothed).toHaveLength(jagged.length);
-    expect(smoothed.map((s) => s.v)).toEqual([21, 20.7, 21.3, 20.7, 21.3, 20.7, 21]);
+    expect(smoothed.map((s) => s.v)).toEqual([21, 20.67, 21.33, 20.67, 21.33, 20.67, 21]);
     // The overall level must not move – only the jitter disappears.
     const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
-    // Rounding to one decimal may shift the mean by a tenth – no more.
+    // Two decimals may shift the mean by a hundredth – no more.
     expect(Math.abs(mean(smoothed.map((s) => s.v as number)) - mean([20, 22, 20, 22, 20, 22, 20]))).toBeLessThan(0.2);
   });
 
@@ -558,12 +559,16 @@ describe('denoising', () => {
       21.3, 21.7, 21.2, 21.6, 21.0, 20.8, 21.1, 20.7, 21.2, 20.9, 21.4, 21.8, 21.5,
     ];
     const input = series(values);
+    // Only steps a reader can see count as a direction change: below half the
+    // resolution of the sensor (0.05 °C) the wobble is smaller than a pixel.
+    const VISIBLE = 0.05;
     const directionChanges = (samples: ChartSample[]) => {
       let flips = 0;
       for (let i = 2; i < samples.length; i++) {
-        const before = Math.sign((samples[i - 1].v as number) - (samples[i - 2].v as number));
-        const after = Math.sign((samples[i].v as number) - (samples[i - 1].v as number));
-        if (before !== 0 && after !== 0 && before !== after) flips += 1;
+        const before = (samples[i - 1].v as number) - (samples[i - 2].v as number);
+        const after = (samples[i].v as number) - (samples[i - 1].v as number);
+        if (Math.abs(before) < VISIBLE || Math.abs(after) < VISIBLE) continue;
+        if (Math.sign(before) !== Math.sign(after)) flips += 1;
       }
       return flips;
     };
@@ -576,9 +581,10 @@ describe('denoising', () => {
     const short = movingAverage(input, 3);
     const long = movingAverage(input, 9);
 
-    // Short window: recognisably calmer than the raw signal…
-    expect(directionChanges(short)).toBeLessThan(raw / 2);
-    expect(directionChanges(short)).toBeGreaterThan(0);
+    // Short window: calmer than the raw signal, but the wider one calms more –
+    // that is exactly the difference between the levels.
+    expect(directionChanges(short)).toBeLessThan(raw);
+    expect(directionChanges(long)).toBeLessThan(directionChanges(short));
     // …but it keeps the amplitude of the measurement much better than the old
     // 9-point window, which flattened the curve into a nearly straight line.
     expect(amplitude(short)).toBeGreaterThan(amplitude(long));
@@ -591,76 +597,93 @@ describe('denoising', () => {
     }
   });
 
-  it('scales the window with the sample count and keeps it odd', () => {
-    expect(smoothingWindow(3)).toBe(1);
-    expect(smoothingWindow(10)).toBe(3);
-    expect(smoothingWindow(40)).toBe(3);
-    expect(smoothingWindow(100)).toBe(5);
-    expect(smoothingWindow(400)).toBe(5);
-    // Never wider than five points: the old 7/9 windows ironed the curve flat.
-    for (const count of [5, 20, 60, 160, 1000]) {
-      expect(smoothingWindow(count)).toBeLessThanOrEqual(5);
-      expect(smoothingWindow(count) % 2).toBe(1);
-    }
-  });
-
-  it('offers four smoothing levels with their own window', () => {
-    // Level 0 is "draw every measurement", the ladder grows from there.
-    for (const count of [10, 40, 100, 400]) {
-      expect(smoothingWindow(count, 'none')).toBe(1);
-    }
-    expect(smoothingWindow(40, 'light')).toBe(3);
-    expect(smoothingWindow(40, 'medium')).toBe(5);
-    expect(smoothingWindow(40, 'strong')).toBe(9);
-    expect(smoothingWindow(200, 'light')).toBe(5);
-    expect(smoothingWindow(200, 'medium')).toBe(9);
-    expect(smoothingWindow(200, 'strong')).toBe(15);
+  it('turns a level into a window that fits the sampling rate', () => {
+    const minutes = (value: number) => value * 60_000;
+    // Five-minute sensor: ±10 / ±30 / ±60 minutes become 5 / 13 / 25 samples.
+    expect(smoothingWindow(minutes(5), 'light')).toBe(5);
+    expect(smoothingWindow(minutes(5), 'medium')).toBe(13);
+    expect(smoothingWindow(minutes(5), 'strong')).toBe(25);
+    // Ten-minute sensor: the same spans, half the samples.
+    expect(smoothingWindow(minutes(10), 'light')).toBe(3);
+    expect(smoothingWindow(minutes(10), 'medium')).toBe(7);
+    expect(smoothingWindow(minutes(10), 'strong')).toBe(13);
+    // A one-minute sensor gets the cap, not a window across hours.
+    expect(smoothingWindow(minutes(1), 'strong')).toBe(121);
+    // A coarse sensor still averages with its direct neighbour.
+    expect(smoothingWindow(minutes(45), 'light')).toBe(3);
     // Every level stays odd so the average is centred.
     for (const level of SMOOTHING_LEVELS) {
-      for (const count of [5, 30, 90, 500]) {
-        expect(smoothingWindow(count, level) % 2).toBe(1);
+      for (const spacing of [minutes(1), minutes(5), minutes(17), minutes(60)]) {
+        expect(smoothingWindow(spacing, level) % 2).toBe(1);
       }
     }
-    // Short runs are never averaged – there is no neighbour to average with.
-    for (const level of SMOOTHING_LEVELS) {
-      expect(smoothingWindow(4, level)).toBe(1);
-    }
+    // No spacing and "off" mean: no averaging.
+    expect(smoothingWindow(0, 'strong')).toBe(1);
+    expect(smoothingWindow(minutes(5), 'none')).toBe(1);
     // Unknown / missing level falls back to the default instead of throwing.
-    expect(smoothingWindow(40, 'wobble' as never)).toBe(smoothingWindow(40, DEFAULT_SMOOTHING));
-    expect(smoothingWindow(40)).toBe(smoothingWindow(40, 'light'));
+    expect(smoothingWindow(minutes(5), 'wobble' as never)).toBe(
+      smoothingWindow(minutes(5), DEFAULT_SMOOTHING)
+    );
+    expect(smoothingWindow(minutes(5))).toBe(smoothingWindow(minutes(5), 'light'));
+  });
+
+  it('lets the whole window into the time guard, but not a stillstand of hours', () => {
+    const spacing = 5 * 60_000;
+    for (const level of SMOOTHING_LEVELS) {
+      const window = smoothingWindow(spacing, level);
+      const radius = Math.floor(window / 2);
+      // Every neighbour the window can reach is inside the guard – otherwise the
+      // guard silently shrinks the window (that was the old bug).
+      expect(radius * spacing).toBeLessThanOrEqual(smoothingGuard(window, spacing));
+      // …and no level ever reaches over a gap of hours.
+      expect(smoothingGuard(window, spacing)).toBeLessThanOrEqual(90 * 60_000);
+    }
+    // At least two minutes, so a dense sensor still averages something.
+    expect(smoothingGuard(3, 20_000)).toBe(2 * 60_000);
+    // Without a usable spacing the guard stays out of the way.
+    expect(smoothingGuard(3, 0)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('offers four distinct smoothing levels', () => {
+    const spacing = 5 * 60_000;
+    expect(smoothingWindow(spacing, 'none')).toBe(1);
+    expect(smoothingWindow(spacing, 'light')).toBeLessThan(smoothingWindow(spacing, 'medium'));
+    expect(smoothingWindow(spacing, 'medium')).toBeLessThan(smoothingWindow(spacing, 'strong'));
   });
 
   it('draws every measured value when smoothing is off', () => {
-    const input = series([21.4, 21.8, 21.5, 22.1, 21.6, 22.4, 21.9]);
-    expect(movingAverage(input, smoothingWindow(input.length, 'none')).map((s) => s.v)).toEqual([
-      21.4, 21.8, 21.5, 22.1, 21.6, 22.4, 21.9,
-    ]);
+    const values = [
+      21.4, 21.8, 21.5, 22.1, 21.6, 22.4, 21.9, 22.6, 22.1, 21.7, 22.2, 21.8, 22.5, 21.9,
+      21.3, 21.7, 21.2, 21.6, 21.0, 20.8, 21.1, 20.7, 21.2, 20.9, 21.4,
+    ];
+    // Two hours at five-minute steps, so the spans become real windows.
+    const input = values.map((v, i) => ({ t: i * 5 * 60_000, v }));
+    expect(movingAverage(input, smoothingWindow(5 * 60_000, 'none')).map((s) => s.v)).toEqual(values);
     // A stronger level flattens more than a light one – same data, less amplitude.
     const amplitude = (window: number) => {
-      const values = movingAverage(input, window).map((sample) => sample.v as number);
-      return Math.max(...values) - Math.min(...values);
+      const smoothed = movingAverage(input, window).map((sample) => sample.v as number);
+      return Math.max(...smoothed) - Math.min(...smoothed);
     };
-    expect(amplitude(smoothingWindow(input.length, 'strong'))).toBeLessThan(
-      amplitude(smoothingWindow(input.length, 'light'))
+    expect(amplitude(smoothingWindow(5 * 60_000, 'strong'))).toBeLessThan(
+      amplitude(smoothingWindow(5 * 60_000, 'light'))
     );
   });
 
-  it('rounds to the precision of the sensor, not to a fixed decimal', () => {
-    // A 0.1 °C sensor keeps one decimal …
-    const coarse = movingAverage(series([21.1, 21.2, 21.1, 21.2, 21.1]), 3);
-    for (const sample of coarse) {
-      expect(String(sample.v).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(1);
-    }
-    // … a fine-grained one keeps its second decimal instead of losing detail.
-    const fine = movingAverage(series([21.0, 21.02, 21.0, 21.04, 21.02]), 3);
-    const fineValues = fine.map((sample) => sample.v as number);
-    expect(new Set(fineValues).size).toBeGreaterThan(1);
-    expect(fineValues.some((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-9)).toBe(
-      true
-    );
+  it('keeps two decimals instead of snapping back onto the sensor grid', () => {
+    // A 0.1 °C sensor keeps sub-tenth detail in the average …
+    const coarse = movingAverage(series([21.1, 21.2, 21.1]), 3);
+    expect(coarse[1].v).toBe(21.13);
+    // … which is exactly what makes the levels distinguishable at all: a wider
+    // window has to produce a different number, not the same rounded one.
+    const input = series([21.0, 21.1, 21.2, 21.1, 21.0]);
+    const short = movingAverage(input, 3);
+    const wide = movingAverage(input, 5);
+    expect(short[2].v).toBe(21.13);
+    expect(wide[2].v).toBe(21.08);
+    expect(short[2].v).not.toBe(wide[2].v);
     // Integer sensors still get a real average instead of being rounded away.
     const whole = movingAverage(series([20, 22, 20]), 3);
-    expect(whole[1].v).toBe(20.7);
+    expect(whole[1].v).toBe(20.67);
   });
 
   it('never leaves the measured range', () => {
