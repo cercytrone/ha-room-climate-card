@@ -436,6 +436,7 @@ export class RoomClimateCard extends LitElement {
     const { temperature: tempType, humidity: humType } = config.typography;
     const style = [
       `--rcc-radius:${config.borderRadius}px`,
+      `--rcc-inset:${config.padding}px`,
       config.height ? `--rcc-height:${config.height}px` : '',
       `--rcc-chart-height:${config.chart.height}px`,
       `--rcc-temp-size:${tempType.fontSize}px`,
@@ -972,6 +973,7 @@ export class RoomClimateCard extends LitElement {
       --rcc-space-2: 8px;
       --rcc-space-3: 12px;
       --rcc-space-5: 20px;
+      --rcc-inset: 10px;
 
       --rcc-bg: var(--ha-card-background, var(--card-background-color, #0e1013));
       --rcc-surface: none;
@@ -1006,7 +1008,7 @@ export class RoomClimateCard extends LitElement {
       height: var(--rcc-height, auto);
       min-height: 0;
       /* One inset for everything: title, values and chart share the same edge. */
-      padding: var(--rcc-space-5);
+      padding: var(--rcc-inset, 10px);
       overflow: hidden;
       background-color: var(--rcc-bg);
       background-image: var(--rcc-surface);
@@ -1386,7 +1388,7 @@ export class RoomClimateCard extends LitElement {
       opacity: 0.7;
     }
     .empty {
-      padding: var(--rcc-space-5);
+      padding: var(--rcc-inset, 10px);
       font-size: 12px;
       color: var(--rcc-muted);
     }

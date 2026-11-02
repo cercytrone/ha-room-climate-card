@@ -32,7 +32,7 @@ const CARD_W = (W - PAD * 2 - GAP) / 2;
 /* ---------------------------------------------------------------- tokens --
  * Mirrors the CSS custom properties of the card one to one.
  * ------------------------------------------------------------------------ */
-const INSET = 20; // card padding
+const INSET = 10; // card padding (config default `card_padding: 10`)
 const RADIUS = 26; // card radius
 const SPACE_1 = 4;
 const SPACE_2 = 8;

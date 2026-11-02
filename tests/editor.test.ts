@@ -491,6 +491,29 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Kartenhöhe').value).toBe(260);
   });
 
+  it('exposes the card padding next to the corner radius', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    const field = selectorByLabel(editor, 'Innenabstand');
+    // Default without a stored value.
+    expect(field.value).toBe(10);
+    expect(selectorByLabel(editor, 'Eckenradius')).toBeTruthy();
+
+    field.emit('14');
+    await editor.updateComplete;
+    expect(editor.config.card_padding).toBe(14);
+
+    // Emptying the field is allowed and changes nothing.
+    selectorByLabel(editor, 'Innenabstand').emit('');
+    await editor.updateComplete;
+    expect(editor.config.card_padding).toBe(14);
+
+    // Out-of-range input is kept visible but not written.
+    selectorByLabel(editor, 'Innenabstand').emit('40');
+    await editor.updateComplete;
+    expect(editor.config.card_padding).toBe(14);
+  });
+
   it('accepts decimal commas from the number field', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

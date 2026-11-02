@@ -4,6 +4,8 @@ name: Wohnzimmer
 icon: mdi:sofa
 height: auto
 border_radius: 18
+# Innenabstand rundum; Standard ist 10, hier etwas luftiger.
+card_padding: 16
 theme: auto
 
 temperature_entity: sensor.wohnzimmer_temperature

@@ -534,7 +534,7 @@ describe('room climate card', () => {
     expect(q(card, '.badge.motion .icon')).not.toBeNull();
   });
 
-  it('keeps the whole card on one 4 px grid with a single 20 px inset', async () => {
+  it('uses one configurable inset and keeps the rest on a 4 px grid', async () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
     const styleText = Array.from(
@@ -544,13 +544,16 @@ describe('room climate card', () => {
     )
       .map((sheet) => sheet.cssText ?? '')
       .join('\n');
-    // One inset for title, values and chart – no 13/16 px mix any more.
-    expect(styleText).toMatch(/\.card\s*\{[^}]*padding:\s*var\(--rcc-space-5\)/);
-    expect(styleText).toMatch(/--rcc-space-5:\s*20px/);
-    // Every gap and margin is a multiple of 4 px.
+    // One inset for title, values and chart – adjustable, default 10 px.
+    expect(styleText).toMatch(/\.card\s*\{[^}]*padding:\s*var\(--rcc-inset,\s*10px\)/);
+    expect(styleText).toMatch(/--rcc-inset:\s*10px/);
+    // Every gap and margin is a multiple of 4 px – except the inset itself,
+    // which the user may set to any pixel value between 0 and 32.
     const lengths = Array.from(
       styleText.matchAll(/(?:padding|margin|gap)(?:-top|-bottom|-left|-right)?:\s*([^;]+);/g)
-    ).map((match) => match[1]);
+    )
+      .map((match) => match[1])
+      .filter((value) => !value.includes('rcc-inset'));
     for (const value of lengths) {
       for (const px of Array.from(value.matchAll(/(-?\d+)px/g)).map((m) => Number(m[1]))) {
         expect(Math.abs(px % 4)).toBe(0);
@@ -571,6 +574,24 @@ describe('room climate card', () => {
     expect(styleText).toContain('#0e1013');
     expect(styleText).toContain('rgba(255, 255, 255, 0.07)');
     expect(styleText).toMatch(/--rcc-radius:\s*26px/);
+  });
+
+  it('writes the inset into the card style and forwards custom values', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const shell = q(card, '.card') as HTMLElement;
+    expect(shell.getAttribute('style')).toContain('--rcc-inset:10px');
+
+    const roomy = mount(
+      { ...fullConfig, card_padding: 24 },
+      createHass({ states: baseStates() })
+    );
+    await roomy.updateComplete;
+    expect((q(roomy, '.card') as HTMLElement).getAttribute('style')).toContain('--rcc-inset:24px');
+
+    const flush = mount({ ...fullConfig, card_padding: 0 }, createHass({ states: baseStates() }));
+    await flush.updateComplete;
+    expect((q(flush, '.card') as HTMLElement).getAttribute('style')).toContain('--rcc-inset:0px');
   });
 
   it('applies a fixed height and density classes', async () => {

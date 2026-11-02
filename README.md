@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.13.0`.
+  `ROOM-CLIMATE-CARD v2.14.0`.
 
 ---
 
@@ -139,7 +139,8 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `name_entity` | entity | – | Entität, deren Friendly Name als Raumname dient (hat Vorrang vor dem Sensor-Namen). |
 | `icon` | string | `mdi:home-thermometer-outline` | Raum-Icon (MDI). |
 | `height` | number \| `auto` | `auto` | Feste Kartenhöhe in px (140–900) oder automatische Höhe. |
-| `border_radius` | number | `18` | Eckenradius in px (0–40). |
+| `border_radius` | number | `26` | Eckenradius in px (0–40). |
+| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für alle vier Seiten – Titel, Messwerte und Verlauf teilen diese Kante. |
 | `theme` | `auto` \| `dark` \| `light` | `auto` | `auto` folgt dem Home-Assistant-Theme, `dark`/`light` erzwingen eine Optik. |
 
 ### Sensoren
@@ -303,7 +304,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 
 | Abschnitt | Felder |
 | --- | --- |
-| **Allgemein** | Raumname, Name aus Entität, Icon, automatische Höhe, Kartenhöhe, Eckenradius, Darstellung |
+| **Allgemein** | Raumname, Name aus Entität, Icon, automatische Höhe, Kartenhöhe, Eckenradius, **Innenabstand**, Darstellung |
 | **Sensoren** | Temperatursensor, Luftfeuchtesensor, Dezimalstellen |
 | **Messwerte (Schrift)** | Schriftgröße und Schriftart für Temperatur und Luftfeuchte – jeweils getrennt; Beschriftungszeile („TEMPERATUR“ / „LUFTFEUCHTE“) ein-/ausschaltbar |
 | **Farben** | Akzentfarbe (Temperaturkurve, Soll-Linie, Ruhezustand der Flamme) und Sekundärfarbe der Luftfeuchte – mehr Farben gibt es bewusst nicht |
@@ -333,8 +334,11 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
   Reinschwarz.
 - **Nur ein großer Wert:** Temperatur 42 px in neutralem Weiß mit −0,035 em Tracking wird der
   Held; die Luftfeuchte steht rechtsbündig auf derselben Grundlinie bei 20 px.
-- **Ein 4-px-Raster:** 20 px Innenabstand rundum, alle Abstände in 4-px-Schritten, eine
-  gemeinsame optische Kante für Titel, Werte und Verlauf.
+- **Ein Innenabstand für alles:** 10 px rundum (Editor: *Allgemein* → **Innenabstand**,
+  0–32 px), eine gemeinsame optische Kante für Titel, Werte und Verlauf. Alle übrigen Abstände
+  bleiben in 4-px-Schritten – nur der Innenabstand ist bewusst frei einstellbar. Die Zeitachse
+  behält ihren eigenen Sicherheitsabstand zum Eckenradius (28 px im Chart), damit bei kleinen
+  Werten kein Label in der Rundung verschwindet.
 - **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
   Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
   in Versalien mit 0,09 em Laufweite.
@@ -589,7 +593,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 167,0 kB, **47,3 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 167,8 kB, **47,6 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -737,7 +741,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 374 Tests in 13 Dateien aus (Stand 2.13.0):
+`npm test` führt 377 Tests in 13 Dateien aus (Stand 2.14.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

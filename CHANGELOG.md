@@ -4,6 +4,25 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.14.0] – 2026-11-02
+
+### Geändert
+
+- **Der Innenabstand der Karte ist jetzt 10 px statt 20 px** – der Inhalt rückt näher an die
+  Außenkante, die Karte wirkt dadurch dichter und zeigt bei gleicher Höhe mehr Verlauf.
+- **Der Abstand ist im Editor einstellbar:** *Allgemein* → **Innenabstand** (0–32 px, ein Feld
+  mit Einheit `px`). Der Wert gilt für alle vier Seiten; Titel, Messwerte, Heizzeile und Verlauf
+  teilen weiterhin dieselbe Kante. YAML: `card_padding`.
+
+### Hinzugefügt
+
+- **`card_padding`** (Standard `10`, Bereich 0–32) – Innenabstand zwischen Inhalt und
+  Außenkante in Pixeln. Er zählt auch in `preferredCardHeight()` mit, damit `getCardSize()` und
+  die Grid-Optionen zur tatsächlichen Höhe passen.
+- Hinweis zur Gestaltung: Alle übrigen Abstände bleiben in 4-px-Schritten. Nur der Innenabstand
+  ist bewusst frei wählbar – ein 10-px-Wert liegt außerhalb des 4-px-Rasters, ohne es zu
+  verschieben.
+
 ## [2.13.0] – 2026-11-02
 
 ### Behoben

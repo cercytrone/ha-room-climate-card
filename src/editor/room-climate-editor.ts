@@ -29,6 +29,8 @@ interface EditorText {
   height: string;
   heightHelper: string;
   radius: string;
+  padding: string;
+  paddingHelper: string;
   theme: string;
   themeAuto: string;
   themeDark: string;
@@ -154,6 +156,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     height: 'Kartenhöhe',
     heightHelper: 'Feste Höhe in Pixeln. Die Karte komprimiert ihren Inhalt automatisch.',
     radius: 'Eckenradius',
+    padding: 'Innenabstand',
+    paddingHelper:
+      'Abstand zwischen Inhalt und Außenkante in Pixeln (0–32). Gilt für alle vier Seiten; Titel, Messwerte und Verlauf teilen diese Kante.',
     theme: 'Darstellung',
     themeAuto: 'Automatisch (Home-Assistant-Theme)',
     themeDark: 'Dunkel',
@@ -280,6 +285,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     height: 'Card height',
     heightHelper: 'Fixed height in pixels. The card compresses itself automatically.',
     radius: 'Corner radius',
+    padding: 'Card padding',
+    paddingHelper:
+      'Space between the content and the card edge in pixels (0–32). Applies to all four sides; title, readings and chart share this edge.',
     theme: 'Appearance',
     themeAuto: 'Automatic (Home Assistant theme)',
     themeDark: 'Dark',
@@ -802,6 +810,16 @@ export class RoomClimateCardEditor extends LitElement {
         step: 1,
         unit: 'px',
         fallback: 26,
+      })}
+      ${this.renderNumber({
+        key: 'card_padding',
+        label: t.padding,
+        helper: t.paddingHelper,
+        min: 0,
+        max: 32,
+        step: 1,
+        unit: 'px',
+        fallback: 10,
       })}
       ${this.renderField({
         key: 'theme',
