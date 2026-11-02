@@ -715,6 +715,82 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelector('.wrap')).toBeNull();
   });
 
+  /** Band of a series, read from its area gradient (userSpaceOnUse = plot pixel). */
+  const bandOf = (chart: RoomClimateChart, series: 'temp' | 'humidity') => {
+    // SVG tag names are case sensitive in a selector; the id is unique anyway.
+    const gradient = chart.shadowRoot!.querySelector(`[id$="-${series}-fill"]`)!;
+    const top = Number(gradient.getAttribute('y1'));
+    const bottom = Number(gradient.getAttribute('y2'));
+    return { top, bottom, height: bottom - top };
+  };
+
+  it('gives a lone series the whole plot instead of half an empty one', async () => {
+    const both = createChart({
+      temperature: samples([20, 21, 22, 21]),
+      humidity: samples([44, 45, 46, 45]),
+    });
+    setSize(both, 360, 112);
+    await both.updateComplete;
+    const plotHeight = Number(both.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')) - 6;
+    const splitTemperature = bandOf(both, 'temp').height;
+    // Two bands share the plot: humidity the upper third, temperature the rest.
+    expect(splitTemperature).toBeLessThan(plotHeight * 0.7);
+
+    document.body.replaceChildren();
+    const lone = createChart({ temperature: samples([20, 21, 22, 21]) });
+    setSize(lone, 360, 112);
+    await lone.updateComplete;
+    const loneTemperature = bandOf(lone, 'temp');
+    expect(loneTemperature.height).toBeGreaterThanOrEqual(plotHeight * 0.8);
+    expect(loneTemperature.height).toBeGreaterThan(splitTemperature * 1.5);
+    // The plateau starts right at the top of the plot, the baseline stays.
+    expect(loneTemperature.top).toBeCloseTo(6, 0);
+  });
+
+  it('gives the humidity curve the whole plot when temperature is off', async () => {
+    const chart = createChart({ humidity: samples([44, 45, 46, 45]) });
+    setSize(chart, 360, 112);
+    await chart.updateComplete;
+    const plotHeight = Number(chart.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')) - 6;
+    const band = bandOf(chart, 'humidity');
+    expect(band.height).toBeGreaterThanOrEqual(plotHeight * 0.8);
+    // One curve only – and it is drawn.
+    expect(chart.shadowRoot!.querySelectorAll('path.series-line')).toHaveLength(1);
+  });
+
+  it('keeps the split when the humidity series is configured but has no values', async () => {
+    const both = createChart({
+      temperature: samples([20, 21, 22, 21]),
+      humidity: samples([44, 45, 46, 45]),
+    });
+    setSize(both, 360, 112);
+    await both.updateComplete;
+
+    document.body.replaceChildren();
+    // Every reading unavailable: the layout must not jump while the sensor is quiet.
+    const quiet = createChart({
+      temperature: samples([20, 21, 22, 21]),
+      humidity: samples([null, null, null, null]),
+    });
+    setSize(quiet, 360, 112);
+    await quiet.updateComplete;
+    expect(bandOf(quiet, 'temp').height).toBeCloseTo(bandOf(both, 'temp').height, 1);
+    expect(bandOf(quiet, 'humidity').height).toBeCloseTo(bandOf(both, 'humidity').height, 1);
+  });
+
+  it('frees the space when a series is switched off with the label', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 21]),
+      humidity: samples([44, 45, 46, 45]),
+      hiddenSeries: ['humidity'],
+    });
+    setSize(chart, 360, 112);
+    await chart.updateComplete;
+    const plotHeight = Number(chart.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')) - 6;
+    expect(bandOf(chart, 'temp').height).toBeGreaterThanOrEqual(plotHeight * 0.8);
+    expect(chart.shadowRoot!.querySelectorAll('path.series-line')).toHaveLength(1);
+  });
+
   it('drops the time row on request and gives the space to the curves', async () => {
     const withAxis = createChart({ temperature: samples([20, 21, 22, 23]) });
     setSize(withAxis, 320, 112);

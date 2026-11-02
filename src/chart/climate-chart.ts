@@ -590,11 +590,23 @@ export class RoomClimateChart extends LitElement {
     const labelX = linearScale([this.start, this.end], [left + cornerInset, right - cornerInset]);
     const labelBaseline = chartHeight - 6;
 
-    // Humidity owns the upper third, temperature the lower half. The two curves
-    // therefore never cross and each one stays readable on its own.
+    /*
+     * Band layout. With both series drawn, humidity owns the upper third and
+     * temperature the lower half, so the two curves never cross. A single series
+     * gets the whole plot instead of leaving the other band empty – the same
+     * temperature swing then covers twice the height.
+     *
+     * The decision looks at the *configuration*, not at the data: a humidity
+     * sensor that briefly reports nothing must not make the chart jump. Only a
+     * hidden series (switch in the card or `show_humidity_chart: false`) frees
+     * the space.
+     */
+    const temperatureSeriesOn = this.isVisible('temperature') && this.temperature !== undefined;
+    const humiditySeriesOn = this.isVisible('humidity') && this.humidity !== undefined;
+    const singleSeries = temperatureSeriesOn !== humiditySeriesOn;
     const humidityTop = top;
-    const humidityBottom = top + plotHeight * HUMIDITY_BAND_HEIGHT;
-    const temperatureTop = top + plotHeight * TEMPERATURE_BAND_TOP;
+    const humidityBottom = singleSeries ? bottom : top + plotHeight * HUMIDITY_BAND_HEIGHT;
+    const temperatureTop = singleSeries ? top : top + plotHeight * TEMPERATURE_BAND_TOP;
     const temperatureBottom = bottom;
 
     const visibleTemperature = this.temperatureVisible ? this.temperature ?? [] : [];
