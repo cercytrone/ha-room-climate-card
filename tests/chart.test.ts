@@ -1011,6 +1011,51 @@ describe('climate chart', () => {
     // The last value is 28 °C, i.e. hot.
     expect(dot.style.fill).toBe('#D16A62');
   });
+
+  it('puts the end dot on the drawn curve, not on the raw measurement', async () => {
+    // 6 h at five-minute resolution: "strong" averages 15 samples, so the last
+    // drawn value differs clearly from the last measurement (rising room).
+    const rising = Array.from({ length: 72 }, (_, i) => Math.round((20 + i * 0.05) * 10) / 10);
+    const damp = Array.from({ length: 72 }, (_, i) => Math.round((45 + i * 0.1) * 10) / 10);
+    const chart = createChart({
+      temperature: samples(rising),
+      humidity: samples(damp),
+      smoothing: 'strong',
+      curve: 'smooth',
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+
+    const paths = Array.from(chart.shadowRoot!.querySelectorAll('path.series-line'));
+    const dots = Array.from(chart.shadowRoot!.querySelectorAll('.end-dot')) as SVGCircleElement[];
+    // Both series are drawn, dots in the same order as the paths.
+    expect(paths.length).toBe(2);
+    expect(dots.length).toBe(2);
+
+    paths.forEach((path, index) => {
+      const numbers = (path.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?/g) ?? [];
+      const endX = Number(numbers[numbers.length - 2]);
+      const endY = Number(numbers[numbers.length - 1]);
+      const dot = dots[index];
+      expect(Number(dot.getAttribute('cx'))).toBeCloseTo(endX, 1);
+      expect(Number(dot.getAttribute('cy'))).toBeCloseTo(endY, 1);
+    });
+  });
+
+  it('keeps the end dot on the line without smoothing as well', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 23, 23.4]),
+      smoothing: 'none',
+      curve: 'smooth',
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const path = chart.shadowRoot!.querySelector('path.series-line');
+    const numbers = (path?.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?/g) ?? [];
+    const dot = chart.shadowRoot!.querySelector('.end-dot') as SVGCircleElement;
+    expect(Number(dot.getAttribute('cx'))).toBeCloseTo(Number(numbers[numbers.length - 2]), 1);
+    expect(Number(dot.getAttribute('cy'))).toBeCloseTo(Number(numbers[numbers.length - 1]), 1);
+  });
   it('strengthens each area fill on its own without touching the curves', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22]),

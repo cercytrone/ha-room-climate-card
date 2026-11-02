@@ -4,6 +4,23 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.1] – 2026-11-02
+
+### Behoben
+
+- **Endpunkt saß neben der Kurve, sobald geglättet wurde.** Der Punkt am Kurvenende
+  (Temperatur und Luftfeuchte) wurde aus dem **rohen** letzten Messwert gesetzt, die Linie aber
+  aus der geglätteten Reihe gezeichnet. Der gleitende Mittelwert ist zentriert und hat am Rand
+  keine rechten Nachbarn mehr, deshalb weicht der letzte gezeichnete Wert vom letzten Messwert ab
+  – bei „Stark“ um bis zu 0,2 °C (≈ 17 px). War der Raum am Ende warm im Aufheizen, schwebte der
+  Punkt sichtbar über der Linie, beim Abkühlen darunter. Am deutlichsten bei 3 h und 6 h, weil
+  dort das Fenster relativ zur sichtbaren Bewegung groß ist.
+  Der Punkt kommt jetzt aus den **gezeichneten** Segmenten und sitzt damit genau auf dem letzten
+  Scheitelpunkt der Kurve – samt Farbe (bei aktiven Farbbereichen) passend zur Höhe. Datenpunkte
+  und Min/Max-Marken hatten dieses Problem nie, sie rechneten schon mit der gezeichneten Reihe.
+  Zwei neue Tests prüfen, dass die Position des Endpunkts mit dem letzten Pfadpunkt übereinstimmt
+  (mit und ohne Glättung).
+
 ## [2.9.0] – 2026-11-02
 
 ### Geändert
