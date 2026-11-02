@@ -6,6 +6,7 @@ import {
   EDITOR_TAG,
 } from './const';
 import {
+  chartSlotBottomMargin,
   chartSlotMargin,
   configEntityIds,
   hasChart,
@@ -912,10 +913,11 @@ export class RoomClimateCard extends LitElement {
      * inline style so the value can be asserted (jsdom has no layout engine).
      */
     const chartMargin = chartSlotMargin(config);
+    const chartBottomMargin = chartSlotBottomMargin(config);
 
     return html`<div
       class="chart-slot ${chartTappable ? 'is-tappable' : ''}"
-      style="margin-left:${chartMargin}px;margin-right:${chartMargin}px"
+      style="margin-left:${chartMargin}px;margin-right:${chartMargin}px;margin-bottom:${chartBottomMargin}px"
     >
       <room-climate-chart
         .temperature=${temperatureSamples}

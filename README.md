@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.16.1`.
+  `ROOM-CLIMATE-CARD v2.16.2`.
 
 ---
 
@@ -140,7 +140,7 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `icon` | string | `mdi:home-thermometer-outline` | Raum-Icon (MDI). |
 | `height` | number \| `auto` | `auto` | Feste Kartenhöhe in px (140–900) oder automatische Höhe. |
 | `border_radius` | number | `26` | Eckenradius in px (0–40). |
-| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für Titel, Messwerte und Heizzeile auf allen vier Seiten; der Verlauf hebt ihn links und rechts auf und schließt bündig mit der Kante ab. Unter 8 px warnt der Editor, dass der Text an der Kante klebt. |
+| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für Titel, Messwerte und Heizzeile auf allen vier Seiten; der Verlauf hebt ihn links und rechts auf – und ohne Zeitangabe auch unten – und schließt bündig mit der Kante ab. Unter 8 px warnt der Editor, dass der Text an der Kante klebt. |
 | `theme` | `auto` \| `dark` \| `light` | `auto` | `auto` folgt dem Home-Assistant-Theme, `dark`/`light` erzwingen eine Optik. |
 
 ### Sensoren
@@ -282,7 +282,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 | `chart_humidity_area_opacity` | number | `100` | Dasselbe für den Flächenverlauf unter der Feuchtekurve (10–300), unabhängig von der Temperatur. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
-| `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile entfällt, die Kurven bekommen den Platz. |
+| `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile entfällt, die Kurven bekommen den Platz und laufen bis zur unteren Kartenkante (bei bündigem Verlauf). |
 | `chart_full_bleed` | boolean | `true` | Der Verlauf läuft bündig bis zur Außenkante (Kurven und Flächen werden von der Rundung beschnitten). `false` lässt ihn auf derselben Kante wie den Text enden – Editor: *Verlauf* → **Verlauf bündig zur Kartenkante**. |
 | `chart_show_setpoint` | boolean | `true` | Gestrichelte Soll-Linie samt „Soll“-Beschriftung im Verlauf. Aus: nur Messwerte im Chart; die Solltemperatur bleibt in der Statuszeile (eigener Schalter `show_setpoint`). |
 | `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
@@ -341,11 +341,13 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 - **Der Verlauf läuft bündig bis zur Außenkante:** Der Chart hebt den Innenabstand links und
   rechts auf, Kurven und Flächenverläufe berühren also die Kante der Karte; die Rundung
   beschneidet sie. Abschaltbar über `chart_full_bleed: false` (Editor: *Verlauf* → **Verlauf
-  bündig zur Kartenkante**) – dann endet der Verlauf auf derselben Kante wie der Text. Damit die „Jetzt“-Marke am Kurvenende nicht halb in dieser Kante
-  verschwindet, endet die Plotfläche einen Markenradius (2,8 px) davor – die Marke sitzt
-  weiterhin exakt auf dem gezeichneten Endpunkt. Die Zeitachse behält ihren eigenen
-  Sicherheitsabstand zum Eckenradius (28 px im Chart), die „Soll“-Beschriftung rückt 3 px und
-  jede Min/Max-Zahl 6 px von der Kante ab.
+  bündig zur Kartenkante**) – dann endet der Verlauf auf derselben Kante wie der Text.
+  Die Zeitachse endet einen Markenradius (2,8 px) vor der Außenkante, damit die „Jetzt“-Marke
+  nicht halb in der Kante verschwindet und exakt auf dem gezeichneten Endpunkt sitzt; Kurve und
+  Flächenverlauf halten den letzten Wert aber flach bis zur echten Kante, so dass neben der
+  Marke kein leerer Streifen bleibt. Die Zeitachse behält ihren eigenen Sicherheitsabstand zum
+  Eckenradius (28 px im Chart), die „Soll“-Beschriftung rückt 3 px und jede Min/Max-Zahl 6 px von
+  der Kante ab.
 - **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
   Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
   in Versalien mit 0,09 em Laufweite.
@@ -356,7 +358,8 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 - **Reduzierte Achse:** eine Haarlinie als Basis, drei Labels in 10,5 px bei 32 % Deckkraft –
   „Sa 05:40 · So 05:40 · Jetzt“. Abschaltbar: `chart_show_axis: false` (Editor: *Verlauf* →
   **Zeitangaben unter dem Verlauf**) entfernt die unterste Zeile vollständig; die Kurven nutzen
-  den freien Platz, die Zeit steht weiterhin im Tooltip und in der Screenreader-Beschreibung.
+  den freien Platz und laufen bis zur unteren Kartenkante durch (nur bei bündigem Verlauf), die
+  Zeit steht weiterhin im Tooltip und in der Screenreader-Beschreibung.
 - **Hell und dunkel:** beide Varianten sind vollständig ausgestaltet und respektieren
   `theme: auto` (HA-Theme). Die Akzentfarben bleiben in beiden Themes identisch – das
   Erscheinungsbild ändert sich, die Bedeutung der Farben nicht.
@@ -471,7 +474,8 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   40 × 34 px wird nichts gezeichnet statt zu verzerren. Die Zeitbeschriftung wird um den
   Karten-Eckenradius eingerückt, damit erstes und letztes Label nicht im abgerundeten Eck
   verschwinden. Der Chart selbst läuft bündig bis zur Außenkante; die „Jetzt“-Marke behält
-  einen Markenradius Abstand, damit sie vollständig sichtbar bleibt.
+  einen Markenradius Abstand, damit sie vollständig sichtbar bleibt, und Kurve samt Fläche
+  werden hinter ihr flach bis zur Kante weitergeführt.
 - **Zeitachse:** Beschriftung und Datumszeile folgen der Zeitzone und dem Uhrzeitformat von Home
   Assistant (`hass.config.time_zone`, `hass.locale`), nicht der Zone des Browsers. Auf einem
   Wandtablet mit falsch gestellter Zeitzone steht damit trotzdem die richtige Uhrzeit; bei
@@ -749,7 +753,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 384 Tests in 13 Dateien aus (Stand 2.16.1):
+`npm test` führt 385 Tests in 13 Dateien aus (Stand 2.16.2):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

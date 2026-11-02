@@ -54,6 +54,17 @@ function pointer(
   overlay.dispatchEvent(event);
 }
 
+/** Vertices of a series path (`M x y` plus one cubic per following segment). */
+function verticesOf(path: string): Array<{ x: number; y: number }> {
+  const numbers = (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  if (numbers.length < 2) return [];
+  const points = [{ x: numbers[0], y: numbers[1] }];
+  for (let index = 2; index + 5 < numbers.length; index += 6) {
+    points.push({ x: numbers[index + 4], y: numbers[index + 5] });
+  }
+  return points;
+}
+
 function tooltipOf(chart: RoomClimateChart): HTMLElement {
   return chart.shadowRoot!.querySelector('.tooltip') as HTMLElement;
 }
@@ -791,13 +802,25 @@ describe('climate chart', () => {
     const svg = chart.shadowRoot!.querySelector('svg[role="img"]')!;
     const width = Number(svg.getAttribute('viewBox')!.split(/\s+/)[2]);
 
-    // The line itself ends on the very edge – no gutter.
+    /*
+     * The time scale ends one dot radius early (so the dot stays whole), but the
+     * drawn line and its area hold the last value across that strip: the right
+     * edge is filled, no 3 px gutter.
+     */
     const longest = Array.from(chart.shadowRoot!.querySelectorAll('path.series-line'))
       .map((path) => path.getAttribute('d') ?? '')
       .sort((a, b) => b.length - a.length)[0];
-    const numbers = (longest.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
-    // One dot radius is reserved at the edge – the curve ends right before it.
-    expect(numbers[numbers.length - 2]).toBeCloseTo(width - 1 - 2.8, 1);
+    const vertices = verticesOf(longest);
+    expect(vertices[vertices.length - 1].x).toBeCloseTo(width - 1, 1);
+    expect(vertices[vertices.length - 2].x).toBeCloseTo(width - 1 - 2.8, 1);
+    // The hold is flat: both vertices carry the last value.
+    expect(vertices[vertices.length - 1].y).toBeCloseTo(vertices[vertices.length - 2].y, 3);
+
+    // The area fill reaches the edge as well.
+    const area = chart.shadowRoot!.querySelector('path.series-area')!.getAttribute('d') ?? '';
+    const areaNumbers = (area.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const areaXs = areaNumbers.filter((_, index) => index % 2 === 0);
+    expect(Math.max(...areaXs)).toBeCloseTo(width - 1, 1);
 
     // Both end dots stay completely inside the chart area, right at the edge.
     const dots = Array.from(chart.shadowRoot!.querySelectorAll('.end-dot')) as SVGCircleElement[];
@@ -878,11 +901,15 @@ describe('climate chart', () => {
     setSize(withoutAxis, 340, 112);
     await withoutAxis.updateComplete;
     expect(withoutAxis.shadowRoot!.querySelectorAll('.axis-label')).toHaveLength(0);
+    // Without the row the plot runs to the bottom edge (0.5 px keeps the line).
     expect(
       Number(
         (withoutAxis.shadowRoot!.querySelector('.baseline') as SVGLineElement).getAttribute('y1')
       )
-    ).toBe(height - 2);
+    ).toBe(height - 0.5);
+    const area = withoutAxis.shadowRoot!.querySelector('path.series-area')!.getAttribute('d') ?? '';
+    const ys = (area.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter((_, index) => index % 2 === 1);
+    expect(Math.max(...ys)).toBe(height - 0.5);
   });
 
   it('hides axis labels when there is not enough height', async () => {
@@ -1349,12 +1376,19 @@ describe('climate chart', () => {
     expect(dots.length).toBe(2);
 
     paths.forEach((path, index) => {
-      const numbers = (path.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?/g) ?? [];
-      const endX = Number(numbers[numbers.length - 2]);
-      const endY = Number(numbers[numbers.length - 1]);
       const dot = dots[index];
-      expect(Number(dot.getAttribute('cx'))).toBeCloseTo(endX, 1);
-      expect(Number(dot.getAttribute('cy'))).toBeCloseTo(endY, 1);
+      const dotX = Number(dot.getAttribute('cx'));
+      const dotY = Number(dot.getAttribute('cy'));
+      // The dot sits on a vertex of the drawn curve – the path continues a few
+      // pixels past it (flat hold to the edge), so it is not the last vertex.
+      const onCurve = verticesOf(path.getAttribute('d') ?? '').find(
+        (vertex) => Math.abs(vertex.x - dotX) < 0.5
+      );
+      expect(onCurve).toBeDefined();
+      expect(dotY).toBeCloseTo(onCurve!.y, 1);
+      // …and the hold carries exactly that value to the edge.
+      const vertices = verticesOf(path.getAttribute('d') ?? '');
+      expect(vertices[vertices.length - 1].y).toBeCloseTo(dotY, 1);
     });
   });
 
@@ -1367,10 +1401,12 @@ describe('climate chart', () => {
     setSize(chart, 360, 130);
     await chart.updateComplete;
     const path = chart.shadowRoot!.querySelector('path.series-line');
-    const numbers = (path?.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?/g) ?? [];
+    const vertices = verticesOf(path?.getAttribute('d') ?? '');
     const dot = chart.shadowRoot!.querySelector('.end-dot') as SVGCircleElement;
-    expect(Number(dot.getAttribute('cx'))).toBeCloseTo(Number(numbers[numbers.length - 2]), 1);
-    expect(Number(dot.getAttribute('cy'))).toBeCloseTo(Number(numbers[numbers.length - 1]), 1);
+    const dotX = Number(dot.getAttribute('cx'));
+    const onCurve = vertices.find((vertex) => Math.abs(vertex.x - dotX) < 0.5);
+    expect(onCurve).toBeDefined();
+    expect(Number(dot.getAttribute('cy'))).toBeCloseTo(onCurve!.y, 1);
   });
   it('strengthens each area fill on its own without touching the curves', async () => {
     const chart = createChart({

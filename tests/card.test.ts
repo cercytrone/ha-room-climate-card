@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../src/main';
 import type { RoomClimateCard } from '../src/room-climate-card';
-import { chartSlotMargin, normalizeConfig } from '../src/config';
+import { chartSlotBottomMargin, chartSlotMargin, normalizeConfig } from '../src/config';
 import type { RoomClimateCardConfig } from '../src/config';
 import type { HomeAssistant } from '../src/types';
 import { createHass, entity, flush, resizeTo, setVisible, type EntityInit } from './helpers';
@@ -641,6 +641,60 @@ describe('room climate card', () => {
     const containedSlot = q(contained, '.chart-slot') as HTMLElement;
     expect(containedSlot.style.marginLeft).toBe('0px');
     expect(containedSlot.style.marginRight).toBe('0px');
+  });
+
+  it('runs the chart into the bottom edge only without the time row', async () => {
+    /*
+     * The time row is what keeps the plot off the bottom edge; once it is gone
+     * the chart may use the freed strip – but only while it is flush with the
+     * card edge at all (full bleed), otherwise it keeps the text edge.
+     */
+    const bottomOf = (axis: boolean, fullBleed: boolean): number =>
+      chartSlotBottomMargin(
+        normalizeConfig({ ...fullConfig, chart_show_axis: axis, chart_full_bleed: fullBleed })
+      );
+
+    expect(bottomOf(false, true)).toBe(-10);
+    expect(bottomOf(true, true)).toBe(0);
+    expect(bottomOf(false, false)).toBe(0);
+    expect(bottomOf(true, false)).toBe(0);
+
+    const paddingOf = (padding: number): number =>
+      chartSlotBottomMargin(
+        normalizeConfig({
+          ...fullConfig,
+          card_padding: padding,
+          chart_show_axis: false,
+          chart_full_bleed: true,
+        })
+      );
+    expect(paddingOf(0)).toBe(-0);
+    expect(paddingOf(16)).toBe(-16);
+
+    // …and the card writes it onto the slot together with the side margins.
+    const flush = mount(
+      { ...fullConfig, card_padding: 24, chart_show_axis: false },
+      createHass({ states: baseStates() })
+    );
+    await flush.updateComplete;
+    const flushSlot = q(flush, '.chart-slot') as HTMLElement;
+    expect(flushSlot.style.marginBottom).toBe('-24px');
+    expect(flushSlot.style.marginLeft).toBe('-24px');
+
+    const withAxis = mount(
+      { ...fullConfig, card_padding: 24, chart_show_axis: true },
+      createHass({ states: baseStates() })
+    );
+    await withAxis.updateComplete;
+    expect((q(withAxis, '.chart-slot') as HTMLElement).style.marginBottom).toBe('0px');
+
+    const contained = mount(
+      { ...fullConfig, card_padding: 24, chart_show_axis: false, chart_full_bleed: false },
+      createHass({ states: baseStates() })
+    );
+    await contained.updateComplete;
+    expect((q(contained, '.chart-slot') as HTMLElement).style.marginBottom).toBe('0px');
+    expect((q(contained, '.chart-slot') as HTMLElement).style.marginLeft).toBe('0px');
   });
 
   it('applies a fixed height and density classes', async () => {
