@@ -1366,10 +1366,13 @@ describe('room climate card', () => {
       bandCold: number;
       bandWarm: number;
       bandHot: number;
+      bandTransition: number;
       temperatureScale: string;
     };
     expect(chart.chartOpacity).toBe(55);
     expect(chart.temperatureBands).toBe(true);
+    // Fully continuous per default, and 0 hands hard steps to the chart.
+    expect(chart.bandTransition).toBe(100);
     expect(chart.bandCold).toBe(18);
     expect(chart.bandWarm).toBe(24);
     expect(chart.bandHot).toBe(27);

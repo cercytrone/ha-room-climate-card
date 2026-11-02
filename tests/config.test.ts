@@ -367,6 +367,15 @@ describe('curve opacity and temperature bands', () => {
     expect(config.chart.opacity).toBe(1);
     expect(config.chart.temperatureBands).toBe(false);
     expect(config.chart.bandLimits).toEqual({ coldBelow: 18, warmAbove: 24, hotAbove: 27 });
+    expect(config.chart.bandTransition).toBe(1);
+  });
+
+  it('turns the band transition percentage into a factor', () => {
+    expect(normalizeConfig({ chart_band_transition: 0 }).chart.bandTransition).toBe(0);
+    expect(normalizeConfig({ chart_band_transition: 45 }).chart.bandTransition).toBeCloseTo(0.45, 2);
+    expect(normalizeConfig({ chart_band_transition: 140 }).chart.bandTransition).toBe(1);
+    expect(normalizeConfig({ chart_band_transition: -20 }).chart.bandTransition).toBe(0);
+    expect(normalizeConfig({ chart_band_transition: 'weich' }).chart.bandTransition).toBe(1);
   });
 
   it('turns a percentage into a factor and keeps it in range', () => {
@@ -423,6 +432,7 @@ describe('curve opacity and temperature bands', () => {
         chart_band_cold_below: 17,
         chart_band_warm_above: 23,
         chart_band_hot_above: 26,
+        chart_band_transition: 60,
       });
       expect(warn).not.toHaveBeenCalled();
     } finally {

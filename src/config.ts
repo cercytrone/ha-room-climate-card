@@ -3,7 +3,7 @@ import {
   SMOOTHING_LEVELS,
   type SmoothingLevel,
 } from './chart/geometry';
-import { DEFAULT_BAND_LIMITS, orderBandLimits, type BandLimits } from './chart/bands';
+import { DEFAULT_BAND_LIMITS, DEFAULT_BAND_SOFTNESS, orderBandLimits, type BandLimits } from './chart/bands';
 import type { HomeAssistant, LovelaceCardConfig } from './types';
 
 export type ThemeMode = 'auto' | 'dark' | 'light';
@@ -121,6 +121,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_band_warm_above?: number;
   /** From this value on it is hot. */
   chart_band_hot_above?: number;
+  /** Softness of the blend between two bands in percent (0 = hard steps). */
+  chart_band_transition?: number;
 }
 
 export interface ResolvedWindowConfig {
@@ -181,6 +183,8 @@ export interface ResolvedChartConfig {
   temperatureBands: boolean;
   /** Thresholds of the four stages, always in ascending order. */
   bandLimits: BandLimits;
+  /** Width of the blend between two stages, 0…1 (1 = fully continuous). */
+  bandTransition: number;
 }
 
 
@@ -402,6 +406,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'chart_band_cold_below',
   'chart_band_warm_above',
   'chart_band_hot_above',
+  'chart_band_transition',
 ];
 
 /** Keys already reported, so a re-render does not flood the console. */
@@ -551,6 +556,10 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
         asNumber(config.chart_band_warm_above, -30, 60, DEFAULT_BAND_LIMITS.warmAbove),
         asNumber(config.chart_band_hot_above, -30, 60, DEFAULT_BAND_LIMITS.hotAbove)
       ),
+      bandTransition:
+        Math.round(
+          asNumber(config.chart_band_transition, 0, 100, DEFAULT_BAND_SOFTNESS)
+        ) / 100,
       // The reference sheet reduces the axis to a hairline plus three labels;
       // the dashed helper lines are opt-in now.
       showGrid: asBoolean(config.chart_show_grid) ?? false,

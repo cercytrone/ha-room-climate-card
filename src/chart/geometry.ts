@@ -437,6 +437,39 @@ export function linePath(points: Point[]): string {
  * generic spline it never overshoots, so the curve stays within the measured
  * values and does not invent peaks.
  */
+/**
+ * How far (in pixel) the curve may leave the interval spanned by two measured
+ * values. One pixel is below the 1.9 px stroke width, so rounding stays visible
+ * while no reader can take the bulge for a measurement.
+ */
+export const MAX_OVERSHOOT = 1;
+
+/**
+ * Damping of the tangent at a turning point: 1 would be the plain mean of the
+ * two slopes, smaller values keep the corner rounder but closer to the data.
+ */
+const TURN_DAMPING = 1;
+
+/** Largest distance a cubic Hermite segment travels outside its end values. */
+function overshoot(y0: number, y1: number, m0: number, m1: number, dx: number): number {
+  if (!(dx > 0) || (y0 === y1 && m0 === 0 && m1 === 0)) return 0;
+  const low = Math.min(y0, y1);
+  const high = Math.max(y0, y1);
+  let worst = 0;
+  const steps = 16;
+  for (let step = 1; step < steps; step++) {
+    const t = step / steps;
+    const u = 1 - t;
+    // Cubic Hermite in its Bézier form (same control points as the path below).
+    const c1 = y0 + (m0 * dx) / 3;
+    const c2 = y1 - (m1 * dx) / 3;
+    const y =
+      u * u * u * y0 + 3 * u * u * t * c1 + 3 * u * t * t * c2 + t * t * t * y1;
+    worst = Math.max(worst, low - y, y - high);
+  }
+  return worst;
+}
+
 export function smoothPath(points: Point[]): string {
   if (points.length === 0) return '';
   if (points.length === 1) return `M ${round(points[0].x)} ${round(points[0].y)}`;
@@ -450,31 +483,55 @@ export function smoothPath(points: Point[]): string {
     slope[i] = dx[i] === 0 ? 0 : (points[i + 1].y - points[i].y) / dx[i];
   }
 
+  // Tangents: the centred mean of the two neighbouring slopes, also at a
+  // turning point. A hard zero there (the strictly monotone variant) turns every
+  // turning point into a flat spot – with dense measurements, i.e. a small x
+  // distance per sample, that reads as a staircase instead of a curve.
   const tangents: number[] = new Array(count).fill(0);
   tangents[0] = slope[0];
   tangents[count - 1] = slope[count - 2];
   for (let i = 1; i < count - 1; i++) {
-    if (slope[i - 1] * slope[i] <= 0) {
-      tangents[i] = 0;
-    } else {
-      tangents[i] = (slope[i - 1] + slope[i]) / 2;
-    }
+    const before = slope[i - 1];
+    const after = slope[i];
+    tangents[i] = before * after <= 0 ? ((before + after) / 2) * TURN_DAMPING : (before + after) / 2;
   }
-  for (let i = 0; i < count - 1; i++) {
-    if (slope[i] === 0) {
-      tangents[i] = 0;
-      tangents[i + 1] = 0;
-      continue;
-    }
-    const a = tangents[i] / slope[i];
-    const b = tangents[i + 1] / slope[i];
-    const sum = a * a + b * b;
-    if (sum > 9) {
-      const tau = 3 / Math.sqrt(sum);
-      tangents[i] = tau * a * slope[i];
-      tangents[i + 1] = tau * b * slope[i];
-    }
+  // One gentle pass over the tangents: sensor noise otherwise makes every other
+  // sample a turning point, and a chain of short wiggles is exactly what reads
+  // as a hard, jagged line. The samples themselves stay untouched.
+  const rough = tangents.slice();
+  for (let i = 1; i < count - 1; i++) {
+    tangents[i] = 0.25 * rough[i - 1] + 0.5 * rough[i] + 0.25 * rough[i + 1];
   }
+
+  // Overshoot guard: a cubic with these tangents may leave the interval between
+  // the two measured values. Rounding a corner is welcome, inventing a peak is
+  // not, so the tangents are damped until the curve stays within
+  // MAX_OVERSHOOT pixel of the measurements. Tangents are shared by both
+  // neighbouring segments, hence the factor per point and the few passes.
+  const factors: number[] = new Array(count).fill(1);
+  for (let pass = 0; pass < 3; pass++) {
+    const limits: number[] = new Array(count).fill(1);
+    let changed = false;
+    for (let i = 0; i < count - 1; i++) {
+      if (dx[i] === 0) continue;
+      const over = overshoot(
+        points[i].y,
+        points[i + 1].y,
+        tangents[i] * factors[i],
+        tangents[i + 1] * factors[i + 1],
+        dx[i]
+      );
+      if (over > MAX_OVERSHOOT) {
+        const scale = MAX_OVERSHOOT / over;
+        limits[i] = Math.min(limits[i], scale);
+        limits[i + 1] = Math.min(limits[i + 1], scale);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+    for (let i = 0; i < count; i++) factors[i] *= limits[i];
+  }
+  for (let i = 0; i < count; i++) tangents[i] *= factors[i];
 
   let path = `M ${round(points[0].x)} ${round(points[0].y)}`;
   for (let i = 0; i < count - 1; i++) {

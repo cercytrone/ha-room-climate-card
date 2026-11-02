@@ -4,6 +4,7 @@ import {
   BAND_HOT,
   BAND_WARM,
   DEFAULT_BAND_LIMITS,
+  DEFAULT_BAND_SOFTNESS,
   MIN_BAND_GAP,
   bandColorAt,
   bandStops,
@@ -103,5 +104,96 @@ describe('band gradient', () => {
       return Math.abs(next.offset - stops[pair].offset);
     })();
     expect(ramp).toBeLessThan(0.25);
+  });
+
+  it('defaults to the fully continuous ramp', () => {
+    expect(DEFAULT_BAND_SOFTNESS).toBe(100);
+    const stops = bandStops([10, 35], limits, colors);
+    expect(stops).toEqual(bandStops([10, 35], limits, colors, 100));
+  });
+
+  it('at 0 % keeps hard steps exactly on the thresholds', () => {
+    const stops = bandStops([10, 35], limits, colors, 0);
+    // Two stops per threshold on the same offset: that is what makes a hard
+    // edge – a single stop would let the gradient blend across the whole band.
+    const pairs = stops
+      .map((stop) => stop.offset)
+      .sort((a, b) => a - b)
+      .reduce<number[]>((acc, offset) => (acc[acc.length - 1] === offset ? acc : [...acc, offset]), []);
+    expect(pairs).toEqual([0, 0.32, 0.44, 0.68, 1]);
+    expect(stops).toHaveLength(8);
+  });
+
+  it('at 100 % blends across the whole gap, so no plateau is left', () => {
+    const stops = bandStops([10, 35], limits, colors, 100);
+    // cold → normal ends on 21 °C, normal → warm on 25.5 °C, then hot from 27 °C.
+    expect(stops.map((stop) => [stop.offset, stop.color])).toEqual([
+      [0, BAND_HOT],
+      [0.32, BAND_HOT],
+      [0.38, BAND_WARM],
+      [0.56, colors.normal],
+      [0.68, BAND_COLD],
+      [1, BAND_COLD],
+    ]);
+  });
+
+  it('widens the ramp monotonically with the softness setting', () => {
+    /** Width in °C of the mixed zone between “cold” and “normal”. */
+    const blendWidth = (softness: number): number => {
+      const stops = [...bandStops([10, 35], limits, colors, softness)].sort(
+        (a, b) => a.offset - b.offset
+      );
+      const rgb = (hex: string): number[] => {
+        const value = Number.parseInt(hex.slice(1), 16);
+        return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+      };
+      const mixAt = (offset: number): number[] => {
+        const upper = stops.find((stop) => stop.offset >= offset) ?? stops[stops.length - 1];
+        const lower = [...stops].reverse().find((stop) => stop.offset <= offset) ?? stops[0];
+        const span = upper.offset - lower.offset;
+        const ratio = span === 0 ? 0 : (offset - lower.offset) / span;
+        const from = rgb(lower.color);
+        const to = rgb(upper.color);
+        return from.map((channel, index) => channel + (to[index] - channel) * ratio);
+      };
+      const isPure = (color: number[], hex: string): boolean => {
+        const target = rgb(hex);
+        return target.every((channel, index) => Math.abs(color[index] - channel) < 2);
+      };
+      let width = 0;
+      for (let value = 15; value <= 22; value += 0.05) {
+        const color = mixAt((35 - value) / 25);
+        if (!isPure(color, BAND_COLD) && !isPure(color, colors.normal)) width += 0.05;
+      }
+      return Number(width.toFixed(2));
+    };
+    expect(blendWidth(0)).toBe(0);
+    expect(blendWidth(25)).toBeGreaterThan(0);
+    expect(blendWidth(50)).toBeGreaterThan(blendWidth(25));
+    expect(blendWidth(100)).toBeGreaterThan(blendWidth(50));
+    // 18 °C → 21 °C, the full half-gap of the 6 °C wide cold band.
+    expect(blendWidth(100)).toBeGreaterThanOrEqual(3);
+    expect(blendWidth(100)).toBeLessThan(4);
+  });
+
+  it('keeps the outer ends pure, so blue and red stay present', () => {
+    const stops = bandStops([10, 35], limits, colors, 100);
+    expect(stops[0].color).toBe(BAND_HOT);
+    expect(stops[stops.length - 1].color).toBe(BAND_COLD);
+    // 18 °C is still fully cold, 27 °C fully hot.
+    const at = (value: number) => {
+      const offset = (35 - value) / 25;
+      const sorted = [...stops].sort((a, b) => a.offset - b.offset);
+      const next = sorted.find((stop) => stop.offset >= offset);
+      return next?.color;
+    };
+    expect(at(17.5)).toBe(BAND_COLD);
+    expect(at(27.5)).toBe(BAND_HOT);
+  });
+
+  it('falls back to the default when the softness value is not a number', () => {
+    expect(bandStops([10, 35], limits, colors, Number.NaN)).toEqual(
+      bandStops([10, 35], limits, colors, 100)
+    );
   });
 });

@@ -52,3 +52,4 @@ chart_temperature_bands: true  # Temperaturkurve nach Bereich einfärben (Standa
 chart_band_cold_below: 18      # kalt unter 18 °C (Blau)
 chart_band_warm_above: 24      # warm ab 24 °C (Amber)
 chart_band_hot_above: 27       # heiß ab 27 °C (gedämpftes Rot)
+chart_band_transition: 100     # Übergang zwischen den Bereichen in % (0 = harte Stufen, 100 = durchgehend)

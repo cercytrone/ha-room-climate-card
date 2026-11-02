@@ -106,6 +106,8 @@ interface EditorText {
   bandWarm: string;
   bandHot: string;
   bandHelper: string;
+  bandTransition: string;
+  bandTransitionHelper: string;
   grid: string;
   points: string;
   tooltip: string;
@@ -237,6 +239,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     bandHot: 'Heiß ab',
     bandHelper:
       'Grenzen in °C. Sie werden automatisch sortiert, falls „warm“ unter „kalt“ liegt – die Reihenfolge kalt → normal → warm → heiß bleibt immer erhalten.',
+    bandTransition: 'Übergang zwischen den Bereichen',
+    bandTransitionHelper:
+      '0 % = harte Stufen genau an den Grenzen, 100 % = die Farbe fließt über den ganzen Abstand zwischen zwei Grenzen. Dazwischen liegt jeder Zwischenwert.',
     grid: 'Gitternetz',
     points: 'Datenpunkte',
     tooltip: 'Werte beim Überfahren',
@@ -354,6 +359,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     bandHot: 'Hot from',
     bandHelper:
       'Limits in °C. They are sorted automatically if “warm” sits below “cold” – the order cold → normal → warm → hot is always kept.',
+    bandTransition: 'Transition between the bands',
+    bandTransitionHelper:
+      '0 % = hard steps exactly at the limits, 100 % = the colour flows across the whole gap between two limits. Anything in between is a valid setting.',
     grid: 'Grid lines',
     points: 'Data points',
     tooltip: 'Values on hover',
@@ -617,6 +625,8 @@ export class RoomClimateCardEditor extends LitElement {
     fallback: number;
     disabled?: boolean;
     helper?: string;
+    /** `slider` gives a drag handle instead of a typing field. */
+    mode?: 'box' | 'slider';
     onChange?: (value: number) => void;
   }): TemplateResult {
     return this.renderField({
@@ -627,7 +637,7 @@ export class RoomClimateCardEditor extends LitElement {
           min: options.min,
           max: options.max,
           step: options.step,
-          mode: 'box',
+          mode: options.mode ?? 'box',
           ...(options.unit ? { unit_of_measurement: options.unit } : {}),
         },
       },
@@ -1191,6 +1201,18 @@ export class RoomClimateCardEditor extends LitElement {
         fallback: 27,
         disabled: !showTemperature || !bandsOn,
         helper: t.bandHelper,
+      })}
+      ${this.renderNumber({
+        key: 'chart_band_transition',
+        label: t.bandTransition,
+        min: 0,
+        max: 100,
+        step: 5,
+        unit: '%',
+        fallback: 100,
+        mode: 'slider',
+        disabled: !showTemperature || !bandsOn,
+        helper: t.bandTransitionHelper,
       })}
       ${this.renderField({
         key: 'chart_humidity_line_style',
