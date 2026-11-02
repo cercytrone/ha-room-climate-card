@@ -50,7 +50,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | --- | --- |
 | **Raumname** | Frei konfigurierbar, optional aus einer Entität (`name_entity`) oder dem Friendly Name des Temperatursensors, optionales Icon. Lange Namen werden zweizeilig gekürzt. |
 | **Temperatur** | Der Held der Karte: 42 px, neutrales Weiß, enges Tracking (−0,035 em), Tabellenziffern. Einheit als eigene, kleinere Sekundärschrift. Schriftgröße und Schriftart im Editor frei einstellbar. |
-| **Luftfeuchte** | Folgt rechtsbündig auf **derselben Grundlinie**, halb so groß (20 px). Eigene Schriftgröße und -art im Editor. Über der Zeile steht die Deklaration mit farbigem Punkt; ein Klick auf den Wert blendet die zugehörige Kurve ein und aus. |
+| **Luftfeuchte** | Folgt rechtsbündig auf **derselben Grundlinie**, halb so groß (20 px). Eigene Schriftgröße und -art im Editor. Über der Zeile steht die Deklaration mit farbigem Punkt. Der Wert ist reiner Text – ein Tippen darauf gehört der Karte. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.12.0`.
+  `ROOM-CLIMATE-CARD v2.13.0`.
 
 ---
 
@@ -228,7 +228,7 @@ Statusname bleibt als Titel und für Screenreader (`aria-label`) erhalten.
 
 #### Thermostat per Tippen öffnen
 
-Ein Klick oder Touch auf die Karte (außerhalb der Messwerte und des Charts) öffnet den
+Ein Klick oder Touch auf die Karte öffnet den
 **More-Info-Dialog** der Climate-Entität – dort werden Solltemperatur und Modus eingestellt. Die
 Karte selbst bleibt eine Anzeige und baut keine eigene Heizungssteuerung nach: der Dialog ist Teil
 von Home Assistant und damit automatisch so vollständig wie die Integration (Sollwert, Modus,
@@ -250,11 +250,16 @@ Genau dieses Event lösen auch Home Assistants eigene Kacheln aus; `composed: tr
 damit es den Shadow DOM der Karte verlässt, `bubbles: true`, damit das Frontend es auf dem Weg nach
 oben sieht. Weder URL noch Navigation ändern sich, und der Dialog bleibt der von Home Assistant.
 
-Eigene Bedienelemente der Karte behalten ihre Funktion (Messwert = Serie ein-/ausblenden, Chart =
-Wertanzeige). Für die Tastatur ist die Statuszeile derselbe Aufruf: sie ist dann ein echter
-`<button>` mit Fokusring und dem Namen „Heizt · Soll 22,0 °C – Thermostat öffnen“. Ohne sichtbare
-Statuszeile (`show_climate_row: false`) gibt es bewusst **kein** Tippziel – ein Zeiger-Ziel ohne
-Tastatur-Pendant wäre eine Falle.
+Ein Tippen auf den Messwert, auf den Raumtitel oder auf die Heizzeile löst denselben Dialog aus –
+die Messwerte sind seit 2.13.0 reiner Text und schalten keine Kurve mehr um. Nur der Chart behält
+seine eigene Berührung: solange die Wertanzeige eingeschaltet ist (`chart_show_tooltip: true`),
+zeigt ein Tippen dort den Messwert; ist sie aus, öffnet auch der Chart den Dialog.
+
+Für die Tastatur ist die Statuszeile derselbe Aufruf: sie ist dann ein echter `<button>` mit
+Fokusring und dem Namen „Heizt · Soll 22,0 °C – Thermostat öffnen“. Ist keine Statuszeile
+gerendert (`show_climate_row: false` oder alle drei Teile aus), wird die Karte selbst zum
+Tastaturziel: `role="button"`, `tabindex="0"`, Enter/Leertaste öffnen den Dialog. Ein
+Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 
 ### Verlauf
 
@@ -465,10 +470,10 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   stammt aus den Attributen der Climate-Entität, mit dem Systemstandard als Rückfall. Ist eine
   der beiden Einheiten unbekannt, entfällt die Linie – lieber keine Linie als eine an falscher
   Stelle. Für Screenreader steht der Sollwert in der Beschreibung des Charts („Soll 22,0 °C“).
-- **Serien ein-/ausblenden:** Ein Klick auf einen Messwert blendet seine Kurve aus. Diese Wahl
-  wird pro Entitäten-Paar im `localStorage` gemerkt und übersteht einen Reload; alle Karten für
-  denselben Raum teilen sie. Ist der Speicher gesperrt (privater Modus, sandboxed iframe), gilt
-  die Auswahl nur für die Sitzung.
+- **Kein Serien-Schalter am Messwert:** Ein Klick auf den großen Wert schaltet keine Kurve mehr
+  aus – die Funktion war laut Rückmeldung nicht nötig und ist in 2.13.0 entfallen. Welche Kurven
+  gezeichnet werden, entscheiden `show_temperature_chart` / `show_humidity_chart` (Editor:
+  *Verlauf*); ein Tippen auf den Wert öffnet wie überall auf der Karte den Thermostat-Dialog.
 - **Nur sichtbare Karten laden:** Ein `IntersectionObserver` hält den Fünf-Minuten-Abruf an, wenn
   die Karte aus dem Sichtfeld gescrollt ist; beim Zurückscrollen wird sofort nachgeladen.
   Lange Dashboards erzeugen so keine Dauerlast im Hintergrund.
@@ -584,7 +589,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 169,2 kB, **47,8 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 167,0 kB, **47,3 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -665,14 +670,14 @@ heating_off_color: '#94a3b8'    # Farbe des Soll-Werts, wenn ausgeschaltet ist
 
 ## Barrierefreiheit
 
-- Messwerte melden sich als „Temperatur: 21,8 °C“ bzw. „Luftfeuchte: 50 %“.
-- Jeder Messwert ist ein `<button>` mit `aria-pressed`, sobald seine Kurve gezeichnet wird:
-  Ein Klick blendet die Serie aus, ein zweiter wieder ein. Das Tap-Ziel ist mindestens 36 px
-  hoch, der Fokusring ist sichtbar.
+- Messwerte melden sich als „Temperatur: 21,8 °C“ bzw. „Luftfeuchte: 50 %“ – als Text, nicht als
+  Schalter; es gibt keinen Bedienschritt am Wert, der eine Kurve verbirgt.
 - Die Heizzeile ist eine Live-Region (`role="status"`) und benennt den Zustand im `aria-label`
   („Heizt“, „Bereit“, „Aus“, „Status unbekannt“); die Flamme selbst ist `aria-hidden`. Ist ein
-  Thermostat verknüpft, wird daraus ein `<button>` (ein zweiter Weg zum More-Info-Dialog neben
+  Thermostat verknüpft, wird daraus ein `<button>` (der Tastaturweg zum More-Info-Dialog neben
   dem Tippen auf die Karte): Fokusring, `title` und der Zusatz „Thermostat öffnen“ im Namen.
+- Ohne gerenderte Statuszeile übernimmt die Karte diesen Tastaturweg selbst (`role="button"`,
+  `tabindex="0"`, Enter/Leertaste) – die Maus-Bedienung bleibt in beiden Fällen gleich.
 - Fenster- und Bewegungs-Badges haben `role="img"` plus sprechende `aria-label`
   („Fenster offen“, „Keine Bewegung“, „Nicht verfügbar“).
 - Der Chart hat `role="img"` und eine Beschreibung inklusive Zeitraum, Sollwert und – sofern
@@ -732,7 +737,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 378 Tests in 13 Dateien aus (Stand 2.12.0):
+`npm test` führt 374 Tests in 13 Dateien aus (Stand 2.13.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
@@ -741,8 +746,8 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung mit erhaltenem Minimum/Maximum, Suche nach dem nächsten Messwert (lückenüberspringend), Reihen-Extrema |
 | `tests/bands.test.ts` | Sortieren und Auseinanderziehen der Bereichsgrenzen, Farbwahl je Wert, Gradientverlauf (Reihenfolge, Abdeckung aller Stufen, schmale Übergänge), Randfälle ohne Spannweite |
-| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Serien-Ausblendung, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert und Messbereich im `aria-label`, Punkte, Gitter, Wertanzeige auf den echten Messwerten, Verhalten bei Berührung, Min/Max-Marken, einfarbige vs. bereichsgefärbte Kurve, Deckkraft für Linie/Fläche/Punkt, Stärke je Fläche (und ihre Multiplikation mit der Deckkraft), Bereichsnamen im `aria-label` |
-| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Klick-Toggle der Serien, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, gemerkte Serien-Auswahl, Sollwert-Umrechnung, Einheiten und Nachkommastellen für die Wertanzeige, Öffnen des Thermostat-Dialogs (Tippen, Tastatur, abschaltbar) |
+| `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Einzelkurve mit ganzer Plotfläche, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert und Messbereich im `aria-label`, Punkte, Gitter, Wertanzeige auf den echten Messwerten, Verhalten bei Berührung, Min/Max-Marken, einfarbige vs. bereichsgefärbte Kurve, Deckkraft für Linie/Fläche/Punkt, Stärke je Fläche (und ihre Multiplikation mit der Deckkraft), Bereichsnamen im `aria-label` |
+| `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Messwerte als Text, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, Sollwert-Umrechnung, Einheiten und Nachkommastellen für die Wertanzeige, Öffnen des Thermostat-Dialogs (Tippen auf Karte/Messwert/Zeile, Tastatur, Karte als Tastaturziel, abschaltbar) |
 | `tests/editor.test.ts` | Abschnitte, Selektoren (inkl. Linienart Feuchte), Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |
 | `tests/registration.test.ts` | Custom-Element-Registrierung, Karten-Picker, `getConfigElement`, `getStubConfig` |
 | `tests/demo.test.ts` | Demo-Szenarien rendern, Testdaten klar gekennzeichnet, keine echten API-Aufrufe |
@@ -764,7 +769,6 @@ src/
   types.ts                 Minimale HA-Typen
   data/states.ts           Auswertung von Sensoren, Fenster, Bewegung, Thermostat
   data/history.ts          History-Abfrage (WebSocket + REST) und Cache
-  data/hidden-series.ts    Merkt ausgeblendete Serien (localStorage, fehlertolerant)
   chart/geometry.ts        Reine Geometrie: Skalen, Pfade, Lücken, Verläufe
   chart/climate-chart.ts   Chart-Web-Component (SVG, ResizeObserver)
   editor/room-climate-editor.ts  Visueller Editor (ha-selector)

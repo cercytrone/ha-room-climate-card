@@ -278,34 +278,6 @@ describe('climate chart', () => {
     expect(await label({ timeZone: 'Not/AZone' })).not.toBe('');
   });
 
-  it('lets one series be switched off without losing the other', async () => {
-    const chart = createChart({
-      temperature: samples([20, 21, 22]),
-      humidity: samples([45, 47, 52]),
-      hiddenSeries: ['humidity'],
-    });
-    setSize(chart, 360, 130);
-    await chart.updateComplete;
-    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
-    expect(lines).toHaveLength(1);
-    expect(lines[0].style.stroke).toBe('#4FD1A5');
-    expect(chart.shadowRoot!.querySelector('.state-title')).toBeNull();
-  });
-
-  it('keeps the chart box when both series are switched off', async () => {
-    const chart = createChart({
-      temperature: samples([20, 21, 22]),
-      humidity: samples([45, 47, 52]),
-      hiddenSeries: ['temperature', 'humidity'],
-    });
-    setSize(chart, 360, 130);
-    await chart.updateComplete;
-    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(0);
-    // No empty-state text: the layout must not jump when toggling.
-    expect(chart.shadowRoot!.querySelector('.state-title')).toBeNull();
-    expect(chart.shadowRoot!.querySelector('.baseline')).not.toBeNull();
-  });
-
   it('labels the axis with day and time, and the newest tick as "Jetzt"', async () => {
     const chart = createChart({
       temperature: samples([20, 21, 22]),
@@ -776,19 +748,6 @@ describe('climate chart', () => {
     await quiet.updateComplete;
     expect(bandOf(quiet, 'temp').height).toBeCloseTo(bandOf(both, 'temp').height, 1);
     expect(bandOf(quiet, 'humidity').height).toBeCloseTo(bandOf(both, 'humidity').height, 1);
-  });
-
-  it('frees the space when a series is switched off with the label', async () => {
-    const chart = createChart({
-      temperature: samples([20, 21, 22, 21]),
-      humidity: samples([44, 45, 46, 45]),
-      hiddenSeries: ['humidity'],
-    });
-    setSize(chart, 360, 112);
-    await chart.updateComplete;
-    const plotHeight = Number(chart.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')) - 6;
-    expect(bandOf(chart, 'temp').height).toBeGreaterThanOrEqual(plotHeight * 0.8);
-    expect(chart.shadowRoot!.querySelectorAll('path.series-line')).toHaveLength(1);
   });
 
   it('drops the time row on request and gives the space to the curves', async () => {
