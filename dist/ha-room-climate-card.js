@@ -1,4 +1,4 @@
-const q = "room-climate-card", xe = "room-climate-card-editor", ur = "Room Climate Card", mr = "Raumklima auf einen Blick: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlauf.", pr = "2.9.2";
+const q = "room-climate-card", xe = "room-climate-card-editor", ur = "Room Climate Card", mr = "Raumklima auf einen Blick: Temperatur, Luftfeuchte, Fenster, Bewegung, Thermostat und echter Verlauf.", pr = "2.10.0";
 const Ue = globalThis, wt = Ue.ShadowRoot && (Ue.ShadyCSS === void 0 || Ue.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Xt = /* @__PURE__ */ new WeakMap();
 let Hi = class {
   constructor(e, t, i) {
@@ -713,7 +713,7 @@ function Wr(r, e, t = {}) {
       const m = r[o + c];
       !m || m.v === null || c !== 0 && Math.abs(m.t - l.t) > s || (d += m.v, h += 1);
     }
-    return h ? { t: l.t, v: Zr(d / h, a) } : { ...l };
+    return h ? { t: l.t, v: Yr(d / h, a) } : { ...l };
   });
 }
 const jr = [
@@ -726,8 +726,8 @@ const jr = [
   light: 10,
   medium: 30,
   strong: 60
-}, Yr = 121;
-function Zr(r, e) {
+}, Zr = 121;
+function Yr(r, e) {
   const t = 10 ** e;
   return Math.round(r * t) / t;
 }
@@ -735,7 +735,7 @@ function qr(r, e = pt) {
   const t = mi[e] ?? mi[pt];
   if (!(t > 0) || !Number.isFinite(r) || r <= 0) return 1;
   const i = Math.max(1, Math.round(t * 6e4 / r));
-  return Math.min(Yr, i * 2 + 1);
+  return Math.min(Zr, i * 2 + 1);
 }
 function Xr(r, e) {
   if (!Number.isFinite(e) || e <= 0) return 1 / 0;
@@ -954,6 +954,7 @@ const cn = [
   "chart_humidity_line_style",
   "chart_show_points",
   "chart_show_grid",
+  "chart_show_axis",
   "chart_show_tooltip",
   "chart_show_extremes",
   "chart_temperature_gradient",
@@ -1046,6 +1047,7 @@ function un(r) {
       showPoints: C(e.chart_show_points) ?? !1,
       showTooltip: C(e.chart_show_tooltip) ?? !0,
       showExtremes: C(e.chart_show_extremes) ?? !0,
+      showAxis: C(e.chart_show_axis) ?? !0,
       showTemperatureGradient: C(e.chart_temperature_gradient) ?? !0,
       showHumidityGradient: C(e.chart_humidity_gradient) ?? !0,
       temperatureAreaOpacity: Math.round(D(e.chart_temperature_area_opacity, 10, 300, 100)) / 100,
@@ -1271,7 +1273,7 @@ function bn(r, e) {
 function te(r, e, t) {
   return Number.isFinite(r) ? bn(e || "en", ve(Math.round(t), 0, 3)).format(r) : "–";
 }
-function Ye(r) {
+function Ze(r) {
   if (r == null) return null;
   const e = String(r).trim();
   if (!e) return null;
@@ -1322,7 +1324,7 @@ function Ie(r, e) {
   }
   return `color-mix(in srgb, ${r} ${Math.round(ve(e, 0, 1) * 100)}%, transparent)`;
 }
-function Ze(r) {
+function Ye(r) {
   return r === "unavailable" || r === "unknown";
 }
 function Si(r, e, t) {
@@ -1331,9 +1333,9 @@ function Si(r, e, t) {
   const n = r?.states[e];
   if (!n) return { value: null, status: "missing", unit: i };
   const s = n.attributes?.unit_of_measurement ?? i;
-  if (Ze(n.state))
+  if (Ye(n.state))
     return { entity: n, value: null, status: "unavailable", unit: s };
-  const a = Ye(n.state);
+  const a = Ze(n.state);
   return a === null ? { entity: n, value: null, status: "invalid", unit: s } : { entity: n, value: a, status: "ok", unit: s };
 }
 function _n(r, e) {
@@ -1342,7 +1344,7 @@ function _n(r, e) {
   const i = r?.states[t];
   if (!i) return { status: "missing" };
   const n = i.state;
-  if (Ze(n)) return { status: "unavailable", entity: i, rawState: n };
+  if (Ye(n)) return { status: "unavailable", entity: i, rawState: n };
   const s = n.trim().toLowerCase();
   return e.window.openStates.includes(s) ? { status: "open", entity: i, rawState: n } : sn.includes(s) ? { status: "closed", entity: i, rawState: n } : { status: "unknown", entity: i, rawState: n };
 }
@@ -1353,7 +1355,7 @@ function xn(r, e) {
   const i = r?.states[t];
   if (!i) return { status: "missing" };
   const n = i.state, s = Date.parse(i.last_changed ?? i.last_updated ?? "");
-  if (Ze(n)) return { status: "unavailable", entity: i, rawState: n };
+  if (Ye(n)) return { status: "unavailable", entity: i, rawState: n };
   const a = n.trim().toLowerCase();
   if ($n.includes(a))
     return { status: "active", entity: i, rawState: n };
@@ -1370,7 +1372,7 @@ function Ai(r, e, t) {
   const l = r?.states[i];
   if (!l)
     return { status: "missing", label: t.t("unavailable"), colorKey: "unknown", setpoint: null, unit: a };
-  const o = l.state?.toLowerCase(), d = l.attributes?.hvac_action, h = typeof d == "string" ? d.toLowerCase() : void 0, c = l.attributes?.temperature, m = typeof c == "number" ? c : typeof c == "string" ? Ye(c) : null, f = {
+  const o = l.state?.toLowerCase(), d = l.attributes?.hvac_action, h = typeof d == "string" ? d.toLowerCase() : void 0, c = l.attributes?.temperature, m = typeof c == "number" ? c : typeof c == "string" ? Ze(c) : null, f = {
     entity: l,
     action: h,
     setpoint: m,
@@ -1378,7 +1380,7 @@ function Ai(r, e, t) {
     mode: o,
     modeLabel: o ? t.mode(o) : void 0
   };
-  return Ze(l.state ?? "") ? { ...f, status: "unavailable", label: t.t("unavailable"), colorKey: "unknown" } : o === "off" ? { ...f, status: "off", label: t.t("off"), colorKey: "off" } : h === "heating" ? { ...f, status: "heating", label: t.t("heating"), colorKey: "heating" } : h === "idle" ? { ...f, status: "idle", label: t.t("idle"), colorKey: "idle" } : h === "off" ? { ...f, status: "off", label: t.t("off"), colorKey: "off" } : h && !Sn.includes(h) ? { ...f, status: "action", label: t.action(h), colorKey: "idle" } : h ? { ...f, status: "action", label: t.action(h), colorKey: "idle" } : { ...f, status: "unknown", label: t.t("statusUnknown"), colorKey: "unknown" };
+  return Ye(l.state ?? "") ? { ...f, status: "unavailable", label: t.t("unavailable"), colorKey: "unknown" } : o === "off" ? { ...f, status: "off", label: t.t("off"), colorKey: "off" } : h === "heating" ? { ...f, status: "heating", label: t.t("heating"), colorKey: "heating" } : h === "idle" ? { ...f, status: "idle", label: t.t("idle"), colorKey: "idle" } : h === "off" ? { ...f, status: "off", label: t.t("off"), colorKey: "off" } : h && !Sn.includes(h) ? { ...f, status: "action", label: t.action(h), colorKey: "idle" } : h ? { ...f, status: "action", label: t.action(h), colorKey: "idle" } : { ...f, status: "unknown", label: t.t("statusUnknown"), colorKey: "unknown" };
 }
 function An(r, e) {
   switch (r.colorKey) {
@@ -1423,7 +1425,7 @@ function ki(r) {
   for (const i of r) {
     const n = kn(i);
     if (n === void 0 || !Number.isFinite(n)) continue;
-    const s = Mn(i), a = Ye(s);
+    const s = Mn(i), a = Ze(s);
     e.push({ t: n, v: a });
   }
   if (!e.length) return [];
@@ -1693,11 +1695,11 @@ function Kn(r, e) {
     a.push(i.slice(n[l - 1] + 1, n[l] + 1).some(Boolean));
   return { samples: s, bridged: a };
 }
-const Wn = 320, jn = 112, Yn = 4e3, Zn = 0.3, qn = 0.44, Xn = { minSpan: 0.4, padding: 0.15 }, Jn = { minSpan: 3, padding: 0.15 };
+const Wn = 320, jn = 112, Zn = 4e3, Yn = 0.3, qn = 0.44, Xn = { minSpan: 0.4, padding: 0.15 }, Jn = { minSpan: 3, padding: 0.15 };
 let Qn = 0;
 class es extends le {
   constructor() {
-    super(...arguments), this.accentColor = "#4FD1A5", this.humidityColor = "#8B86D6", this.setpoint = null, this.setpointUnit = "°C", this.hiddenSeries = [], this.start = Date.now() - 6 * 3600 * 1e3, this.end = Date.now(), this.showPoints = !1, this.showGrid = !1, this.curve = "smooth", this.smoothing = "light", this.gapMode = "connect", this.maxGapMinutes = 120, this.gapStyle = "solid", this.humidityLineStyle = "solid", this.showTemperatureArea = !0, this.showHumidityArea = !0, this.chartOpacity = 100, this.temperatureAreaOpacity = 1, this.humidityAreaOpacity = 1, this.temperatureBands = !1, this.bandCold = 18, this.bandWarm = 24, this.bandHot = 27, this.bandTransition = 100, this.temperatureScale = "C", this.cornerRadius = 26, this.showTooltip = !0, this.showExtremes = !0, this.temperatureDecimals = 1, this.humidityDecimals = 1, this.language = "de", this.loading = !1, this.labels = {
+    super(...arguments), this.accentColor = "#4FD1A5", this.humidityColor = "#8B86D6", this.setpoint = null, this.setpointUnit = "°C", this.hiddenSeries = [], this.start = Date.now() - 6 * 3600 * 1e3, this.end = Date.now(), this.showPoints = !1, this.showGrid = !1, this.curve = "smooth", this.smoothing = "light", this.gapMode = "connect", this.maxGapMinutes = 120, this.gapStyle = "solid", this.humidityLineStyle = "solid", this.showTemperatureArea = !0, this.showHumidityArea = !0, this.chartOpacity = 100, this.temperatureAreaOpacity = 1, this.humidityAreaOpacity = 1, this.temperatureBands = !1, this.bandCold = 18, this.bandWarm = 24, this.bandHot = 27, this.bandTransition = 100, this.temperatureScale = "C", this.showAxis = !0, this.cornerRadius = 26, this.showTooltip = !0, this.showExtremes = !0, this.temperatureDecimals = 1, this.humidityDecimals = 1, this.language = "de", this.loading = !1, this.labels = {
       empty: "Keine Verlaufsdaten",
       emptyHint: "",
       loading: "Verlauf wird geladen …",
@@ -1712,7 +1714,7 @@ class es extends le {
     }, this.onPointerMove = (e) => {
       this.showTooltip && (this.lastPointerType = e.pointerType || "mouse", this.clearHoverTimer(), this.updateHoverAt(e));
     }, this.onPointerUp = (e) => {
-      (e.pointerType || this.lastPointerType) !== "mouse" && (this.clearHoverTimer(), this.hoverHideTimer = setTimeout(() => this.hideHover(), Yn));
+      (e.pointerType || this.lastPointerType) !== "mouse" && (this.clearHoverTimer(), this.hoverHideTimer = setTimeout(() => this.hideHover(), Zn));
     }, this.onPointerLeave = (e) => {
       (e.pointerType || this.lastPointerType) === "mouse" && this.hideHover();
     };
@@ -1747,6 +1749,7 @@ class es extends le {
       bandHot: { attribute: !1 },
       bandTransition: { attribute: !1 },
       temperatureScale: { attribute: !1 },
+      showAxis: { attribute: !1 },
       cornerRadius: { attribute: !1 },
       showTooltip: { attribute: !1 },
       showExtremes: { attribute: !1 },
@@ -2026,7 +2029,7 @@ class es extends le {
     return this.hoverGeometry = a, g`<div class="wrap">${s}${this.renderOverlay(a)}</div>`;
   }
   renderChart(e, t) {
-    const i = t, n = i >= 62, s = n ? 20 : 2, a = 6, l = i - s, o = Math.max(6, l - a), d = 1, h = e - 1, c = Math.max(1, this.end - this.start), m = Ne([this.start, this.end], [d, h]), f = n ? Math.min(Math.max(this.cornerRadius, 0), 30) + 2 : 0, y = Ne([this.start, this.end], [d + f, h - f]), S = i - 6, k = a, A = a + o * Zn, E = a + o * qn, v = l, L = this.temperatureVisible ? this.temperature ?? [] : [], I = this.humidityVisible ? this.humidity ?? [] : [], z = L.map((u) => u.v).filter((u) => u !== null && Number.isFinite(u)), qe = I.map((u) => u.v).filter((u) => u !== null && Number.isFinite(u)), Y = typeof this.setpoint == "number" && Number.isFinite(this.setpoint) ? this.setpoint : null, Xe = Y !== null ? [...z, Y] : z, Je = li(Xe), Qe = li(qe), ie = Je ? hi(Je[0], Je[1], Xn) : null, fe = Qe ? hi(Qe[0], Qe[1], Jn) : null, R = ie ? Ne(ie, [v, E]) : null, ye = Math.min(1, Math.max(0.15, (this.chartOpacity ?? 100) / 100)), re = this.temperatureBands && ie ? rn(
+    const i = t, n = this.showAxis && i >= 62, s = n ? 20 : 2, a = 6, l = i - s, o = Math.max(6, l - a), d = 1, h = e - 1, c = Math.max(1, this.end - this.start), m = Ne([this.start, this.end], [d, h]), f = n ? Math.min(Math.max(this.cornerRadius, 0), 30) + 2 : 0, y = Ne([this.start, this.end], [d + f, h - f]), S = i - 6, k = a, A = a + o * Yn, E = a + o * qn, v = l, L = this.temperatureVisible ? this.temperature ?? [] : [], I = this.humidityVisible ? this.humidity ?? [] : [], z = L.map((u) => u.v).filter((u) => u !== null && Number.isFinite(u)), qe = I.map((u) => u.v).filter((u) => u !== null && Number.isFinite(u)), Z = typeof this.setpoint == "number" && Number.isFinite(this.setpoint) ? this.setpoint : null, Xe = Z !== null ? [...z, Z] : z, Je = li(Xe), Qe = li(qe), ie = Je ? hi(Je[0], Je[1], Xn) : null, fe = Qe ? hi(Qe[0], Qe[1], Jn) : null, R = ie ? Ne(ie, [v, E]) : null, ye = Math.min(1, Math.max(0.15, (this.chartOpacity ?? 100) / 100)), re = this.temperatureBands && ie ? rn(
       ie,
       { coldBelow: this.bandCold, warmAbove: this.bandWarm, hotAbove: this.bandHot },
       { cold: Le, normal: this.accentColor, warm: ze, hot: Be },
@@ -2049,7 +2052,7 @@ class es extends le {
         opacity: Number((0.08 * Ct).toFixed(3))
       },
       { offset: 1, color: this.accentColor, opacity: 0 }
-    ], Yi = [
+    ], Zi = [
       { offset: 0, color: this.humidityColor, opacity: Number(Math.min(1, 0.2 * Tt).toFixed(3)) },
       { offset: 0.6, color: this.humidityColor, opacity: Number(Math.min(1, 0.07 * Tt).toFixed(3)) },
       { offset: 1, color: this.humidityColor, opacity: 0 }
@@ -2068,7 +2071,7 @@ class es extends le {
       return x < 3 ? u : Wr(u, x, {
         maxDeltaMs: Xr(x, w)
       });
-    }, Zi = Dt(ne), qi = Dt(Ce), Rt = ie ? ci(Zi, Ht) : [], Ot = fe ? ci(qi, Ht) : [], Xi = Math.max(1, Rt.length + Ot.length), Ji = Math.max(60, Math.floor(1200 / Xi)), Nt = (u) => u.map((w) => Kn(w, Ji)), Te = Nt(Rt), Ee = Nt(Ot), Ft = [];
+    }, Yi = Dt(ne), qi = Dt(Ce), Rt = ie ? ci(Yi, Ht) : [], Ot = fe ? ci(qi, Ht) : [], Xi = Math.max(1, Rt.length + Ot.length), Ji = Math.max(60, Math.floor(1200 / Xi)), Nt = (u) => u.map((w) => Kn(w, Ji)), Te = Nt(Rt), Ee = Nt(Ot), Ft = [];
     if (this.showGrid)
       for (let u = 1; u < 3; u++) {
         const w = a + o * u / 3;
@@ -2115,13 +2118,13 @@ class es extends le {
         (w) => u(w.samples, U, this.humidityColor)
       );
     }
-    const B = Y !== null && R ? R(Y) : null, He = B !== null && Number.isFinite(B) && B >= E - 0.5 && B <= v + 0.5, sr = ne.find((u) => u.v !== null)?.v ?? null, ar = [...ne].reverse().find((u) => u.v !== null)?.v ?? null, Wt = (u) => u === null || Y === null ? 0 : Math.abs(u - Y), tt = Wt(ar) >= Wt(sr), jt = (u) => {
+    const B = Z !== null && R ? R(Z) : null, He = B !== null && Number.isFinite(B) && B >= E - 0.5 && B <= v + 0.5, sr = ne.find((u) => u.v !== null)?.v ?? null, ar = [...ne].reverse().find((u) => u.v !== null)?.v ?? null, Wt = (u) => u === null || Z === null ? 0 : Math.abs(u - Z), tt = Wt(ar) >= Wt(sr), jt = (u) => {
       for (let w = u.length - 1; w >= 0; w -= 1) {
         const x = u[w].samples;
         for (let b = x.length - 1; b >= 0; b -= 1)
           if (x[b].v !== null) return x[b];
       }
-    }, De = jt(Te), it = jt(Ee), or = He && Y !== null ? `${this.labels.setpoint} ${te(Y, this.language, 1)}${this.setpointUnit ? ` ${this.setpointUnit}` : ""}` : "", Yt = (u, w, x, b) => {
+    }, De = jt(Te), it = jt(Ee), or = He && Z !== null ? `${this.labels.setpoint} ${te(Z, this.language, 1)}${this.setpointUnit ? ` ${this.setpointUnit}` : ""}` : "", Zt = (u, w, x, b) => {
       const H = pi(w);
       if (!H || H.min.v === H.max.v) return "";
       const X = te(H.min.v, this.language, b), O = te(H.max.v, this.language, b);
@@ -2144,25 +2147,25 @@ class es extends le {
     })(), cr = [
       this.labels.aria,
       or,
-      R ? Yt(this.labels.temperature, ne, lr, this.temperatureDecimals) : "",
-      U ? Yt(this.labels.humidity, Ce, this.humidityUnit, this.humidityDecimals) : "",
+      R ? Zt(this.labels.temperature, ne, lr, this.temperatureDecimals) : "",
+      U ? Zt(this.labels.humidity, Ce, this.humidityUnit, this.humidityDecimals) : "",
       hr
-    ].filter(Boolean).join(". "), rt = [], Zt = (u, w, x, b, H, X) => {
+    ].filter(Boolean).join(". "), rt = [], Yt = (u, w, x, b, H, X) => {
       if (!this.showExtremes || e < 200 || b - x < 18) return;
       const O = pi(u);
       if (!O || O.min.v === O.max.v || u.filter((_) => _.v !== null).length < 3) return;
       const V = [
         { sample: O.max, isMax: !0 },
         { sample: O.min, isMax: !1 }
-      ].map(({ sample: _, isMax: Z }) => {
+      ].map(({ sample: _, isMax: Y }) => {
         const Re = m(_.t), N = w(_.v), P = N - 11 >= x, Oe = N + 17 <= b, se = P ? N - 9 : x + 8, Q = Oe ? N + 15 : b - 1;
-        let nt = Z ? P ? se : Q : Oe ? Q : se;
+        let nt = Y ? P ? se : Q : Oe ? Q : se;
         if (He && B !== null && Math.abs(nt - B) < 9) {
-          const qt = Z ? Q : se;
+          const qt = Y ? Q : se;
           Math.abs(qt - B) >= 9 && (nt = qt);
         }
-        return { sample: _, cx: Re, cy: N, labelY: nt, isMax: Z };
-      }).filter((_) => Number.isFinite(_.cx) && Number.isFinite(_.cy)).filter((_) => _.cy >= x - 1 && _.cy <= b + 1), J = (_, Z) => Math.abs(_.labelY - Z.labelY) < 9 && Math.abs(_.cx - Z.cx) < 34;
+        return { sample: _, cx: Re, cy: N, labelY: nt, isMax: Y };
+      }).filter((_) => Number.isFinite(_.cx) && Number.isFinite(_.cy)).filter((_) => _.cy >= x - 1 && _.cy <= b + 1), J = (_, Y) => Math.abs(_.labelY - Y.labelY) < 9 && Math.abs(_.cx - Y.cx) < 34;
       let M = [...V];
       if (M.length === 2 && J(M[0], M[1])) {
         for (const _ of M)
@@ -2171,9 +2174,9 @@ class es extends le {
       }
       for (const _ of M) {
         if (!_) continue;
-        const Z = 26, Re = _.cx < (d + h) / 2;
+        const Y = 26, Re = _.cx < (d + h) / 2;
         let N = Re ? _.cx + 6 : _.cx - 6, P = Re ? "start" : "end";
-        P === "start" && N + Z > h - 2 ? (N = _.cx - 6, P = "end") : P === "end" && N - Z < d + 2 && (N = _.cx + 6, P = "start");
+        P === "start" && N + Y > h - 2 ? (N = _.cx - 6, P = "end") : P === "end" && N - Y < d + 2 && (N = _.cx + 6, P = "start");
         const Oe = tt ? h : d, se = (Q) => He && B !== null && Math.abs(_.labelY - (B - 5)) < 9 && Math.abs(Q - Oe) < 40;
         if (se(N)) {
           const Q = P === "start" ? _.cx - 6 : _.cx + 6;
@@ -2196,14 +2199,14 @@ class es extends le {
         );
       }
     };
-    R && Zt(
+    R && Yt(
       ne,
       R,
       E,
       v,
       this.accentColor,
       this.temperatureDecimals
-    ), U && Zt(
+    ), U && Yt(
       Ce,
       U,
       k,
@@ -2246,7 +2249,7 @@ class es extends le {
     )}
               </linearGradient>` : p}
         <linearGradient id=${`${this.uid}-humidity-fill`} x1="0" y1=${k} x2="0" y2=${A} gradientUnits="userSpaceOnUse">
-          ${Yi.map(
+          ${Zi.map(
       (u) => $`<stop offset=${u.offset} stop-color=${u.color} stop-opacity=${u.opacity} />`
     )}
         </linearGradient>
@@ -2548,6 +2551,8 @@ const ct = {
     bandTransition: "Übergang zwischen den Bereichen",
     bandTransitionHelper: "0 % = harte Stufen genau an den Grenzen, 100 % = die Farbe fließt über den ganzen Abstand zwischen zwei Grenzen. Dazwischen liegt jeder Zwischenwert.",
     grid: "Gitternetz",
+    axis: "Zeitangaben unter dem Verlauf",
+    axisHelper: "Die unterste Zeile mit Startzeit, Mitte und „Jetzt“. Ohne sie gehört der Platz den Kurven; die Zeit steht weiterhin im Tooltip und in der Beschreibung für Screenreader.",
     points: "Datenpunkte",
     tooltip: "Werte beim Überfahren",
     extremes: "Minimum/Maximum im Chart anzeigen",
@@ -2654,6 +2659,8 @@ const ct = {
     bandTransition: "Transition between the bands",
     bandTransitionHelper: "0 % = hard steps exactly at the limits, 100 % = the colour flows across the whole gap between two limits. Anything in between is a valid setting.",
     grid: "Grid lines",
+    axis: "Time labels below the chart",
+    axisHelper: "The bottom row with the start time, the middle and “now”. Without it the space belongs to the curves; the time is still in the tooltip and in the screen-reader description.",
     points: "Data points",
     tooltip: "Values on hover",
     extremes: "Show minimum/maximum in the chart",
@@ -3402,6 +3409,13 @@ class Wi extends le {
       disabled: !n
     })}
       ${this.renderSwitch({
+      key: "chart_show_axis",
+      label: e.axis,
+      value: this.rawBoolean("chart_show_axis") ?? !0,
+      disabled: !n,
+      helper: e.axisHelper
+    })}
+      ${this.renderSwitch({
       key: "chart_show_points",
       label: e.points,
       value: this.rawBoolean("chart_show_points") ?? !1,
@@ -3677,7 +3691,7 @@ class ss extends le {
     if (!Number.isFinite(s)) return e;
     const a = e[e.length - 1], l = Math.min(s, i);
     if (l <= a.t) return e;
-    const o = Ye(n.state);
+    const o = Ze(n.state);
     return a.v === o ? e : [...e, { t: l, v: o }];
   }
   updateDensity(e) {
@@ -4009,6 +4023,7 @@ class ss extends le {
         .showTemperatureArea=${e.chart.showTemperatureGradient}
         .showHumidityArea=${e.chart.showHumidityGradient}
         .chartOpacity=${Math.round(e.chart.opacity * 100)}
+        .showAxis=${e.chart.showAxis}
         .temperatureAreaOpacity=${e.chart.temperatureAreaOpacity}
         .humidityAreaOpacity=${e.chart.humidityAreaOpacity}
         .temperatureBands=${e.chart.temperatureBands}

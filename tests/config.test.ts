@@ -370,6 +370,22 @@ describe('curve opacity and temperature bands', () => {
     expect(config.chart.bandTransition).toBe(1);
   });
 
+  it('keeps the time row by default and switches it off on request', () => {
+    expect(normalizeConfig({}).chart.showAxis).toBe(true);
+    expect(normalizeConfig({ chart_show_axis: false }).chart.showAxis).toBe(false);
+    expect(normalizeConfig({ chart_show_axis: true }).chart.showAxis).toBe(true);
+    expect(normalizeConfig({ chart_show_axis: 'nein' }).chart.showAxis).toBe(true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      resetUnknownKeyWarnings();
+      normalizeConfig({ chart_show_axis: false });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      resetUnknownKeyWarnings();
+    }
+  });
+
   it('turns the band transition percentage into a factor', () => {
     expect(normalizeConfig({ chart_band_transition: 0 }).chart.bandTransition).toBe(0);
     expect(normalizeConfig({ chart_band_transition: 45 }).chart.bandTransition).toBeCloseTo(0.45, 2);

@@ -150,6 +150,7 @@ export class RoomClimateChart extends LitElement {
     bandHot: { attribute: false },
     bandTransition: { attribute: false },
     temperatureScale: { attribute: false },
+    showAxis: { attribute: false },
     cornerRadius: { attribute: false },
     showTooltip: { attribute: false },
     showExtremes: { attribute: false },
@@ -417,6 +418,8 @@ export class RoomClimateChart extends LitElement {
   bandTransition = 100;
   /** Scale of the plotted values – only used for the numbers in `aria-label`. */
   temperatureScale: 'C' | 'F' = 'C';
+  /** Time labels under the plot (start, middle, "now"). */
+  showAxis = true;
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 26;
   /** Crosshair readout while the pointer is over the plot. */
@@ -571,7 +574,9 @@ export class RoomClimateChart extends LitElement {
     height: number
   ): { chart: TemplateResult; geometry: HoverGeometry } {
     const chartHeight = height;
-    const showAxis = chartHeight >= 62;
+    // Below this height the labels would collide with the curves, so they are
+    // dropped; the editor switch removes them on purpose and frees the space.
+    const showAxis = this.showAxis && chartHeight >= 62;
     const axisSpace = showAxis ? 20 : 2;
     const top = 6;
     const bottom = chartHeight - axisSpace;

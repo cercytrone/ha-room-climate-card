@@ -99,6 +99,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_humidity_line_style?: HumidityLineStyle;
   chart_show_points?: boolean;
   chart_show_grid?: boolean;
+  /** Time labels below the plot (start, middle, "now"). Default on. */
+  chart_show_axis?: boolean;
   /** Crosshair readout with the measured values. Default on. */
   chart_show_tooltip?: boolean;
   /** Quiet min/max marks next to the curves. Default on. */
@@ -169,6 +171,8 @@ export interface ResolvedChartConfig {
   showGrid: boolean;
   showTooltip: boolean;
   showExtremes: boolean;
+  /** Time labels below the plot: without them the curves get the space. */
+  showAxis: boolean;
   /** Area fill under the temperature curve. */
   showTemperatureGradient: boolean;
   /** Area fill under the humidity curve. */
@@ -395,6 +399,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'chart_humidity_line_style',
   'chart_show_points',
   'chart_show_grid',
+  'chart_show_axis',
   'chart_show_tooltip',
   'chart_show_extremes',
   'chart_temperature_gradient',
@@ -541,6 +546,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       showPoints: asBoolean(config.chart_show_points) ?? false,
       showTooltip: asBoolean(config.chart_show_tooltip) ?? true,
       showExtremes: asBoolean(config.chart_show_extremes) ?? true,
+      showAxis: asBoolean(config.chart_show_axis) ?? true,
       showTemperatureGradient: asBoolean(config.chart_temperature_gradient) ?? true,
       showHumidityGradient: asBoolean(config.chart_humidity_gradient) ?? true,
       temperatureAreaOpacity:

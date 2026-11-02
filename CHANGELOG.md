@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.10.0] – 2026-11-02
+
+### Hinzugefügt
+
+- **Zeitangaben unter dem Verlauf abschaltbar.** `chart_show_axis` (Standard `true`) – im Editor
+  unter *Verlauf* als Schalter **Zeitangaben unter dem Verlauf**, nur aktiv, solange eine Kurve
+  gezeichnet wird. Ausgeschaltet entfällt die unterste Zeile (Start · Mitte · Jetzt) vollständig,
+  und die Kurven bekommen die 20 px, die vorher für die Beschriftung reserviert waren – die
+  Kartenhöhe selbst bleibt, wie sie eingestellt ist. Uhrzeit und Messwerte stehen weiterhin im
+  Tooltip und in der Beschreibung für Screenreader; die Achse bleibt unabhängig davon bei zu
+  wenig Platz automatisch weg.
+
 ## [2.9.2] – 2026-11-02
 
 ### Behoben

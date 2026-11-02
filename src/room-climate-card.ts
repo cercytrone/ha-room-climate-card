@@ -948,6 +948,7 @@ export class RoomClimateCard extends LitElement {
         .showTemperatureArea=${config.chart.showTemperatureGradient}
         .showHumidityArea=${config.chart.showHumidityGradient}
         .chartOpacity=${Math.round(config.chart.opacity * 100)}
+        .showAxis=${config.chart.showAxis}
         .temperatureAreaOpacity=${config.chart.temperatureAreaOpacity}
         .humidityAreaOpacity=${config.chart.humidityAreaOpacity}
         .temperatureBands=${config.chart.temperatureBands}
