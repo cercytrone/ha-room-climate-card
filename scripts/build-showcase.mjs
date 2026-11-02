@@ -1,7 +1,12 @@
 /**
- * Renders `docs/images/showcase.svg` (and a PNG version) from
- * `scripts/showcase.ts`. Uses esbuild (a Vite dependency) to bundle the
- * TypeScript file and @resvg/resvg-js to rasterise it – no browser needed.
+ * Renders the README previews from `scripts/showcase.ts`:
+ *
+ *   showcase.svg/.png        – four cards, dark theme
+ *   showcase-light.svg/.png  – two cards, light theme ("daytime")
+ *   editor.svg/.png          – the visual editor with a live preview
+ *
+ * Uses esbuild (a Vite dependency) to bundle the TypeScript file and
+ * @resvg/resvg-js to rasterise it – no browser needed.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -27,13 +32,25 @@ await build({
   logLevel: 'warning',
 });
 
-const svg = execFileSync(process.execPath, [tmpFile], { cwd: root, encoding: 'utf8' });
-writeFileSync(resolve(outDir, 'showcase.svg'), svg);
+const variants = [
+  { mode: 'dark', name: 'showcase' },
+  { mode: 'light', name: 'showcase-light' },
+  { mode: 'editor', name: 'editor' },
+  { mode: 'bands', name: 'showcase-bands' },
+];
 
-const png = new Resvg(svg, {
-  fitTo: { mode: 'width', value: 2000 },
-  font: { loadSystemFonts: true, defaultFontFamily: 'DejaVu Sans' },
-}).render();
-writeFileSync(resolve(outDir, 'showcase.png'), png.asPng());
+for (const variant of variants) {
+  const svg = execFileSync(process.execPath, [tmpFile, variant.mode], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  writeFileSync(resolve(outDir, `${variant.name}.svg`), svg);
 
-console.log(`showcase.svg + showcase.png written to docs/images (${png.width}px wide)`);
+  const png = new Resvg(svg, {
+    fitTo: { mode: 'width', value: 2000 },
+    font: { loadSystemFonts: true, defaultFontFamily: 'DejaVu Sans' },
+  }).render();
+  writeFileSync(resolve(outDir, `${variant.name}.png`), png.asPng());
+
+  console.log(`${variant.name}.svg + ${variant.name}.png written (${png.width}px wide)`);
+}

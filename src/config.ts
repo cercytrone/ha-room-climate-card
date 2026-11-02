@@ -3,6 +3,7 @@ import {
   SMOOTHING_LEVELS,
   type SmoothingLevel,
 } from './chart/geometry';
+import { DEFAULT_BAND_LIMITS, orderBandLimits, type BandLimits } from './chart/bands';
 import type { HomeAssistant, LovelaceCardConfig } from './types';
 
 export type ThemeMode = 'auto' | 'dark' | 'light';
@@ -106,6 +107,20 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_temperature_gradient?: boolean;
   /** Soft colour gradient under the humidity curve. Default on. */
   chart_humidity_gradient?: boolean;
+  /** Strength of the temperature area fill in percent (100 = built-in default). */
+  chart_temperature_area_opacity?: number;
+  /** Strength of the humidity area fill in percent (100 = built-in default). */
+  chart_humidity_area_opacity?: number;
+  /** Overall opacity of the curves (line, area, points) in percent. */
+  chart_opacity?: number;
+  /** Colour the temperature curve by value: cold / normal / warm / hot. */
+  chart_temperature_bands?: boolean;
+  /** Below this value the curve is cold. */
+  chart_band_cold_below?: number;
+  /** From this value on it is warm. */
+  chart_band_warm_above?: number;
+  /** From this value on it is hot. */
+  chart_band_hot_above?: number;
 }
 
 export interface ResolvedWindowConfig {
@@ -156,6 +171,16 @@ export interface ResolvedChartConfig {
   showTemperatureGradient: boolean;
   /** Area fill under the humidity curve. */
   showHumidityGradient: boolean;
+  /** Multiplier of the temperature area fill (1 = built-in default). */
+  temperatureAreaOpacity: number;
+  /** Multiplier of the humidity area fill (1 = built-in default). */
+  humidityAreaOpacity: number;
+  /** Opacity of line, area and points as a factor between 0.15 and 1. */
+  opacity: number;
+  /** Whether the temperature curve is coloured by value. */
+  temperatureBands: boolean;
+  /** Thresholds of the four stages, always in ascending order. */
+  bandLimits: BandLimits;
 }
 
 
@@ -370,6 +395,13 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'chart_show_extremes',
   'chart_temperature_gradient',
   'chart_humidity_gradient',
+  'chart_temperature_area_opacity',
+  'chart_humidity_area_opacity',
+  'chart_opacity',
+  'chart_temperature_bands',
+  'chart_band_cold_below',
+  'chart_band_warm_above',
+  'chart_band_hot_above',
 ];
 
 /** Keys already reported, so a re-render does not flood the console. */
@@ -506,6 +538,19 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       showExtremes: asBoolean(config.chart_show_extremes) ?? true,
       showTemperatureGradient: asBoolean(config.chart_temperature_gradient) ?? true,
       showHumidityGradient: asBoolean(config.chart_humidity_gradient) ?? true,
+      temperatureAreaOpacity:
+        Math.round(asNumber(config.chart_temperature_area_opacity, 10, 300, 100)) / 100,
+      humidityAreaOpacity:
+        Math.round(asNumber(config.chart_humidity_area_opacity, 10, 300, 100)) / 100,
+      opacity: Math.round(asNumber(config.chart_opacity, 15, 100, 100)) / 100,
+      temperatureBands:
+        (asBoolean(config.chart_temperature_bands) ?? false) && showTemperatureChart,
+      // Thresholds are sorted in `orderBandLimits`: a user may type 24 / 18 / 27.
+      bandLimits: orderBandLimits(
+        asNumber(config.chart_band_cold_below, -30, 60, DEFAULT_BAND_LIMITS.coldBelow),
+        asNumber(config.chart_band_warm_above, -30, 60, DEFAULT_BAND_LIMITS.warmAbove),
+        asNumber(config.chart_band_hot_above, -30, 60, DEFAULT_BAND_LIMITS.hotAbove)
+      ),
       // The reference sheet reduces the axis to a hairline plus three labels;
       // the dashed helper lines are opt-in now.
       showGrid: asBoolean(config.chart_show_grid) ?? false,

@@ -4,6 +4,62 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.8.0] – 2026-11-02
+
+### Hinzugefügt
+
+- **Stärke der Flächenverläufe, einzeln regelbar.** `chart_temperature_area_opacity` und
+  `chart_humidity_area_opacity` (Editor: *Stärke des Flächenverlaufs (Temperatur)* bzw.
+  *(Luftfeuchte)*, 10–300 %). 100 % ist der eingebaute Verlauf, 180–250 % machen die Fläche
+  kräftiger, 30 % lassen sie fast verschwinden. Beide Regler sind unabhängig voneinander und
+  wirken zusätzlich zur Deckkraft der Kurven (Faktor × Faktor); der oberste Stop wird bei voller
+  Deckung gekappt, damit aus dem Verlauf kein Farbblock wird.
+- **Deckkraft der Kurven im Editor.** `chart_opacity` (15–100 %) skaliert Linie, Flächen,
+  Endpunkte und Datenpunkte gemeinsam; die Flächenverläufe behalten ihre relative Abstufung.
+  Gitter, Achse und Soll-Linie bleiben unverändert – sie sind Orientierung, kein Datum.
+- **Temperaturkurve nach Bereich einfärben** (`chart_temperature_bands`, im Editor unter
+  *Verlauf*). Kalt / normal / warm / heiß als **ein** senkrechter Farbverlauf über der
+  Temperaturfläche: jeder Punkt nimmt die Farbe seines eigenen Werts an, zwischen den Bereichen
+  rampt es über wenige Zehntel Grad. Die Kurve bleibt dabei ein einziger SVG-Pfad – keine
+  zusätzlichen Knoten, kein Leistungssprung.
+- **Frei einstellbare Grenzen:** `chart_band_cold_below` (18 °C), `chart_band_warm_above`
+  (24 °C), `chart_band_hot_above` (27 °C). Vertauschte Werte werden sortiert, zu eng gesetzte
+  Grenzen auf mindestens 1 °C auseinandergezogen.
+- **Farben aus der bestehenden Palette:** gedämpftes Blau `#7FA6D9` für kalt, der Akzent (Mint)
+  im Normalbereich, das Amber des Fenster-Badges `#EFB35F` für warm, das Rot der Flamme
+  `#D16A62` für heiß. Die Schwellen sind konfigurierbar, die Farben bewusst nicht – so bleibt
+  die Palette ein Aussagesystem und wird keine Farbauswahl.
+- **Screenreader-Text für die Bereiche:** die Beschreibung des Charts nennt den Bereich
+  („Temperatur 16,9–28,9 °C (kalt – heiß)“), weil ein Farbverlauf allein nichts aussagt.
+- **Fahrenheit-Umrechnung:** die Grenzen sind in °C hinterlegt und werden für Sensoren in °F
+  umgerechnet, damit der Verlauf zur gezeichneten Kurve passt.
+- **Neuer README-Abschnitt „Farbbereiche & Deckkraft“** mit Vorschaubild
+  (`docs/images/showcase-bands.*`).
+
+### Geändert
+
+- Der Showcase-Renderer zeichnet Farbbereiche und Deckkraft mit denselben Funktionen wie die
+  Karte (`src/chart/bands.ts`), damit das Vorschaubild nicht von der Implementierung abweichen
+  kann. Das Editor-Bild zeigt jetzt den Abschnitt *Verlauf* mit den neuen Feldern.
+
+## [2.7.2] – 2026-11-02
+
+### Hinzugefügt
+
+- **Abschnitt „Auf Tablets & schlanken Geräten“ in der README.** Gemessene Werte für ein
+  Fire HD 10 Plus mit Fully Kiosk und acht gleichzeitigen Karten: Bundle-Größe, DOM-Knoten je
+  Karte, SVG-Knoten je Chart, gespeicherte Messwerte, Zahl der History-Anfragen und Timer –
+  dazu Empfehlungen zu `chart_hours`, Datenpunkten, WebView-Version und Neuladen.
+- **Helle Vorschau** (`docs/images/showcase-light.*`) und **Editor-Ansicht**
+  (`docs/images/editor.*`) für die README, jeweils als gerenderte Design-Vorschau mit
+  Demo-Werten gekennzeichnet.
+
+### Geändert
+
+- Der Showcase-Renderer gibt drei Bilder aus (`npm run showcase`). Farben und Flächenverlauf
+  liegen jetzt als Hell-/Dunkel-Palette vor und spiegeln die Theme-Tokens der Karte, sodass die
+  helle Vorschau nicht mehr aus einer zweiten, abweichenden Farbtabelle stammt.
+
 ## [2.7.1] – 2026-10-31
 
 ### Geändert

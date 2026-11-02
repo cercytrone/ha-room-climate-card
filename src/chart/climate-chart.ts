@@ -25,6 +25,7 @@ import {
   type GapMode,
   type SeriesSegment,
 } from './geometry';
+import { BAND_COLD, BAND_HOT, BAND_WARM, bandColorAt, bandStops } from './bands';
 
 /**
  * Decimates a segment for rendering but keeps the `bridged` flags aligned with
@@ -108,6 +109,14 @@ export interface ChartLabels {
   now: string;
   /** Two-letter caption of the dashed setpoint reference line. */
   setpoint: string;
+  /**
+   * Names of the four temperature bands, used for the `aria-label` only: the
+   * gradient is pure colour, so the words are its accessible counterpart.
+   */
+  bandColdText?: string;
+  bandNormalText?: string;
+  bandWarmText?: string;
+  bandHotText?: string;
 }
 
 export class RoomClimateChart extends LitElement {
@@ -131,6 +140,14 @@ export class RoomClimateChart extends LitElement {
     humidityLineStyle: { attribute: false },
     showTemperatureArea: { attribute: false },
     showHumidityArea: { attribute: false },
+    chartOpacity: { attribute: false },
+    temperatureAreaOpacity: { attribute: false },
+    humidityAreaOpacity: { attribute: false },
+    temperatureBands: { attribute: false },
+    bandCold: { attribute: false },
+    bandWarm: { attribute: false },
+    bandHot: { attribute: false },
+    temperatureScale: { attribute: false },
     cornerRadius: { attribute: false },
     showTooltip: { attribute: false },
     showExtremes: { attribute: false },
@@ -379,6 +396,23 @@ export class RoomClimateChart extends LitElement {
   showTemperatureArea = true;
   /** Soft area under the humidity curve, kept inside its own band. */
   showHumidityArea = true;
+  /** Opacity of line, area and points in percent (15–100). */
+  chartOpacity = 100;
+  /** Strength of the temperature area fill (1 = built-in default). */
+  temperatureAreaOpacity = 1;
+  /** Strength of the humidity area fill (1 = built-in default). */
+  humidityAreaOpacity = 1;
+  /** Paint the temperature curve by value: cold / normal / warm / hot. */
+  temperatureBands = false;
+  /**
+   * Thresholds of the colour bands, always ascending and in the unit the curve
+   * is drawn in (the card converts the stored °C values).
+   */
+  bandCold = 18;
+  bandWarm = 24;
+  bandHot = 27;
+  /** Scale of the plotted values – only used for the numbers in `aria-label`. */
+  temperatureScale: 'C' | 'F' = 'C';
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 26;
   /** Crosshair readout while the pointer is over the plot. */
@@ -580,6 +614,63 @@ export class RoomClimateChart extends LitElement {
       : null;
 
     const tempY = tempDomain ? linearScale(tempDomain, [temperatureBottom, temperatureTop]) : null;
+
+    /*
+     * Curve opacity and the optional temperature bands.
+     *
+     * The bands are one vertical gradient in user space: every point of the
+     * curve picks the colour of its own value, so the transition is continuous
+     * instead of four hard blocks. Off by default – the accent stays the curve.
+     */
+    const opacityFactor = Math.min(1, Math.max(0.15, (this.chartOpacity ?? 100) / 100));
+    const bandGradient =
+      this.temperatureBands && tempDomain
+        ? bandStops(
+            tempDomain,
+            { coldBelow: this.bandCold, warmAbove: this.bandWarm, hotAbove: this.bandHot },
+            { cold: BAND_COLD, normal: this.accentColor, warm: BAND_WARM, hot: BAND_HOT }
+          )
+        : null;
+    const temperatureColor = bandGradient ? `url(#${this.uid}-temp-stroke)` : this.accentColor;
+    const opacityStyle = opacityFactor < 1 ? `;stroke-opacity:${opacityFactor}` : '';
+    /*
+     * The area strength is a multiplier on top of the built-in falloff, so the
+     * curve at 100 % looks exactly as before and 200 % doubles the fill. It is
+     * clamped at 1 per stop: an area is a background, never a block of colour.
+     */
+    // Clamped per stop, not here: 200 % must really double the built-in 0.22.
+    const areaFactor = (strength: number): number =>
+      Math.max(0.01, (Number.isFinite(strength) ? strength : 1) * opacityFactor);
+    const temperatureAreaFactor = areaFactor(this.temperatureAreaOpacity);
+    const humidityAreaFactor = areaFactor(this.humidityAreaOpacity);
+    const fillFade = (offset: number): number =>
+      Math.min(
+        1,
+        Number(
+          (0.22 * Math.pow(1 - Math.min(1, Math.max(0, offset)), 1.45) * temperatureAreaFactor).toFixed(3)
+        )
+      );
+    const temperatureFillStops = bandGradient
+      ? bandGradient.map((stop) => ({
+          offset: stop.offset,
+          color: stop.color,
+          opacity: fillFade(stop.offset),
+        }))
+      : [
+          { offset: 0, color: this.accentColor, opacity: fillFade(0) },
+          {
+            offset: 0.55,
+            color: this.accentColor,
+            // Same 0.08 falloff as before, scaled by strength and opacity.
+            opacity: Number((0.08 * temperatureAreaFactor).toFixed(3)),
+          },
+          { offset: 1, color: this.accentColor, opacity: 0 },
+        ];
+    const humidityFillStops = [
+      { offset: 0, color: this.humidityColor, opacity: Number(Math.min(1, 0.2 * humidityAreaFactor).toFixed(3)) },
+      { offset: 0.6, color: this.humidityColor, opacity: Number(Math.min(1, 0.07 * humidityAreaFactor).toFixed(3)) },
+      { offset: 1, color: this.humidityColor, opacity: 0 },
+    ];
     const humidityY = humidityDomain
       ? linearScale(humidityDomain, [humidityBottom, humidityTop])
       : null;
@@ -682,6 +773,7 @@ export class RoomClimateChart extends LitElement {
           options.color ? `stroke:${options.color}` : `stroke:${stroke}`,
           options.width ? `stroke-width:${options.width}` : '',
           options.dashed ? 'stroke-dasharray:0.1 5.5' : '',
+          opacityStyle.replace(/^;/, ''),
         ]
           .filter(Boolean)
           .join(';');
@@ -692,7 +784,7 @@ export class RoomClimateChart extends LitElement {
     // One colour, drawn straight: the old gradient had two identical stops and
     // therefore never changed anything – it only forced a `url(#…)` indirection.
     const tempPaths = tempSegments.flatMap((segment) =>
-      seriesElement(segment, tempY!, this.accentColor, { color: this.accentColor })
+      seriesElement(segment, tempY!, temperatureColor, { color: temperatureColor })
     );
 
     // Restrained area fills, one per series and each one inside its own band.
@@ -746,7 +838,7 @@ export class RoomClimateChart extends LitElement {
           if (index % stride !== 0 && index !== numeric.length - 1) return;
           const value = sample.v as number;
           pointMarkers.push(
-            svg`<circle class="point" r="1.7" cx=${x(sample.t)} cy=${projectY(value)} style="stroke:${color}" />`
+            svg`<circle class="point" r="1.7" cx=${x(sample.t)} cy=${projectY(value)} style="stroke:${color}${opacityStyle}" />`
           );
         });
       };
@@ -802,6 +894,36 @@ export class RoomClimateChart extends LitElement {
       return `${label} ${low}–${high}${unit ? ` ${unit}` : ''}`;
     };
     const temperatureUnit = this.temperatureUnit || this.setpointUnit;
+    /*
+     * The bands are pure colour, so the accessible text has to name them: a
+     * screen reader hears "16,9–28,9 °C (kalt – heiß)" instead of a gradient.
+     */
+    const bandRangeText = (() => {
+      if (!bandGradient || !tempY) return '';
+      const values = tempSeries
+        .map((sample) => sample.v)
+        .filter((value): value is number => value !== null && Number.isFinite(value));
+      if (!values.length) return '';
+      const limits = {
+        coldBelow: this.bandCold,
+        warmAbove: this.bandWarm,
+        hotAbove: this.bandHot,
+      };
+      const names = {
+        cold: this.labels.bandColdText ?? 'kalt',
+        normal: this.labels.bandNormalText ?? 'normal',
+        warm: this.labels.bandWarmText ?? 'warm',
+        hot: this.labels.bandHotText ?? 'heiß',
+      };
+      const colors = { cold: BAND_COLD, normal: this.accentColor, warm: BAND_WARM, hot: BAND_HOT };
+      const first = bandColorAt(Math.min(...values), limits, colors);
+      const last = bandColorAt(Math.max(...values), limits, colors);
+      const nameOf = (color: string): string =>
+        color === BAND_COLD ? names.cold : color === BAND_WARM ? names.warm : color === BAND_HOT ? names.hot : names.normal;
+      const from = nameOf(first);
+      const to = nameOf(last);
+      return from === to ? `(${from})` : `(${from} – ${to})`;
+    })();
     const ariaLabel = [
       this.labels.aria,
       setpointText,
@@ -809,6 +931,7 @@ export class RoomClimateChart extends LitElement {
       humidityY
         ? rangeText(this.labels.humidity, humiditySeries, this.humidityUnit, this.humidityDecimals)
         : '',
+      bandRangeText,
     ]
       .filter(Boolean)
       .join('. ');
@@ -978,14 +1101,25 @@ export class RoomClimateChart extends LitElement {
     >
       <defs>
         <linearGradient id=${`${this.uid}-temp-fill`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color=${this.accentColor} stop-opacity="0.22" />
-          <stop offset="0.55" stop-color=${this.accentColor} stop-opacity="0.08" />
-          <stop offset="1" stop-color=${this.accentColor} stop-opacity="0" />
+          ${temperatureFillStops.map(
+            (stop) =>
+              svg`<stop offset=${stop.offset} stop-color=${stop.color} stop-opacity=${stop.opacity} />`
+          )}
         </linearGradient>
+        ${
+          bandGradient
+            ? svg`<linearGradient id=${`${this.uid}-temp-stroke`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
+                ${bandGradient.map(
+                  (stop) => svg`<stop offset=${stop.offset} stop-color=${stop.color} />`
+                )}
+              </linearGradient>`
+            : nothing
+        }
         <linearGradient id=${`${this.uid}-humidity-fill`} x1="0" y1=${humidityTop} x2="0" y2=${humidityBottom} gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color=${this.humidityColor} stop-opacity="0.2" />
-          <stop offset="0.6" stop-color=${this.humidityColor} stop-opacity="0.07" />
-          <stop offset="1" stop-color=${this.humidityColor} stop-opacity="0" />
+          ${humidityFillStops.map(
+            (stop) =>
+              svg`<stop offset=${stop.offset} stop-color=${stop.color} stop-opacity=${stop.opacity} />`
+          )}
         </linearGradient>
       </defs>
       ${gridLines}
@@ -1017,7 +1151,7 @@ export class RoomClimateChart extends LitElement {
             r="2.6"
             cx=${x(lastHumidity.t)}
             cy=${humidityY(lastHumidity.v as number)}
-            style="fill:${this.humidityColor}"
+            style=${`fill:${this.humidityColor};fill-opacity:${opacityFactor}`}
           />`
         : nothing}
       ${lastTemp && tempY
@@ -1026,7 +1160,15 @@ export class RoomClimateChart extends LitElement {
             r="2.8"
             cx=${x(lastTemp.t)}
             cy=${tempY(lastTemp.v as number)}
-            style="fill:${this.accentColor}"
+            style=${`fill:${
+              bandGradient
+                ? bandColorAt(
+                    lastTemp.v as number,
+                    { coldBelow: this.bandCold, warmAbove: this.bandWarm, hotAbove: this.bandHot },
+                    { cold: BAND_COLD, normal: this.accentColor, warm: BAND_WARM, hot: BAND_HOT }
+                  )
+                : this.accentColor
+            };fill-opacity:${opacityFactor}`}
           />`
         : nothing}
       ${extremeMarks}

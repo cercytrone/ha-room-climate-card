@@ -45,3 +45,10 @@ chart_show_grid: true
 chart_show_points: false
 chart_show_tooltip: true       # Werte beim Überfahren (Standard: an)
 chart_show_extremes: true      # Minimum/Maximum an der Kurve (Standard: an)
+chart_opacity: 100             # Deckkraft der Kurven in % (15–100, Standard: 100)
+chart_temperature_area_opacity: 180  # Stärke des Flächenverlaufs Temperatur in % (10–300)
+chart_humidity_area_opacity: 100     # Stärke des Flächenverlaufs Luftfeuchte in %
+chart_temperature_bands: true  # Temperaturkurve nach Bereich einfärben (Standard: aus)
+chart_band_cold_below: 18      # kalt unter 18 °C (Blau)
+chart_band_warm_above: 24      # warm ab 24 °C (Amber)
+chart_band_hot_above: 27       # heiß ab 27 °C (gedämpftes Rot)

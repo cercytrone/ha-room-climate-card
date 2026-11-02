@@ -889,4 +889,175 @@ describe('climate chart', () => {
     const aria = chart.shadowRoot!.querySelector('svg')?.getAttribute('aria-label') ?? '';
     expect(aria).toContain('Temperatur 19,0–23,0 °C');
   });
+  it('keeps the curve in one accent colour until the bands are switched on', async () => {
+    const chart = createChart({ temperature: samples([17, 22, 28]), accentColor: '#4FD1A5' });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    expect(chart.shadowRoot!.querySelector('[id$="-temp-stroke"]')).toBeNull();
+    const line = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+    expect(line.style.stroke).toBe('#4FD1A5');
+  });
+
+  it('paints the temperature curve with one vertical gradient when the bands are on', async () => {
+    const chart = createChart({
+      temperature: samples([17, 22, 28]),
+      accentColor: '#4FD1A5',
+      temperatureBands: true,
+      bandCold: 18,
+      bandWarm: 24,
+      bandHot: 27,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const gradient = chart.shadowRoot!.querySelector('[id$="-temp-stroke"]');
+    expect(gradient).not.toBeNull();
+    // One gradient, not one path per stage: the curve stays a single element.
+    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(1);
+    const line = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+    expect(line.style.stroke).toContain('temp-stroke');
+
+    const stops = Array.from(gradient!.querySelectorAll('stop')).map((stop) => ({
+      offset: Number(stop.getAttribute('offset')),
+      color: stop.getAttribute('stop-color'),
+    }));
+    // Top of the band = the hot end, bottom = the cold end.
+    expect(stops[0].color).toBe('#D16A62');
+    expect(stops[stops.length - 1].color).toBe('#7FA6D9');
+    // Normal stage wears the accent, so nothing new enters the palette.
+    expect(stops.map((stop) => stop.color)).toContain('#4FD1A5');
+    for (let index = 1; index < stops.length; index++) {
+      expect(stops[index].offset).toBeGreaterThanOrEqual(stops[index - 1].offset);
+    }
+  });
+
+  it('names the bands in the accessible description instead of leaving a gradient', async () => {
+    const chart = createChart({
+      temperature: samples([17, 28]),
+      temperatureBands: true,
+      bandCold: 18,
+      bandWarm: 24,
+      bandHot: 27,
+      labels: {
+        ...labels,
+        bandColdText: 'kalt',
+        bandNormalText: 'normal',
+        bandWarmText: 'warm',
+        bandHotText: 'heiß',
+      },
+    });
+    setSize(chart, 320, 130);
+    await chart.updateComplete;
+    const aria = chart.shadowRoot!.querySelector('svg')?.getAttribute('aria-label') ?? '';
+    expect(aria).toContain('(kalt – heiß)');
+  });
+
+  it('dims line, area and points with the configured opacity', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      chartOpacity: 40,
+      showPoints: true,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const root = chart.shadowRoot!;
+    const line = root.querySelector('.series-line') as SVGPathElement;
+    expect(line.style.strokeOpacity).toBe('0.4');
+    const point = root.querySelector('.point') as SVGCircleElement;
+    expect(point.style.strokeOpacity).toBe('0.4');
+
+    // The fills keep their relative falloff, only scaled down.
+    const tempStops = Array.from(root.querySelectorAll('[id$="-temp-fill"] stop')).map((stop) =>
+      Number(stop.getAttribute('stop-opacity'))
+    );
+    expect(tempStops[0]).toBeCloseTo(0.22 * 0.4, 3);
+    expect(tempStops[tempStops.length - 1]).toBe(0);
+    const humidityStops = Array.from(root.querySelectorAll('[id$="-humidity-fill"] stop')).map(
+      (stop) => Number(stop.getAttribute('stop-opacity'))
+    );
+    expect(humidityStops[0]).toBeCloseTo(0.2 * 0.4, 3);
+  });
+
+  it('leaves the full opacity untouched at 100 %', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]), chartOpacity: 100 });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const line = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+    // No `stroke-opacity` at all: the attribute stays a single stroke colour.
+    expect(line.getAttribute('style')).not.toContain('stroke-opacity');
+  });
+
+  it('clamps an opacity outside the allowed range instead of drawing an invisible curve', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]), chartOpacity: 1 });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const line = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
+    expect(line.style.strokeOpacity).toBe('0.15');
+  });
+
+  it('picks the band colour of its own value for the end dot', async () => {
+    const chart = createChart({
+      temperature: samples([17, 22, 28]),
+      temperatureBands: true,
+      bandCold: 18,
+      bandWarm: 24,
+      bandHot: 27,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const dot = Array.from(chart.shadowRoot!.querySelectorAll('.end-dot')).find((node) =>
+      (node.getAttribute('style') ?? '').includes('#')
+    ) as SVGCircleElement;
+    // The last value is 28 °C, i.e. hot.
+    expect(dot.style.fill).toBe('#D16A62');
+  });
+  it('strengthens each area fill on its own without touching the curves', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      humidity: samples([45, 47, 52]),
+      temperatureAreaOpacity: 2,
+      humidityAreaOpacity: 0.5,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const root = chart.shadowRoot!;
+    const tempStops = Array.from(root.querySelectorAll('[id$="-temp-fill"] stop')).map((stop) =>
+      Number(stop.getAttribute('stop-opacity'))
+    );
+    const humidityStops = Array.from(root.querySelectorAll('[id$="-humidity-fill"] stop')).map(
+      (stop) => Number(stop.getAttribute('stop-opacity'))
+    );
+    // Twice the built-in falloff (0.22 → 0.44), still fading to nothing.
+    expect(tempStops[0]).toBeCloseTo(0.44, 2);
+    expect(tempStops[tempStops.length - 1]).toBe(0);
+    expect(humidityStops[0]).toBeCloseTo(0.1, 2);
+    // The curves themselves are untouched: the strength is a fill property.
+    const line = root.querySelector('.series-line') as SVGPathElement;
+    expect(line.getAttribute('style')).not.toContain('stroke-opacity');
+  });
+
+  it('multiplies area strength and curve opacity instead of replacing one with the other', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22]),
+      temperatureAreaOpacity: 2,
+      chartOpacity: 50,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const stops = Array.from(
+      chart.shadowRoot!.querySelectorAll('[id$="-temp-fill"] stop')
+    ).map((stop) => Number(stop.getAttribute('stop-opacity')));
+    expect(stops[0]).toBeCloseTo(0.22 * 2 * 0.5, 2);
+  });
+
+  it('never lets an area fill become a solid block', async () => {
+    const chart = createChart({ temperature: samples([20, 21, 22]), temperatureAreaOpacity: 8 });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const stops = Array.from(
+      chart.shadowRoot!.querySelectorAll('[id$="-temp-fill"] stop')
+    ).map((stop) => Number(stop.getAttribute('stop-opacity')));
+    expect(Math.max(...stops)).toBeLessThanOrEqual(1);
+  });
+
 });

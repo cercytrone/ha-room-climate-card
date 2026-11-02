@@ -37,6 +37,7 @@ import {
   formatNumber,
   formatRelative,
   parseNumericState,
+  temperatureScale,
   withAlpha,
 } from './utils/format';
 import { icons } from './ui/icons';
@@ -896,6 +897,13 @@ export class RoomClimateCard extends LitElement {
         ? null
         : convertTemperature(rawSetpoint, thermostat.unit, temperatureUnitOfSensor);
     const setpoint = convertedSetpoint ?? (thermostat?.unit === temperatureUnitOfSensor ? rawSetpoint : null);
+    /*
+     * The band thresholds are stored in °C (the editor always says °C), but the
+     * curve plots the raw values of the sensor. A °F sensor therefore needs the
+     * limits converted, otherwise 18 °C would sit at 64 °F in the band scale.
+     */
+    const bandValue = (celsius: number, unit: string | undefined): number =>
+      convertTemperature(celsius, '°C', unit) ?? celsius;
     const labels = {
       empty: t.t('noHistory'),
       emptyHint: t.t('noHistoryHint'),
@@ -906,6 +914,10 @@ export class RoomClimateCard extends LitElement {
       humidity: t.t('humidity'),
       now: t.t('now'),
       setpoint: t.t('setpoint'),
+      bandColdText: t.t('bandCold'),
+      bandNormalText: t.t('bandNormal'),
+      bandWarmText: t.t('bandWarm'),
+      bandHotText: t.t('bandHot'),
     };
 
     return html`<div class="chart-slot">
@@ -935,6 +947,14 @@ export class RoomClimateCard extends LitElement {
         .humidityLineStyle=${config.chart.humidityLineStyle}
         .showTemperatureArea=${config.chart.showTemperatureGradient}
         .showHumidityArea=${config.chart.showHumidityGradient}
+        .chartOpacity=${Math.round(config.chart.opacity * 100)}
+        .temperatureAreaOpacity=${config.chart.temperatureAreaOpacity}
+        .humidityAreaOpacity=${config.chart.humidityAreaOpacity}
+        .temperatureBands=${config.chart.temperatureBands}
+        .bandCold=${bandValue(config.chart.bandLimits.coldBelow, temperatureUnitOfSensor)}
+        .bandWarm=${bandValue(config.chart.bandLimits.warmAbove, temperatureUnitOfSensor)}
+        .bandHot=${bandValue(config.chart.bandLimits.hotAbove, temperatureUnitOfSensor)}
+        .temperatureScale=${temperatureScale(temperatureUnitOfSensor) ?? 'C'}
         .cornerRadius=${config.borderRadius}
         .language=${language}
         .timeZone=${clock.timeZone}

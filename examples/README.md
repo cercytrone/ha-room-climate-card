@@ -5,7 +5,7 @@ eigene Installation angepasst werden.
 
 | Datei | Zeigt |
 | --- | --- |
-| [`wohnzimmer.yaml`](wohnzimmer.yaml) | Vollausbau: alle Sensoren, Thermostat, 12-h-Verlauf, Wertanzeige und Min/Max, eigene Schriftgrößen |
+| [`wohnzimmer.yaml`](wohnzimmer.yaml) | Vollausbau: alle Sensoren, Thermostat, 12-h-Verlauf, Wertanzeige und Min/Max, eigene Schriftgrößen, Temperaturkurve nach Bereich eingefärbt |
 | [`kueche.yaml`](kueche.yaml) | Fenster offen als Warnung, kompakte Höhe, keine Bewegung |
 | [`bad.yaml`](bad.yaml) | Nur Feuchte + Feuchte-Verlauf, eigene Feuchtefarbe, helles Theme |
 | [`minimal.yaml`](minimal.yaml) | Nur ein Temperatursensor |

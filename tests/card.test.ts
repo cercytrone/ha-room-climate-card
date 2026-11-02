@@ -1354,4 +1354,64 @@ describe('room climate card', () => {
     expect(qa(card, '.badge').length).toBe(2);
     expect(q(card, '.climate-row')).not.toBeNull();
   });
+  it('hands opacity and band thresholds to the chart, converted to the sensor scale', async () => {
+    const celsius = mount(
+      { ...fullConfig, chart_opacity: 55, chart_temperature_bands: true },
+      createHass({ states: baseStates() })
+    );
+    await celsius.updateComplete;
+    const chart = q(celsius, 'room-climate-chart') as HTMLElement & {
+      chartOpacity: number;
+      temperatureBands: boolean;
+      bandCold: number;
+      bandWarm: number;
+      bandHot: number;
+      temperatureScale: string;
+    };
+    expect(chart.chartOpacity).toBe(55);
+    expect(chart.temperatureBands).toBe(true);
+    expect(chart.bandCold).toBe(18);
+    expect(chart.bandWarm).toBe(24);
+    expect(chart.bandHot).toBe(27);
+    expect(chart.temperatureScale).toBe('C');
+
+    // A °F sensor plots Fahrenheit values, so 18 / 24 / 27 °C must be converted
+    // – otherwise the whole curve would sit in the "hot" band.
+    const fahrenheit = mount(
+      { ...fullConfig, chart_temperature_bands: true },
+      createHass({
+        states: baseStates().map((state) =>
+          state.entity_id === 'sensor.temp'
+            ? entity('sensor.temp', {
+                state: '71.2',
+                attributes: { unit_of_measurement: '°F', device_class: 'temperature' },
+              })
+            : state
+        ),
+      })
+    );
+    await fahrenheit.updateComplete;
+    const fChart = q(fahrenheit, 'room-climate-chart') as HTMLElement & {
+      bandCold: number;
+      bandWarm: number;
+      bandHot: number;
+      temperatureScale: string;
+    };
+    expect(fChart.temperatureScale).toBe('F');
+    expect(fChart.bandCold).toBeCloseTo(64.4, 1);
+    expect(fChart.bandWarm).toBeCloseTo(75.2, 1);
+    expect(fChart.bandHot).toBeCloseTo(80.6, 1);
+  });
+
+  it('keeps the bands quiet when they are not configured', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    const chart = q(card, 'room-climate-chart') as HTMLElement & {
+      chartOpacity: number;
+      temperatureBands: boolean;
+    };
+    expect(chart.chartOpacity).toBe(100);
+    expect(chart.temperatureBands).toBe(false);
+  });
+
 });

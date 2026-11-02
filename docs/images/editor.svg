@@ -1,0 +1,210 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1745" viewBox="0 0 1000 1745" role="img" aria-label="Room Climate Card – visueller Editor, Nachbau mit Demo-Werten">
+  <rect width="1000" height="1745" fill="#07080a" />
+  <text x="24" y="46" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="rgba(255,255,255,0.92)">Visueller Editor</text>
+  <text x="24" y="68" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.55)">Acht Abschnitte, native Home-Assistant-Selektoren, Live-Vorschau – hier der Abschnitt „Verlauf“</text>
+  <g transform="translate(24,0)"><g transform="translate(0,96)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Allgemein</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,144)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Sensoren</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,192)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Messwerte (Schrift)</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,240)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Farben</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,288)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Fenster</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,336)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Bewegung</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,384)">
+    <rect x="0" y="0" width="500" height="40" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Thermostat</text>
+    <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"></g>
+  </g><g transform="translate(0,432)">
+    <rect x="0" y="0" width="500" height="1259" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Verlauf</text>
+    <path d="M476 19 l4.5 -5 4.5 5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    <g transform="translate(14,40)"><g transform="translate(0,4)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Temperaturverlauf anzeigen</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,46)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Luftfeuchteverlauf anzeigen</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,88)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Zeitraum</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">6 h</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,155)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Chart-Höhe</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">112</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">px</text></g></g><g transform="translate(0,222)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Kurvenverlauf</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Geglättet</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,289)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Glättung der Kurven</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Leicht (Standard)</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,356)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Farbverlauf unter der Temperaturkurve</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,398)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Farbverlauf unter der Feuchtekurve</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,440)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Stärke des Flächenverlaufs (Temperatur)</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">180</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text><text x="1" y="71" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">100 % ist der eingebaute Verlauf. Höhere Werte machen die Fläche unter der Kurve</text><text x="1" y="84" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">kräftiger (bis 300 %).</text></g></g><g transform="translate(0,539)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Stärke des Flächenverlaufs (Luftfeuchte)</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">100</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text></g></g><g transform="translate(0,606)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Deckkraft der Kurven</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">85</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text><text x="1" y="71" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">Gilt für Linien, Flächen und Datenpunkte. 100 % ist die volle Darstellung.</text></g></g><g transform="translate(0,692)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Temperaturkurve nach Bereich einfärben (kalt / normal / warm</text><text x="0" y="35" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">/ heiß)</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,750)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Kalt unter</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">18</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,817)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Warm ab</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">24</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,884)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Heiß ab</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">27</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,951)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Linienart Luftfeuchte</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Durchgezogen</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,1018)"><g opacity="1">
+    <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Datenlücken</text>
+    <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Kurze Ausfälle überbrücken</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,1085)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Datenpunkte</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="rgba(255,255,255,0.22)" />
+    <circle cx="446" cy="16" r="8" fill="rgba(255,255,255,0.75)" />
+  </g></g><g transform="translate(0,1127)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Werte beim Überfahren</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,1169)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Minimum/Maximum im Chart anzeigen</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g></g>
+  </g></g>
+
+  <text x="552" y="108" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" letter-spacing="0.85" fill="rgba(255,255,255,0.34)">LIVE-VORSCHAU</text>
+  <g>
+    <clipPath id="editor-card-clip">
+      <rect x="552" y="148" width="424" height="294" rx="26" />
+    </clipPath>
+    <defs>
+      <radialGradient id="editor-card-surface" cx="552" cy="148" r="508.79999999999995" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.07" />
+        <stop offset="0.55" stop-color="#ffffff" stop-opacity="0" />
+      </radialGradient>
+      <linearGradient id="editor-card-area" gradientUnits="userSpaceOnUse" x1="0" y1="350.48" x2="0" y2="402">
+        <stop offset="0" stop-color="#4FD1A5" stop-opacity="0.220" />
+        <stop offset="0.55" stop-color="#4FD1A5" stop-opacity="0.080" />
+        <stop offset="1" stop-color="#4FD1A5" stop-opacity="0" />
+      </linearGradient>
+      
+      <linearGradient id="editor-card-area-humidity" gradientUnits="userSpaceOnUse" x1="0" y1="310" x2="0" y2="337.6">
+        <stop offset="0" stop-color="#8B86D6" stop-opacity="0.200" />
+        <stop offset="0.6" stop-color="#8B86D6" stop-opacity="0.070" />
+        <stop offset="1" stop-color="#8B86D6" stop-opacity="0" />
+      </linearGradient>
+    </defs>
+    <g clip-path="url(#editor-card-clip)">
+      <rect x="552" y="148" width="424" height="294" fill="#0e1013" />
+      <rect x="552" y="148" width="424" height="294" fill="url(#editor-card-surface)" />
+    </g>
+    <!-- 1 px hairline at 7 % white instead of a frame -->
+    <rect x="552.5" y="148.5" width="423" height="293" rx="25.5" fill="none" stroke="rgba(255,255,255,0.07)" />
+
+    <g clip-path="url(#editor-card-clip)">
+      <g transform="translate(572.0,173.2) scale(0.6666666666666666)" fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1Z" /></g>
+      <text x="592.0" y="187" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="500" letter-spacing="-0.18" fill="rgba(255,255,255,0.50)">Wohnzimmer</text>
+      
+      <g opacity="1">
+    <circle cx="575" cy="216" r="3" fill="#4FD1A5" />
+    <text x="584" y="219.46" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" letter-spacing="0.85" fill="rgba(255,255,255,0.50)">TEMPERATUR</text>
+  </g>
+      <g opacity="1">
+        <circle cx="863.4" cy="216" r="3" fill="#8B86D6" />
+        <text x="956" y="219.46" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="500" letter-spacing="0.85" fill="rgba(255,255,255,0.50)" text-anchor="end">LUFTFEUCHTE</text>
+      </g>
+      <g opacity="1">
+    <text x="572" y="261" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="42" font-weight="500" letter-spacing="-1.47" fill="rgba(255,255,255,0.92)">21,8</text>
+    <text x="668.7" y="261" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14.280000000000001" font-weight="400" fill="rgba(255,255,255,0.50)">°C</text>
+  </g>
+      <g opacity="1">
+        <text x="948.5" y="261" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="20" font-weight="500" letter-spacing="-0.40" fill="rgba(255,255,255,0.92)" text-anchor="end">50</text>
+        <text x="956" y="261" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="400" fill="rgba(255,255,255,0.50)" text-anchor="end">%</text>
+      </g>
+      <g><g transform="translate(572,273.6) scale(0.583)"><g fill="none" stroke="#d16a62" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 21a6.3 6.3 0 0 1-6.3-6.3c0-2 .9-3.7 2.2-5.1.8-.9 2-2.1 2.7-3.4.5-.9.9-1.9 1.1-2.7.2-.7 1.1-.9 1.5-.3.8 1.3 1.8 3 2.4 4.6.5 1.2.7 2.3.7 3.2 0 1-.3 2-.8 2.8" />
+  </g></g><text x="590" y="292" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgba(255,255,255,0.50)">Heizt</text><text x="629" y="292" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgba(255,255,255,0.32)">·</text><text x="641.6" y="292" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="rgba(255,255,255,0.50)">Soll 22,0 °C</text></g>
+
+      
+      <path d="M 572 372.59 C 573.78 372.51, 575.56 372.58, 577.33 372.33 C 579.11 372.08, 580.89 371.63, 582.67 371.03 C 584.44 370.42, 586.22 369.2, 588 368.68 C 589.78 368.16, 591.56 368.2, 593.33 367.9 C 595.11 367.59, 596.89 367.38, 598.67 366.85 C 600.44 366.33, 602.22 365.25, 604 364.77 C 605.78 364.29, 607.56 363.99, 609.33 363.99 C 611.11 363.99, 612.89 364.51, 614.67 364.51 C 616.44 364.51, 618.22 364.03, 620 363.73 C 621.78 363.42, 623.56 362.68, 625.33 362.68 C 627.11 362.68, 628.89 362.81, 630.67 362.94 C 632.44 363.07, 634.22 363.46, 636 363.46 C 637.78 363.46, 639.56 362.77, 641.33 362.42 C 643.11 362.07, 644.89 361.38, 646.67 361.38 C 648.44 361.38, 650.22 361.64, 652 361.64 C 653.78 361.64, 655.56 361.64, 657.33 361.64 C 659.11 361.64, 660.89 360.34, 662.67 360.07 C 664.44 359.81, 666.22 359.81, 668 359.81 C 669.78 359.81, 671.56 360.64, 673.33 360.86 C 675.11 361.07, 676.89 361.12, 678.67 361.12 C 680.44 361.12, 682.22 360.6, 684 360.6 C 685.78 360.6, 687.56 361.47, 689.33 362.16 C 691.11 362.86, 692.89 364.16, 694.67 364.77 C 696.44 365.38, 698.22 365.46, 700 365.81 C 701.78 366.16, 703.56 366.16, 705.33 366.85 C 707.11 367.55, 708.89 369.03, 710.67 369.98 C 712.44 370.94, 714.22 371.98, 716 372.59 C 717.78 373.2, 719.56 373.2, 721.33 373.63 C 723.11 374.07, 724.89 374.46, 726.67 375.2 C 728.44 375.94, 730.22 377.37, 732 378.07 C 733.78 378.76, 735.56 379.18, 737.33 379.37 C 739.11 379.55, 740.89 379.45, 742.67 379.63 C 744.44 379.81, 746.22 380.41, 748 380.93 C 749.78 381.45, 751.56 382.5, 753.33 382.76 C 755.11 383.02, 756.89 383.02, 758.67 383.02 C 760.44 383.02, 762.22 382.76, 764 382.76 C 765.78 382.76, 767.56 384.02, 769.33 384.58 C 771.11 385.15, 772.89 386.15, 774.67 386.15 C 776.44 386.15, 778.22 386.15, 780 386.15 C 781.78 386.15, 783.56 386.41, 785.33 386.93 C 787.11 387.45, 788.89 388.67, 790.67 389.28 C 792.44 389.88, 794.22 390.58, 796 390.58 C 797.78 390.58, 799.56 390.58, 801.33 390.58 C 803.11 390.58, 804.89 391.19, 806.67 391.62 C 808.44 392.06, 810.22 393.19, 812 393.19 C 813.78 393.19, 815.56 393.19, 817.33 393.19 C 819.11 393.19, 820.89 391.88, 822.67 391.88 C 824.44 391.88, 826.22 391.88, 828 391.88 C 829.78 391.88, 831.56 391.88, 833.33 391.88 C 835.11 391.88, 836.89 390.28, 838.67 389.54 C 840.44 388.8, 842.22 387.86, 844 387.45 C 845.78 387.04, 847.56 387.26, 849.33 386.93 C 851.11 386.6, 852.89 386.06, 854.67 385.37 C 856.44 384.67, 858.22 383.45, 860 382.76 C 861.78 382.06, 863.56 381.38, 865.33 381.19 C 867.11 381.01, 868.89 381.12, 870.67 380.93 C 872.44 380.75, 874.22 379.98, 876 379.37 C 877.78 378.76, 879.56 377.54, 881.33 377.28 C 883.11 377.03, 884.89 377.07, 886.67 377.02 C 888.44 376.97, 890.22 377.02, 892 376.76 C 893.78 376.51, 895.56 375.76, 897.33 375.2 C 899.11 374.63, 900.89 373.76, 902.67 373.37 C 904.44 372.98, 906.22 373.11, 908 372.85 C 909.78 372.59, 911.56 372.42, 913.33 371.81 C 915.11 371.2, 916.89 369.98, 918.67 369.2 C 920.44 368.42, 922.22 367.48, 924 367.11 C 925.78 366.75, 927.56 366.96, 929.33 366.59 C 931.11 366.22, 932.89 365.29, 934.67 364.51 C 936.44 363.73, 938.22 362.51, 940 361.9 C 941.78 361.29, 943.56 361.12, 945.33 360.86 C 947.11 360.6, 948.89 360.68, 950.67 360.34 C 952.44 359.99, 954.22 358.77, 956 358.77 C 956 358.77, 956 358.77, 956 358.77 L 956 402 L 572 402 Z" fill="url(#editor-card-area)" />
+      <line x1="572" x2="956" y1="375.7" y2="375.7" stroke="#4FD1A5" stroke-opacity="0.42" stroke-width="1" stroke-dasharray="3 4" />
+        <text x="956" y="370.7" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.81" fill="rgba(255,255,255,0.32)" text-anchor="end">SOLL</text>
+      <path d="M 572 322.87 C 573.78 322.76, 575.56 322.67, 577.33 322.54 C 579.11 322.42, 580.89 322.34, 582.67 322.13 C 584.44 321.92, 586.22 321.56, 588 321.31 C 589.78 321.06, 591.56 320.86, 593.33 320.63 C 595.11 320.4, 596.89 320.17, 598.67 319.92 C 600.44 319.68, 602.22 319.4, 604 319.16 C 605.78 318.93, 607.56 318.72, 609.33 318.52 C 611.11 318.33, 612.89 318.19, 614.67 318.01 C 616.44 317.83, 618.22 317.63, 620 317.43 C 621.78 317.23, 623.56 316.99, 625.33 316.81 C 627.11 316.63, 628.89 316.5, 630.67 316.36 C 632.44 316.21, 634.22 316.1, 636 315.95 C 637.78 315.79, 639.56 315.6, 641.33 315.43 C 643.11 315.27, 644.89 315.09, 646.67 314.96 C 648.44 314.83, 650.22 314.75, 652 314.65 C 653.78 314.54, 655.56 314.44, 657.33 314.32 C 659.11 314.2, 660.89 314.03, 662.67 313.93 C 664.44 313.82, 666.22 313.74, 668 313.68 C 669.78 313.62, 671.56 313.62, 673.33 313.58 C 675.11 313.54, 676.89 313.48, 678.67 313.43 C 680.44 313.39, 682.22 313.31, 684 313.31 C 685.78 313.31, 687.56 313.35, 689.33 313.39 C 691.11 313.44, 692.89 313.52, 694.67 313.58 C 696.44 313.63, 698.22 313.65, 700 313.7 C 701.78 313.75, 703.56 313.79, 705.33 313.89 C 707.11 313.98, 708.89 314.13, 710.67 314.26 C 712.44 314.39, 714.22 314.55, 716 314.67 C 717.78 314.79, 719.56 314.86, 721.33 314.98 C 723.11 315.1, 724.89 315.23, 726.67 315.39 C 728.44 315.55, 730.22 315.76, 732 315.93 C 733.78 316.09, 735.56 316.25, 737.33 316.4 C 739.11 316.55, 740.89 316.67, 742.67 316.83 C 744.44 317, 746.22 317.19, 748 317.39 C 749.78 317.59, 751.56 317.85, 753.33 318.05 C 755.11 318.25, 756.89 318.4, 758.67 318.59 C 760.44 318.77, 762.22 318.95, 764 319.16 C 765.78 319.38, 767.56 319.64, 769.33 319.88 C 771.11 320.13, 772.89 320.41, 774.67 320.65 C 776.44 320.89, 778.22 321.09, 780 321.33 C 781.78 321.56, 783.56 321.8, 785.33 322.07 C 787.11 322.34, 788.89 322.67, 790.67 322.95 C 792.44 323.24, 794.22 323.52, 796 323.78 C 797.78 324.04, 799.56 324.26, 801.33 324.52 C 803.11 324.78, 804.89 325.04, 806.67 325.33 C 808.44 325.61, 810.22 325.94, 812 326.21 C 813.78 326.48, 815.56 326.7, 817.33 326.93 C 819.11 327.16, 820.89 327.36, 822.67 327.59 C 824.44 327.83, 826.22 328.09, 828 328.33 C 829.78 328.58, 831.56 328.83, 833.33 329.04 C 835.11 329.24, 836.89 329.4, 838.67 329.57 C 840.44 329.75, 842.22 329.9, 844 330.09 C 845.78 330.28, 847.56 330.52, 849.33 330.71 C 851.11 330.89, 852.89 331.07, 854.67 331.22 C 856.44 331.37, 858.22 331.47, 860 331.61 C 861.78 331.75, 863.56 331.89, 865.33 332.04 C 867.11 332.2, 868.89 332.4, 870.67 332.54 C 872.44 332.68, 874.22 332.8, 876 332.91 C 877.78 333.02, 879.56 333.08, 881.33 333.18 C 883.11 333.28, 884.89 333.4, 886.67 333.51 C 888.44 333.62, 890.22 333.76, 892 333.84 C 893.78 333.91, 895.56 333.93, 897.33 333.96 C 899.11 334, 900.89 334.01, 902.67 334.04 C 904.44 334.08, 906.22 334.17, 908 334.17 C 909.78 334.17, 911.56 334.17, 913.33 334.17 C 915.11 334.17, 916.89 334.04, 918.67 333.98 C 920.44 333.92, 922.22 333.85, 924 333.8 C 925.78 333.74, 927.56 333.73, 929.33 333.65 C 931.11 333.57, 932.89 333.45, 934.67 333.32 C 936.44 333.2, 938.22 333.02, 940 332.89 C 941.78 332.76, 943.56 332.61, 945.33 332.52 C 947.11 332.43, 948.89 332.41, 950.67 332.33 C 952.44 332.25, 954.22 332.04, 956 332.04 C 956 332.04, 956 332.04, 956 332.04 L 956 337.6 L 572 337.6 Z" fill="url(#editor-card-area-humidity)" />
+      <path d="M 572 322.87 C 573.78 322.76, 575.56 322.67, 577.33 322.54 C 579.11 322.42, 580.89 322.34, 582.67 322.13 C 584.44 321.92, 586.22 321.56, 588 321.31 C 589.78 321.06, 591.56 320.86, 593.33 320.63 C 595.11 320.4, 596.89 320.17, 598.67 319.92 C 600.44 319.68, 602.22 319.4, 604 319.16 C 605.78 318.93, 607.56 318.72, 609.33 318.52 C 611.11 318.33, 612.89 318.19, 614.67 318.01 C 616.44 317.83, 618.22 317.63, 620 317.43 C 621.78 317.23, 623.56 316.99, 625.33 316.81 C 627.11 316.63, 628.89 316.5, 630.67 316.36 C 632.44 316.21, 634.22 316.1, 636 315.95 C 637.78 315.79, 639.56 315.6, 641.33 315.43 C 643.11 315.27, 644.89 315.09, 646.67 314.96 C 648.44 314.83, 650.22 314.75, 652 314.65 C 653.78 314.54, 655.56 314.44, 657.33 314.32 C 659.11 314.2, 660.89 314.03, 662.67 313.93 C 664.44 313.82, 666.22 313.74, 668 313.68 C 669.78 313.62, 671.56 313.62, 673.33 313.58 C 675.11 313.54, 676.89 313.48, 678.67 313.43 C 680.44 313.39, 682.22 313.31, 684 313.31 C 685.78 313.31, 687.56 313.35, 689.33 313.39 C 691.11 313.44, 692.89 313.52, 694.67 313.58 C 696.44 313.63, 698.22 313.65, 700 313.7 C 701.78 313.75, 703.56 313.79, 705.33 313.89 C 707.11 313.98, 708.89 314.13, 710.67 314.26 C 712.44 314.39, 714.22 314.55, 716 314.67 C 717.78 314.79, 719.56 314.86, 721.33 314.98 C 723.11 315.1, 724.89 315.23, 726.67 315.39 C 728.44 315.55, 730.22 315.76, 732 315.93 C 733.78 316.09, 735.56 316.25, 737.33 316.4 C 739.11 316.55, 740.89 316.67, 742.67 316.83 C 744.44 317, 746.22 317.19, 748 317.39 C 749.78 317.59, 751.56 317.85, 753.33 318.05 C 755.11 318.25, 756.89 318.4, 758.67 318.59 C 760.44 318.77, 762.22 318.95, 764 319.16 C 765.78 319.38, 767.56 319.64, 769.33 319.88 C 771.11 320.13, 772.89 320.41, 774.67 320.65 C 776.44 320.89, 778.22 321.09, 780 321.33 C 781.78 321.56, 783.56 321.8, 785.33 322.07 C 787.11 322.34, 788.89 322.67, 790.67 322.95 C 792.44 323.24, 794.22 323.52, 796 323.78 C 797.78 324.04, 799.56 324.26, 801.33 324.52 C 803.11 324.78, 804.89 325.04, 806.67 325.33 C 808.44 325.61, 810.22 325.94, 812 326.21 C 813.78 326.48, 815.56 326.7, 817.33 326.93 C 819.11 327.16, 820.89 327.36, 822.67 327.59 C 824.44 327.83, 826.22 328.09, 828 328.33 C 829.78 328.58, 831.56 328.83, 833.33 329.04 C 835.11 329.24, 836.89 329.4, 838.67 329.57 C 840.44 329.75, 842.22 329.9, 844 330.09 C 845.78 330.28, 847.56 330.52, 849.33 330.71 C 851.11 330.89, 852.89 331.07, 854.67 331.22 C 856.44 331.37, 858.22 331.47, 860 331.61 C 861.78 331.75, 863.56 331.89, 865.33 332.04 C 867.11 332.2, 868.89 332.4, 870.67 332.54 C 872.44 332.68, 874.22 332.8, 876 332.91 C 877.78 333.02, 879.56 333.08, 881.33 333.18 C 883.11 333.28, 884.89 333.4, 886.67 333.51 C 888.44 333.62, 890.22 333.76, 892 333.84 C 893.78 333.91, 895.56 333.93, 897.33 333.96 C 899.11 334, 900.89 334.01, 902.67 334.04 C 904.44 334.08, 906.22 334.17, 908 334.17 C 909.78 334.17, 911.56 334.17, 913.33 334.17 C 915.11 334.17, 916.89 334.04, 918.67 333.98 C 920.44 333.92, 922.22 333.85, 924 333.8 C 925.78 333.74, 927.56 333.73, 929.33 333.65 C 931.11 333.57, 932.89 333.45, 934.67 333.32 C 936.44 333.2, 938.22 333.02, 940 332.89 C 941.78 332.76, 943.56 332.61, 945.33 332.52 C 947.11 332.43, 948.89 332.41, 950.67 332.33 C 952.44 332.25, 954.22 332.04, 956 332.04 C 956 332.04, 956 332.04, 956 332.04" fill="none" stroke="#8B86D6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M 572 372.59 C 573.78 372.51, 575.56 372.58, 577.33 372.33 C 579.11 372.08, 580.89 371.63, 582.67 371.03 C 584.44 370.42, 586.22 369.2, 588 368.68 C 589.78 368.16, 591.56 368.2, 593.33 367.9 C 595.11 367.59, 596.89 367.38, 598.67 366.85 C 600.44 366.33, 602.22 365.25, 604 364.77 C 605.78 364.29, 607.56 363.99, 609.33 363.99 C 611.11 363.99, 612.89 364.51, 614.67 364.51 C 616.44 364.51, 618.22 364.03, 620 363.73 C 621.78 363.42, 623.56 362.68, 625.33 362.68 C 627.11 362.68, 628.89 362.81, 630.67 362.94 C 632.44 363.07, 634.22 363.46, 636 363.46 C 637.78 363.46, 639.56 362.77, 641.33 362.42 C 643.11 362.07, 644.89 361.38, 646.67 361.38 C 648.44 361.38, 650.22 361.64, 652 361.64 C 653.78 361.64, 655.56 361.64, 657.33 361.64 C 659.11 361.64, 660.89 360.34, 662.67 360.07 C 664.44 359.81, 666.22 359.81, 668 359.81 C 669.78 359.81, 671.56 360.64, 673.33 360.86 C 675.11 361.07, 676.89 361.12, 678.67 361.12 C 680.44 361.12, 682.22 360.6, 684 360.6 C 685.78 360.6, 687.56 361.47, 689.33 362.16 C 691.11 362.86, 692.89 364.16, 694.67 364.77 C 696.44 365.38, 698.22 365.46, 700 365.81 C 701.78 366.16, 703.56 366.16, 705.33 366.85 C 707.11 367.55, 708.89 369.03, 710.67 369.98 C 712.44 370.94, 714.22 371.98, 716 372.59 C 717.78 373.2, 719.56 373.2, 721.33 373.63 C 723.11 374.07, 724.89 374.46, 726.67 375.2 C 728.44 375.94, 730.22 377.37, 732 378.07 C 733.78 378.76, 735.56 379.18, 737.33 379.37 C 739.11 379.55, 740.89 379.45, 742.67 379.63 C 744.44 379.81, 746.22 380.41, 748 380.93 C 749.78 381.45, 751.56 382.5, 753.33 382.76 C 755.11 383.02, 756.89 383.02, 758.67 383.02 C 760.44 383.02, 762.22 382.76, 764 382.76 C 765.78 382.76, 767.56 384.02, 769.33 384.58 C 771.11 385.15, 772.89 386.15, 774.67 386.15 C 776.44 386.15, 778.22 386.15, 780 386.15 C 781.78 386.15, 783.56 386.41, 785.33 386.93 C 787.11 387.45, 788.89 388.67, 790.67 389.28 C 792.44 389.88, 794.22 390.58, 796 390.58 C 797.78 390.58, 799.56 390.58, 801.33 390.58 C 803.11 390.58, 804.89 391.19, 806.67 391.62 C 808.44 392.06, 810.22 393.19, 812 393.19 C 813.78 393.19, 815.56 393.19, 817.33 393.19 C 819.11 393.19, 820.89 391.88, 822.67 391.88 C 824.44 391.88, 826.22 391.88, 828 391.88 C 829.78 391.88, 831.56 391.88, 833.33 391.88 C 835.11 391.88, 836.89 390.28, 838.67 389.54 C 840.44 388.8, 842.22 387.86, 844 387.45 C 845.78 387.04, 847.56 387.26, 849.33 386.93 C 851.11 386.6, 852.89 386.06, 854.67 385.37 C 856.44 384.67, 858.22 383.45, 860 382.76 C 861.78 382.06, 863.56 381.38, 865.33 381.19 C 867.11 381.01, 868.89 381.12, 870.67 380.93 C 872.44 380.75, 874.22 379.98, 876 379.37 C 877.78 378.76, 879.56 377.54, 881.33 377.28 C 883.11 377.03, 884.89 377.07, 886.67 377.02 C 888.44 376.97, 890.22 377.02, 892 376.76 C 893.78 376.51, 895.56 375.76, 897.33 375.2 C 899.11 374.63, 900.89 373.76, 902.67 373.37 C 904.44 372.98, 906.22 373.11, 908 372.85 C 909.78 372.59, 911.56 372.42, 913.33 371.81 C 915.11 371.2, 916.89 369.98, 918.67 369.2 C 920.44 368.42, 922.22 367.48, 924 367.11 C 925.78 366.75, 927.56 366.96, 929.33 366.59 C 931.11 366.22, 932.89 365.29, 934.67 364.51 C 936.44 363.73, 938.22 362.51, 940 361.9 C 941.78 361.29, 943.56 361.12, 945.33 360.86 C 947.11 360.6, 948.89 360.68, 950.67 360.34 C 952.44 359.99, 954.22 358.77, 956 358.77 C 956 358.77, 956 358.77, 956 358.77" fill="none" stroke="#4FD1A5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+      
+      <line x1="572" x2="956" y1="402" y2="402" stroke="rgba(255,255,255,0.92)" stroke-opacity="0.1" />
+      <circle cx="956.0" cy="332.0" r="2.6" fill="#8B86D6" stroke="#0e1013" stroke-width="1.4" /><circle cx="956.0" cy="358.8" r="2.8" fill="#4FD1A5" fill-opacity="1" stroke="#0e1013" stroke-width="1.4" />
+      <circle cx="694.7" cy="313.2" r="1.8" fill="#0e1013" stroke="#8B86D6" stroke-width="1.2" /><text x="700.7" y="328.2" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.18" fill="rgba(255,255,255,0.92)" fill-opacity="0.55" stroke="#0e1013" stroke-width="1.4" paint-order="stroke" text-anchor="start">55</text><circle cx="902.7" cy="334.4" r="1.8" fill="#0e1013" stroke="#8B86D6" stroke-width="1.2" /><text x="896.7" y="325.4" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.18" fill="rgba(255,255,255,0.92)" fill-opacity="0.55" stroke="#0e1013" stroke-width="1.4" paint-order="stroke" text-anchor="end">45</text>
+      <circle cx="950.7" cy="356.4" r="1.8" fill="#0e1013" stroke="#4FD1A5" stroke-width="1.2" /><circle cx="822.7" cy="396.1" r="1.8" fill="#0e1013" stroke="#4FD1A5" stroke-width="1.2" /><text x="816.7" y="387.1" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.18" fill="rgba(255,255,255,0.92)" fill-opacity="0.55" stroke="#0e1013" stroke-width="1.4" paint-order="stroke" text-anchor="end">21,2</text>
+      <text x="572.0" y="416" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="start">Mo 08:02</text><text x="764.0" y="416" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="middle">Mo 11:02</text><text x="956.0" y="416" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="end">Jetzt</text>
+    </g>
+    <g transform="translate(896,168)">
+    <rect x="0" y="0" width="28" height="28" rx="10" fill="#4FD1A524" stroke="#4FD1A559" stroke-width="1" />
+    <g transform="translate(6.5,6.5)" fill="none" stroke="#4FD1A5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <g transform="scale(0.625)"><circle cx="13" cy="4.4" r="1.9" /><path d="M10 21l2.6-5.6 3 1.9 2.2-4.6" /><path d="M7.4 13.4l3.4-2.7.9-3.4-3-1-2.8 3.6" /></g>
+    </g>
+  </g>
+    <g transform="translate(928,168)">
+    <rect x="0" y="0" width="28" height="28" rx="10" fill="rgba(148,163,184,0.10)" stroke="rgba(255,255,255,0.07)" stroke-width="1" />
+    <g transform="translate(6.5,6.5)" fill="none" stroke="rgba(255,255,255,0.50)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <g transform="scale(0.625)"><rect x="3.5" y="4" width="17" height="16" rx="2" /><path d="M12 4v16M3.5 12h17" /></g>
+    </g>
+  </g>
+  </g>
+  <text x="552" y="466" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">Die Vorschau reagiert sofort auf jede Änderung – hier steht die echte</text><text x="552" y="480" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">Karte.</text>
+  <g transform="translate(552,504)">
+      <circle cx="3" cy="-3.5" r="2" fill="#4FD1A5" />
+      <text x="12" y="0" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.55)">Jede Änderung landet sofort in der Vorschau.</text>
+    </g><g transform="translate(552,524)">
+      <circle cx="3" cy="-3.5" r="2" fill="#4FD1A5" />
+      <text x="12" y="0" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.55)">Nicht benötigte Felder werden automatisch deaktiviert.</text>
+    </g><g transform="translate(552,544)">
+      <circle cx="3" cy="-3.5" r="2" fill="#4FD1A5" />
+      <text x="12" y="0" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.55)">Leere Zahlenfelder springen nicht auf den Standardwert zurück.</text>
+    </g><g transform="translate(552,564)">
+      <circle cx="3" cy="-3.5" r="2" fill="#4FD1A5" />
+      <text x="12" y="0" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.55)">Unbekannte YAML-Schlüssel bleiben erhalten.</text>
+    </g>
+  <text x="24" y="1731" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="rgba(255,255,255,0.34)">Nachbau der Editor-Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert, keine Live-Daten.</text>
+</svg>
