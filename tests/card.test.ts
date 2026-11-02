@@ -547,9 +547,9 @@ describe('room climate card', () => {
     // One inset for the text; adjustable, default 10 px.
     expect(styleText).toMatch(/\.card\s*\{[^}]*padding:\s*var\(--rcc-inset,\s*10px\)/);
     expect(styleText).toMatch(/--rcc-inset:\s*10px/);
-    // The chart cancels that inset horizontally: curves run to the outer edge.
+    // The chart cancels that inset horizontally while full bleed is on.
     expect(styleText).toMatch(
-      /\.chart-slot\s*\{[^}]*margin-left:\s*calc\(var\(--rcc-inset[^;]*;\s*margin-right:\s*calc\(var\(--rcc-inset/
+      /\.chart-slot\.is-full-bleed\s*\{[^}]*margin-left:\s*calc\(var\(--rcc-inset[^;]*;\s*margin-right:\s*calc\(var\(--rcc-inset/
     );
     // Every gap and margin is a multiple of 4 px – except the inset itself,
     // which the user may set to any pixel value between 0 and 32.
@@ -596,6 +596,19 @@ describe('room climate card', () => {
     const flush = mount({ ...fullConfig, card_padding: 0 }, createHass({ states: baseStates() }));
     await flush.updateComplete;
     expect((q(flush, '.card') as HTMLElement).getAttribute('style')).toContain('--rcc-inset:0px');
+  });
+
+  it('puts the chart on the card edge only while full bleed is on', async () => {
+    const card = mount(fullConfig, createHass({ states: baseStates() }));
+    await card.updateComplete;
+    expect(q(card, '.chart-slot')?.classList.contains('is-full-bleed')).toBe(true);
+
+    const contained = mount(
+      { ...fullConfig, chart_full_bleed: false },
+      createHass({ states: baseStates() })
+    );
+    await contained.updateComplete;
+    expect(q(contained, '.chart-slot')?.classList.contains('is-full-bleed')).toBe(false);
   });
 
   it('applies a fixed height and density classes', async () => {

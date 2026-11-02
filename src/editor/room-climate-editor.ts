@@ -31,6 +31,9 @@ interface EditorText {
   radius: string;
   padding: string;
   paddingHelper: string;
+  paddingWarning: string;
+  fullBleed: string;
+  fullBleedHelper: string;
   theme: string;
   themeAuto: string;
   themeDark: string;
@@ -158,7 +161,12 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     radius: 'Eckenradius',
     padding: 'Innenabstand',
     paddingHelper:
-      'Abstand zwischen Inhalt und Außenkante in Pixeln (0–32). Gilt für alle vier Seiten; Titel, Messwerte und Verlauf teilen diese Kante.',
+      'Abstand zwischen Inhalt und Außenkante in Pixeln (0–32). Gilt für Titel, Messwerte und Heizzeile; der Verlauf kann bündig laufen.',
+    paddingWarning:
+      'Unter 8 px klebt der Text an der Kante – Titel, Messwerte und Heizzeile brauchen Luft.',
+    fullBleed: 'Verlauf bündig zur Kartenkante',
+    fullBleedHelper:
+      'An (Standard): Kurven und Flächen laufen bis an die Außenkante, die Rundung beschneidet sie. Aus: der Verlauf endet auf derselben Kante wie der Text.',
     theme: 'Darstellung',
     themeAuto: 'Automatisch (Home-Assistant-Theme)',
     themeDark: 'Dunkel',
@@ -287,7 +295,12 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     radius: 'Corner radius',
     padding: 'Card padding',
     paddingHelper:
-      'Space between the content and the card edge in pixels (0–32). Applies to all four sides; title, readings and chart share this edge.',
+      'Space between the content and the card edge in pixels (0–32). Applies to title, readings and status row; the chart may run flush.',
+    paddingWarning:
+      'Below 8 px the text sits on the edge – title, readings and status row need room to breathe.',
+    fullBleed: 'Chart flush with the card edge',
+    fullBleedHelper:
+      'On (default): curves and fills run to the outer edge and are clipped by the corner. Off: the chart ends on the same edge as the text.',
     theme: 'Appearance',
     themeAuto: 'Automatic (Home Assistant theme)',
     themeDark: 'Dark',
@@ -547,6 +560,11 @@ export class RoomClimateCardEditor extends LitElement {
     return this.lastManualHeight;
   }
 
+  /** True while the configured inset is too small for readable text edges. */
+  private paddingIsTight(): boolean {
+    return this.numberValue('card_padding', 10) < 8;
+  }
+
   private numberValue(key: string, fallback: number): number {
     const value = this._config[key];
     const parsed = typeof value === 'number' ? value : Number(value);
@@ -649,6 +667,8 @@ export class RoomClimateCardEditor extends LitElement {
     fallback: number;
     disabled?: boolean;
     helper?: string;
+    /** Shown in amber when the current value is problematic. */
+    warning?: string;
     /** `slider` gives a drag handle instead of a typing field. */
     mode?: 'box' | 'slider';
     onChange?: (value: number) => void;
@@ -668,6 +688,7 @@ export class RoomClimateCardEditor extends LitElement {
       value: this.numberValue(options.key, options.fallback),
       disabled: options.disabled,
       helper: options.helper,
+      warning: options.warning,
       revertOnLeave: true,
       onChange: (raw) => {
         const parsed = parseEditorNumber(raw);
@@ -815,6 +836,8 @@ export class RoomClimateCardEditor extends LitElement {
         key: 'card_padding',
         label: t.padding,
         helper: t.paddingHelper,
+        // Live warning: below 8 px the text touches the card's edge.
+        warning: this.paddingIsTight() ? t.paddingWarning : undefined,
         min: 0,
         max: 32,
         step: 1,
@@ -1095,6 +1118,14 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.showHumidityChart,
         value: showHumidity,
         onChange: (value) => this.patch({ show_humidity_chart: value }),
+      })}
+      ${this.renderSwitch({
+        key: 'chart_full_bleed',
+        label: t.fullBleed,
+        value: this.rawBoolean('chart_full_bleed') ?? true,
+        helper: t.fullBleedHelper,
+        disabled: !anyChart,
+        onChange: (value) => this.patch({ chart_full_bleed: value }),
       })}
       ${this.renderField({
         key: 'chart_hours',

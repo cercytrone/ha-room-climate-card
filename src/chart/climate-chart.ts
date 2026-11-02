@@ -62,6 +62,9 @@ const MIN_EXTREME_BAND = 14;
  */
 const END_DOT_RADIUS = 2.8;
 
+/** Minimum distance of a min/max number to the chart edge, in CSS pixel. */
+const EXTREME_EDGE_GAP = 6;
+
 /**
  * Why a min/max mark is missing, reported once per reason.
  *
@@ -1105,10 +1108,15 @@ export class RoomClimateChart extends LitElement {
         const preferRight = entry.cx < (left + right) / 2;
         let labelX = preferRight ? entry.cx + 6 : entry.cx - 6;
         let anchor: 'start' | 'end' = preferRight ? 'start' : 'end';
-        if (anchor === 'start' && labelX + textWidth > right - 2) {
+        /*
+         * The chart may run edge to edge, so a number keeps 6 px to the outer
+         * edge instead of the 2 px that were enough while it always sat inside
+         * the card inset.
+         */
+        if (anchor === 'start' && labelX + textWidth > right - EXTREME_EDGE_GAP) {
           labelX = entry.cx - 6;
           anchor = 'end';
-        } else if (anchor === 'end' && labelX - textWidth < left + 2) {
+        } else if (anchor === 'end' && labelX - textWidth < left + EXTREME_EDGE_GAP) {
           labelX = entry.cx + 6;
           anchor = 'start';
         }
@@ -1127,6 +1135,11 @@ export class RoomClimateChart extends LitElement {
             anchor = anchor === 'start' ? 'end' : 'start';
           }
         }
+        // Whatever the flips did: the number keeps its gap to the chart edge.
+        labelX =
+          anchor === 'start'
+            ? Math.min(labelX, right - EXTREME_EDGE_GAP - textWidth)
+            : Math.max(labelX, left + EXTREME_EDGE_GAP + textWidth);
         extremeMarks.push(
           svg`<circle
             class="extreme-dot"
