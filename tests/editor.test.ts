@@ -514,6 +514,36 @@ describe('room climate card editor', () => {
     expect(editor.config.card_padding).toBe(14);
   });
 
+  it('warns while the card padding leaves no room for the text', async () => {
+    const editor = await mountEditor({ ...baseConfig, card_padding: 4 });
+    openAll(editor);
+    const warning = editor.shadowRoot!.querySelector('.helper.warning');
+    expect(warning?.textContent).toContain('Unter 8 px');
+    expect(selectorByLabel(editor, 'Innenabstand').value).toBe(4);
+
+    // 8 px and above: no warning.
+    const roomy = await mountEditor({ ...baseConfig, card_padding: 8 });
+    openAll(roomy);
+    expect(roomy.shadowRoot!.querySelector('.helper.warning')).toBeNull();
+
+    // The warning follows a live edit, not just the stored config.
+    selectorByLabel(editor, 'Innenabstand').emit('12');
+    await editor.updateComplete;
+    expect(editor.shadowRoot!.querySelector('.helper.warning')).toBeNull();
+  });
+
+  it('switches the full-bleed chart off and on', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    const field = selectorByLabel(editor, 'Verlauf bündig zur Kartenkante');
+    // Default: on.
+    expect(field.value).toBe(true);
+
+    field.emit(false);
+    await editor.updateComplete;
+    expect(editor.config.chart_full_bleed).toBe(false);
+  });
+
   it('accepts decimal commas from the number field', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

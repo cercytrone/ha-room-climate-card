@@ -996,6 +996,39 @@ describe('climate chart', () => {
     expect(chart.shadowRoot!.querySelectorAll('.extreme-dot')).toHaveLength(4);
   });
 
+  it('keeps every min/max number at least 6 px inside the plot edges', async () => {
+    // The chart may run edge to edge, so the numbers need their own distance.
+    const cases: Array<Partial<RoomClimateChart>> = [
+      { temperature: samples([23, 20, 21, 22]) }, // maximum on the left edge
+      { temperature: samples([20, 21, 22, 23]) }, // maximum on the right edge
+      {
+        temperature: samples([19, 21, 23, 20]),
+        humidity: samples([44, 52, 47, 49]),
+        humidityDecimals: 0,
+      },
+      { temperature: samples([23, 20, 21, 22]), setpoint: 22.5 },
+    ];
+    for (const overrides of cases) {
+      document.body.replaceChildren();
+      const chart = createChart(overrides);
+      setSize(chart, 320, 130);
+      await chart.updateComplete;
+      const left = 1;
+      const right = 320 - 1 - 2.8;
+      const textWidth = 26;
+      const labels = Array.from(chart.shadowRoot!.querySelectorAll('.extreme-label'));
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        const x = Number(label.getAttribute('x'));
+        if (label.getAttribute('text-anchor') === 'start') {
+          expect(x + textWidth).toBeLessThanOrEqual(right - 6 + 0.01);
+        } else {
+          expect(x - textWidth).toBeGreaterThanOrEqual(left + 6 - 0.01);
+        }
+      }
+    }
+  });
+
   it('prints one mark when the curve never moved instead of none', async () => {
     // A well-regulated room: every reading is the same. Min and max are one value.
     const chart = createChart({

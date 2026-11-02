@@ -103,6 +103,11 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_show_grid?: boolean;
   /** Time labels below the plot (start, middle, "now"). Default on. */
   chart_show_axis?: boolean;
+  /**
+   * The chart runs edge to edge and ignores the card inset horizontally.
+   * Default on; `false` keeps it inside the same edge as the text.
+   */
+  chart_full_bleed?: boolean;
   /** Dashed reference line at the thermostat's target value. Default on. */
   chart_show_setpoint?: boolean;
   /** Crosshair readout with the measured values. Default on. */
@@ -177,6 +182,8 @@ export interface ResolvedChartConfig {
   showExtremes: boolean;
   /** Time labels below the plot: without them the curves get the space. */
   showAxis: boolean;
+  /** `true` runs the chart to the card's outer edge instead of the text edge. */
+  fullBleed: boolean;
   /** Dashed target line inside the chart. */
   showChartSetpoint: boolean;
   /** Area fill under the temperature curve. */
@@ -413,6 +420,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'chart_show_points',
   'chart_show_grid',
   'chart_show_axis',
+  'chart_full_bleed',
   'chart_show_setpoint',
   'chart_show_tooltip',
   'chart_show_extremes',
@@ -569,6 +577,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       showTooltip: asBoolean(config.chart_show_tooltip) ?? true,
       showExtremes: asBoolean(config.chart_show_extremes) ?? true,
       showAxis: asBoolean(config.chart_show_axis) ?? true,
+      fullBleed: asBoolean(config.chart_full_bleed) ?? true,
       showChartSetpoint: asBoolean(config.chart_show_setpoint) ?? true,
       showTemperatureGradient: asBoolean(config.chart_temperature_gradient) ?? true,
       showHumidityGradient: asBoolean(config.chart_humidity_gradient) ?? true,

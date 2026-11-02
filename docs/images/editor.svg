@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1924" viewBox="0 0 1000 1924" role="img" aria-label="Room Climate Card – visueller Editor, Nachbau mit Demo-Werten">
-  <rect width="1000" height="1924" fill="#07080a" />
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1966" viewBox="0 0 1000 1966" role="img" aria-label="Room Climate Card – visueller Editor, Nachbau mit Demo-Werten">
+  <rect width="1000" height="1966" fill="#07080a" />
   <text x="24" y="46" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="rgba(255,255,255,0.92)">Visueller Editor</text>
   <text x="24" y="68" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.55)">Acht Abschnitte, native Home-Assistant-Selektoren, Live-Vorschau – hier der Abschnitt „Verlauf“</text>
   <g transform="translate(24,0)"><g transform="translate(0,96)">
@@ -38,7 +38,7 @@
     <path d="M476 14 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
     <g transform="translate(14,40)"></g>
   </g><g transform="translate(0,432)">
-    <rect x="0" y="0" width="500" height="1438" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
+    <rect x="0" y="0" width="500" height="1480" rx="12" fill="#16181d" stroke="rgba(255,255,255,0.10)" />
     <text x="14" y="26" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="rgba(255,255,255,0.92)">Verlauf</text>
     <path d="M476 19 l4.5 -5 4.5 5" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
     <g transform="translate(14,40)"><g transform="translate(0,4)"><g opacity="1">
@@ -50,76 +50,80 @@
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
   </g></g><g transform="translate(0,88)"><g opacity="1">
+    <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Verlauf bündig zur Kartenkante</text>
+    <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
+    <circle cx="462" cy="16" r="8" fill="#ffffff" />
+  </g></g><g transform="translate(0,130)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Zeitraum</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">6 h</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,155)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">6 h</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,197)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Chart-Höhe</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">112</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">px</text></g></g><g transform="translate(0,222)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">112</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">px</text></g></g><g transform="translate(0,264)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Kurvenverlauf</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Geglättet</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,289)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Geglättet</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,331)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Glättung der Kurven</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Leicht (Standard)</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,356)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Leicht (Standard)</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,398)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Farbverlauf unter der Temperaturkurve</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
-  </g></g><g transform="translate(0,398)"><g opacity="1">
+  </g></g><g transform="translate(0,440)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Farbverlauf unter der Feuchtekurve</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
-  </g></g><g transform="translate(0,440)"><g opacity="1">
+  </g></g><g transform="translate(0,482)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Stärke des Flächenverlaufs (Temperatur)</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">180</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text><text x="1" y="71" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">100 % ist der eingebaute Verlauf. Höhere Werte machen die Fläche unter der Kurve</text><text x="1" y="84" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">kräftiger (bis 300 %).</text></g></g><g transform="translate(0,539)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">180</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text><text x="1" y="71" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">100 % ist der eingebaute Verlauf. Höhere Werte machen die Fläche unter der Kurve</text><text x="1" y="84" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">kräftiger (bis 300 %).</text></g></g><g transform="translate(0,581)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Stärke des Flächenverlaufs (Luftfeuchte)</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">100</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text></g></g><g transform="translate(0,606)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">100</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text></g></g><g transform="translate(0,648)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Deckkraft der Kurven</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">85</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text><text x="1" y="71" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">Gilt für Linien, Flächen und Datenpunkte. 100 % ist die volle Darstellung.</text></g></g><g transform="translate(0,692)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">85</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">%</text><text x="1" y="71" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">Gilt für Linien, Flächen und Datenpunkte. 100 % ist die volle Darstellung.</text></g></g><g transform="translate(0,734)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Temperaturkurve nach Bereich einfärben (kalt / normal / warm</text><text x="0" y="35" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">/ heiß)</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
-  </g></g><g transform="translate(0,750)"><g opacity="1">
+  </g></g><g transform="translate(0,792)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Kalt unter</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">18</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,817)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">18</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,859)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Warm ab</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">24</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,884)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">24</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,926)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Heiß ab</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">27</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,951)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">27</text><text x="458" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">°C</text></g></g><g transform="translate(0,993)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Übergang zwischen den Bereichen</text>
     <rect x="0" y="39" width="420" height="4" rx="2" fill="rgba(255,255,255,0.22)" />
     <rect x="0" y="39" width="420" height="4" rx="2" fill="#2196f3" />
     <circle cx="420" cy="41" r="7" fill="#2196f3" stroke="#ffffff" stroke-width="1.5" />
     <text x="472" y="46" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.34)" text-anchor="end">100 %</text>
-  </g><text x="1" y="65" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">0 % = harte Stufen, 100 % = die Farbe fließt über den ganzen Abstand zwischen</text><text x="1" y="78" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">zwei Grenzen.</text></g><g transform="translate(0,1046)"><g opacity="1">
+  </g><text x="1" y="65" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">0 % = harte Stufen, 100 % = die Farbe fließt über den ganzen Abstand zwischen</text><text x="1" y="78" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.42)">zwei Grenzen.</text></g><g transform="translate(0,1088)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Linienart Luftfeuchte</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Durchgezogen</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,1113)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Durchgezogen</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,1155)"><g opacity="1">
     <text x="0" y="12" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.42)">Datenlücken</text>
     <rect x="0" y="19" width="472" height="38" rx="8" fill="rgba(255,255,255,0.055)" stroke="rgba(255,255,255,0.09)" />
-  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Kurze Ausfälle überbrücken</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,1180)"><g opacity="1">
+  <text x="14" y="42.5" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Kurze Ausfälle überbrücken</text><path d="M448 35.5 l4.5 5 4.5 -5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></g></g><g transform="translate(0,1222)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Soll-Linie im Verlauf</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
-  </g></g><g transform="translate(0,1222)"><g opacity="1">
+  </g></g><g transform="translate(0,1264)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Zeitangaben unter dem Verlauf</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
-  </g></g><g transform="translate(0,1264)"><g opacity="1">
+  </g></g><g transform="translate(0,1306)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Datenpunkte</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="rgba(255,255,255,0.22)" />
     <circle cx="446" cy="16" r="8" fill="rgba(255,255,255,0.75)" />
-  </g></g><g transform="translate(0,1306)"><g opacity="1">
+  </g></g><g transform="translate(0,1348)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Werte beim Überfahren</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
-  </g></g><g transform="translate(0,1348)"><g opacity="1">
+  </g></g><g transform="translate(0,1390)"><g opacity="1">
     <text x="0" y="19" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="rgba(255,255,255,0.55)">Minimum/Maximum im Chart anzeigen</text>
     <rect x="436" y="6" width="36" height="20" rx="10" fill="#2196f3" />
     <circle cx="462" cy="16" r="8" fill="#ffffff" />
@@ -192,7 +196,7 @@
       <circle cx="972.2" cy="322.0" r="2.6" fill="#8B86D6" stroke="#0e1013" stroke-width="1.4" /><circle cx="972.2" cy="348.8" r="2.8" fill="#4FD1A5" fill-opacity="1" stroke="#0e1013" stroke-width="1.4" />
       <circle cx="686.9" cy="303.2" r="1.8" fill="#0e1013" stroke="#8B86D6" stroke-width="1.2" /><text x="692.9" y="318.2" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.18" fill="rgba(255,255,255,0.92)" fill-opacity="0.55" stroke="#0e1013" stroke-width="1.4" paint-order="stroke" text-anchor="start">55</text><circle cx="914.0" cy="324.4" r="1.8" fill="#0e1013" stroke="#8B86D6" stroke-width="1.2" /><text x="908.0" y="315.4" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.18" fill="rgba(255,255,255,0.92)" fill-opacity="0.55" stroke="#0e1013" stroke-width="1.4" paint-order="stroke" text-anchor="end">45</text>
       <circle cx="966.4" cy="346.4" r="1.8" fill="#0e1013" stroke="#4FD1A5" stroke-width="1.2" /><circle cx="826.6" cy="386.1" r="1.8" fill="#0e1013" stroke="#4FD1A5" stroke-width="1.2" /><text x="820.6" y="377.1" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9" font-weight="500" letter-spacing="0.18" fill="rgba(255,255,255,0.92)" fill-opacity="0.55" stroke="#0e1013" stroke-width="1.4" paint-order="stroke" text-anchor="end">21,2</text>
-      <text x="581.0" y="406" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="start">Mo 15:10</text><text x="762.6" y="406" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="middle">Mo 18:10</text><text x="944.2" y="406" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="end">Jetzt</text>
+      <text x="581.0" y="406" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="start">Mo 15:19</text><text x="762.6" y="406" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="middle">Mo 18:19</text><text x="944.2" y="406" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.32)" text-anchor="end">Jetzt</text>
     </g>
     <g transform="translate(906,158)">
     <rect x="0" y="0" width="28" height="28" rx="10" fill="#4FD1A524" stroke="#4FD1A559" stroke-width="1" />
@@ -221,5 +225,5 @@
       <circle cx="3" cy="-3.5" r="2" fill="#4FD1A5" />
       <text x="12" y="0" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="rgba(255,255,255,0.55)">Unbekannte YAML-Schlüssel bleiben erhalten.</text>
     </g>
-  <text x="24" y="1910" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="rgba(255,255,255,0.34)">Nachbau der Editor-Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert, keine Live-Daten.</text>
+  <text x="24" y="1952" font-family="DejaVu Sans, Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="rgba(255,255,255,0.34)">Nachbau der Editor-Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert, keine Live-Daten.</text>
 </svg>

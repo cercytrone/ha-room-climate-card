@@ -501,10 +501,10 @@ function renderCard(options: CardOptions): string {
         const preferRight = entry.cx < (chartLeft + chartRight) / 2;
         let labelX = preferRight ? entry.cx + 6 : entry.cx - 6;
         let anchor = preferRight ? 'start' : 'end';
-        if (anchor === 'start' && labelX + 26 > chartRight - 2) {
+        if (anchor === 'start' && labelX + 26 > chartRight - 6) {
           labelX = entry.cx - 6;
           anchor = 'end';
-        } else if (anchor === 'end' && labelX - 26 < chartLeft + 2) {
+        } else if (anchor === 'end' && labelX - 26 < chartLeft + 6) {
           labelX = entry.cx + 6;
           anchor = 'start';
         }
@@ -1187,6 +1187,13 @@ export function renderEditor(palette: Palette): string {
       fields: [
         { label: 'Temperaturverlauf anzeigen', kind: 'switch', on: true },
         { label: 'Luftfeuchteverlauf anzeigen', kind: 'switch', on: true },
+        {
+          label: 'Verlauf bündig zur Kartenkante',
+          kind: 'switch',
+          on: true,
+          helper:
+            'An: Kurven und Flächen laufen bis an die Außenkante. Aus: der Verlauf endet auf derselben Kante wie der Text.',
+        },
         { label: 'Zeitraum', value: '6 h', kind: 'select' },
         { label: 'Chart-Höhe', value: '112', unit: 'px', kind: 'number' },
         { label: 'Kurvenverlauf', value: 'Geglättet', kind: 'select' },

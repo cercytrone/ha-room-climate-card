@@ -30,6 +30,9 @@ describe('normalizeConfig', () => {
     expect(config.humidity.color).toBe('#8B86D6');
     expect(config.chart.hours).toBe(6);
     expect(config.chart.height).toBe(112);
+    // The chart runs edge to edge unless the config says otherwise.
+    expect(config.chart.fullBleed).toBe(true);
+    expect(normalizeConfig({ chart_full_bleed: false }).chart.fullBleed).toBe(false);
     expect(config.chart.showGrid).toBe(false);
     expect(config.window.openStates).toEqual(DEFAULT_OPEN_STATES);
     expect(config.window.enabled).toBe(false);

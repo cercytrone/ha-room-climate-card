@@ -4,6 +4,24 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.16.0] – 2026-11-02
+
+### Hinzugefügt
+
+- **`chart_full_bleed`** (Standard `true`) – der bündige Verlauf aus 2.15.0 lässt sich abschalten.
+  Mit `false` endet der Chart auf derselben Kante wie Titel und Messwerte, statt von der Rundung
+  beschnitten zu werden. Im Editor: *Verlauf* → **Verlauf bündig zur Kartenkante** (ausgegraut,
+  wenn keine Kurve gezeichnet wird; Beschreibung in der Hilfe darunter).
+- **Warnung für zu knappen Innenabstand.** Im Editor erscheint unter *Allgemein* →
+  **Innenabstand** ein amberfarbener Hinweis, sobald der Wert unter 8 px liegt („Unter 8 px klebt
+  der Text an der Kante …“). Er reagiert live auf die Eingabe, nicht erst auf das Speichern.
+
+### Geändert
+
+- **Min/Max-Zahlen halten 6 px Abstand zur Kante** (bisher 2 px, was nur reichte, solange der
+  Chart im Karten-Innenabstand lag). Der Abstand gilt auch nach einem Seitenwechsel der Zahl,
+  etwa wenn sie der „Soll“-Beschriftung ausweicht.
+
 ## [2.15.0] – 2026-11-02
 
 ### Geändert

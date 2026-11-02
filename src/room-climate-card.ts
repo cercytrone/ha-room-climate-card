@@ -906,7 +906,11 @@ export class RoomClimateCard extends LitElement {
     // With the readout switched off the chart area belongs to the card tap.
     const chartTappable = Boolean(this.tapTarget) && !config.chart.showTooltip;
 
-    return html`<div class="chart-slot ${chartTappable ? 'is-tappable' : ''}">
+    return html`<div
+      class="chart-slot ${chartTappable ? 'is-tappable' : ''} ${config.chart.fullBleed
+        ? 'is-full-bleed'
+        : ''}"
+    >
       <room-climate-chart
         .temperature=${temperatureSamples}
         .humidity=${humiditySamples}
@@ -1344,16 +1348,19 @@ export class RoomClimateCard extends LitElement {
       position: relative;
       display: flex;
       flex-direction: column;
-      /*
-       * The chart runs edge to edge: it cancels the card inset horizontally, so
-       * the curves and their area fills touch the outer edge instead of ending
-       * in a gutter. Only the (textual) axis row keeps its distance, and the
-       * card's overflow:hidden clips the corners.
-       */
-      margin-left: calc(var(--rcc-inset, 10px) * -1);
-      margin-right: calc(var(--rcc-inset, 10px) * -1);
       margin-top: var(--rcc-space-3);
       min-height: 0;
+    }
+    /*
+     * Full bleed (default): the chart cancels the card inset horizontally, so
+     * the curves and their area fills touch the outer edge instead of ending in
+     * a gutter. Only the (textual) axis row keeps its distance, and the card's
+     * overflow:hidden clips the corners. Switched off, the chart shares the
+     * text edge.
+     */
+    .chart-slot.is-full-bleed {
+      margin-left: calc(var(--rcc-inset, 10px) * -1);
+      margin-right: calc(var(--rcc-inset, 10px) * -1);
     }
     .chart-slot > room-climate-chart {
       flex: 1 1 auto;

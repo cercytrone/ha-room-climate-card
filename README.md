@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.15.0`.
+  `ROOM-CLIMATE-CARD v2.16.0`.
 
 ---
 
@@ -140,7 +140,7 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `icon` | string | `mdi:home-thermometer-outline` | Raum-Icon (MDI). |
 | `height` | number \| `auto` | `auto` | Feste Kartenhöhe in px (140–900) oder automatische Höhe. |
 | `border_radius` | number | `26` | Eckenradius in px (0–40). |
-| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für Titel, Messwerte und Heizzeile auf allen vier Seiten; der Verlauf hebt ihn links und rechts auf und schließt bündig mit der Kante ab. |
+| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für Titel, Messwerte und Heizzeile auf allen vier Seiten; der Verlauf hebt ihn links und rechts auf und schließt bündig mit der Kante ab. Unter 8 px warnt der Editor, dass der Text an der Kante klebt. |
 | `theme` | `auto` \| `dark` \| `light` | `auto` | `auto` folgt dem Home-Assistant-Theme, `dark`/`light` erzwingen eine Optik. |
 
 ### Sensoren
@@ -283,6 +283,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
 | `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile entfällt, die Kurven bekommen den Platz. |
+| `chart_full_bleed` | boolean | `true` | Der Verlauf läuft bündig bis zur Außenkante (Kurven und Flächen werden von der Rundung beschnitten). `false` lässt ihn auf derselben Kante wie den Text enden – Editor: *Verlauf* → **Verlauf bündig zur Kartenkante**. |
 | `chart_show_setpoint` | boolean | `true` | Gestrichelte Soll-Linie samt „Soll“-Beschriftung im Verlauf. Aus: nur Messwerte im Chart; die Solltemperatur bleibt in der Statuszeile (eigener Schalter `show_setpoint`). |
 | `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
 | `chart_show_extremes` | boolean | `true` | Minimum und Maximum der sichtbaren Kurven als dezente Zahlen neben der Kurve. |
@@ -311,7 +312,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, **Tippen auf die Karte** (Thermostat-Dialog öffnen / nichts), Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Soll-Linie im Verlauf**, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, **Verlauf bündig zur Kartenkante**, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Soll-Linie im Verlauf**, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -339,11 +340,12 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
   nur der Innenabstand ist bewusst frei einstellbar.
 - **Der Verlauf läuft bündig bis zur Außenkante:** Der Chart hebt den Innenabstand links und
   rechts auf, Kurven und Flächenverläufe berühren also die Kante der Karte; die Rundung
-  beschneidet sie. Damit die „Jetzt“-Marke am Kurvenende nicht halb in dieser Kante
+  beschneidet sie. Abschaltbar über `chart_full_bleed: false` (Editor: *Verlauf* → **Verlauf
+  bündig zur Kartenkante**) – dann endet der Verlauf auf derselben Kante wie der Text. Damit die „Jetzt“-Marke am Kurvenende nicht halb in dieser Kante
   verschwindet, endet die Plotfläche einen Markenradius (2,8 px) davor – die Marke sitzt
   weiterhin exakt auf dem gezeichneten Endpunkt. Die Zeitachse behält ihren eigenen
-  Sicherheitsabstand zum Eckenradius (28 px im Chart), und die „Soll“-Beschriftung rückt 3 px
-  von der Kante ab.
+  Sicherheitsabstand zum Eckenradius (28 px im Chart), die „Soll“-Beschriftung rückt 3 px und
+  jede Min/Max-Zahl 6 px von der Kante ab.
 - **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
   Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
   in Versalien mit 0,09 em Laufweite.
@@ -599,7 +601,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 168,3 kB, **47,7 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 169,8 kB, **48,2 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -747,7 +749,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 379 Tests in 13 Dateien aus (Stand 2.15.0):
+`npm test` führt 383 Tests in 13 Dateien aus (Stand 2.16.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
