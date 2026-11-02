@@ -1344,6 +1344,14 @@ export class RoomClimateCard extends LitElement {
       position: relative;
       display: flex;
       flex-direction: column;
+      /*
+       * The chart runs edge to edge: it cancels the card inset horizontally, so
+       * the curves and their area fills touch the outer edge instead of ending
+       * in a gutter. Only the (textual) axis row keeps its distance, and the
+       * card's overflow:hidden clips the corners.
+       */
+      margin-left: calc(var(--rcc-inset, 10px) * -1);
+      margin-right: calc(var(--rcc-inset, 10px) * -1);
       margin-top: var(--rcc-space-3);
       min-height: 0;
     }

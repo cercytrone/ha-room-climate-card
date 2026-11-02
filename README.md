@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.14.0`.
+  `ROOM-CLIMATE-CARD v2.15.0`.
 
 ---
 
@@ -140,7 +140,7 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `icon` | string | `mdi:home-thermometer-outline` | Raum-Icon (MDI). |
 | `height` | number \| `auto` | `auto` | Feste Kartenhöhe in px (140–900) oder automatische Höhe. |
 | `border_radius` | number | `26` | Eckenradius in px (0–40). |
-| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für alle vier Seiten – Titel, Messwerte und Verlauf teilen diese Kante. |
+| `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für Titel, Messwerte und Heizzeile auf allen vier Seiten; der Verlauf hebt ihn links und rechts auf und schließt bündig mit der Kante ab. |
 | `theme` | `auto` \| `dark` \| `light` | `auto` | `auto` folgt dem Home-Assistant-Theme, `dark`/`light` erzwingen eine Optik. |
 
 ### Sensoren
@@ -334,11 +334,16 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
   Reinschwarz.
 - **Nur ein großer Wert:** Temperatur 42 px in neutralem Weiß mit −0,035 em Tracking wird der
   Held; die Luftfeuchte steht rechtsbündig auf derselben Grundlinie bei 20 px.
-- **Ein Innenabstand für alles:** 10 px rundum (Editor: *Allgemein* → **Innenabstand**,
-  0–32 px), eine gemeinsame optische Kante für Titel, Werte und Verlauf. Alle übrigen Abstände
-  bleiben in 4-px-Schritten – nur der Innenabstand ist bewusst frei einstellbar. Die Zeitachse
-  behält ihren eigenen Sicherheitsabstand zum Eckenradius (28 px im Chart), damit bei kleinen
-  Werten kein Label in der Rundung verschwindet.
+- **Ein Innenabstand für den Text:** 10 px rundum (Editor: *Allgemein* → **Innenabstand**,
+  0–32 px) für Titel, Werte und Heizzeile. Alle übrigen Abstände bleiben in 4-px-Schritten –
+  nur der Innenabstand ist bewusst frei einstellbar.
+- **Der Verlauf läuft bündig bis zur Außenkante:** Der Chart hebt den Innenabstand links und
+  rechts auf, Kurven und Flächenverläufe berühren also die Kante der Karte; die Rundung
+  beschneidet sie. Damit die „Jetzt“-Marke am Kurvenende nicht halb in dieser Kante
+  verschwindet, endet die Plotfläche einen Markenradius (2,8 px) davor – die Marke sitzt
+  weiterhin exakt auf dem gezeichneten Endpunkt. Die Zeitachse behält ihren eigenen
+  Sicherheitsabstand zum Eckenradius (28 px im Chart), und die „Soll“-Beschriftung rückt 3 px
+  von der Kante ab.
 - **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
   Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
   in Versalien mit 0,09 em Laufweite.
@@ -463,7 +468,8 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   (`ResizeObserver`), Achsenbeschriftungen entfallen bei zu wenig Platz, unter
   40 × 34 px wird nichts gezeichnet statt zu verzerren. Die Zeitbeschriftung wird um den
   Karten-Eckenradius eingerückt, damit erstes und letztes Label nicht im abgerundeten Eck
-  verschwinden.
+  verschwinden. Der Chart selbst läuft bündig bis zur Außenkante; die „Jetzt“-Marke behält
+  einen Markenradius Abstand, damit sie vollständig sichtbar bleibt.
 - **Zeitachse:** Beschriftung und Datumszeile folgen der Zeitzone und dem Uhrzeitformat von Home
   Assistant (`hass.config.time_zone`, `hass.locale`), nicht der Zone des Browsers. Auf einem
   Wandtablet mit falsch gestellter Zeitzone steht damit trotzdem die richtige Uhrzeit; bei
@@ -593,7 +599,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 167,8 kB, **47,6 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 168,3 kB, **47,7 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -741,7 +747,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 377 Tests in 13 Dateien aus (Stand 2.14.0):
+`npm test` führt 379 Tests in 13 Dateien aus (Stand 2.15.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

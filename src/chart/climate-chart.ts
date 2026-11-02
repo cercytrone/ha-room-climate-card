@@ -57,6 +57,12 @@ const MIN_EXTREME_WIDTH = 150;
 const MIN_EXTREME_BAND = 14;
 
 /**
+ * Radius of the "now" dot at the end of a curve. The plot reserves this much on
+ * the right, because the chart is drawn edge to edge inside the card.
+ */
+const END_DOT_RADIUS = 2.8;
+
+/**
  * Why a min/max mark is missing, reported once per reason.
  *
  * The card used to drop the marks silently when a chart was narrow, a band flat
@@ -605,7 +611,19 @@ export class RoomClimateChart extends LitElement {
     const bottom = chartHeight - axisSpace;
     const plotHeight = Math.max(6, bottom - top);
     const left = 1;
-    const right = width - 1;
+    /*
+     * The chart runs to the card's outer edge (the card cancels its inset for
+     * the chart), so the last dot would otherwise be cut in half by that edge.
+     * The plot therefore ends one dot radius short: the dot still sits exactly
+     * on the drawn endpoint, and it stays fully visible. Both series use the
+     * same reserve so their end dots share one x position.
+     */
+    const right = width - 1 - END_DOT_RADIUS;
+    /*
+     * The "Soll" caption is text, and the chart now touches the card's edge:
+     * without a couple of pixels it would sit right on that edge.
+     */
+    const captionInset = 3;
     const rangeMs = Math.max(1, this.end - this.start);
     const x = linearScale([this.start, this.end], [left, right]);
     // The curves may run into the rounded corners, the labels may not.
@@ -1096,7 +1114,7 @@ export class RoomClimateChart extends LitElement {
         }
         // "Soll" lives at the very edge of the plot: step aside instead of
         // printing two numbers on top of each other.
-        const captionX = captionOnRight ? right : left;
+        const captionX = captionOnRight ? right - captionInset : left + captionInset;
         const captionClash = (x: number): boolean =>
           showSetpoint &&
           setpointY !== null &&
@@ -1220,7 +1238,7 @@ export class RoomClimateChart extends LitElement {
           ></line>
           <text
             class="setpoint-caption"
-            x=${captionOnRight ? right : left}
+            x=${captionOnRight ? right - captionInset : left + captionInset}
             y=${setpointY - 5}
             text-anchor=${captionOnRight ? 'end' : 'start'}
           >

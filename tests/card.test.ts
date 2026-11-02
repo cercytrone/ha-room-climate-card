@@ -544,9 +544,13 @@ describe('room climate card', () => {
     )
       .map((sheet) => sheet.cssText ?? '')
       .join('\n');
-    // One inset for title, values and chart – adjustable, default 10 px.
+    // One inset for the text; adjustable, default 10 px.
     expect(styleText).toMatch(/\.card\s*\{[^}]*padding:\s*var\(--rcc-inset,\s*10px\)/);
     expect(styleText).toMatch(/--rcc-inset:\s*10px/);
+    // The chart cancels that inset horizontally: curves run to the outer edge.
+    expect(styleText).toMatch(
+      /\.chart-slot\s*\{[^}]*margin-left:\s*calc\(var\(--rcc-inset[^;]*;\s*margin-right:\s*calc\(var\(--rcc-inset/
+    );
     // Every gap and margin is a multiple of 4 px – except the inset itself,
     // which the user may set to any pixel value between 0 and 32.
     const lengths = Array.from(
