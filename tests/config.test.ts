@@ -20,6 +20,8 @@ describe('normalizeConfig', () => {
     expect(config.icon).toBe('mdi:home-thermometer-outline');
     expect(config.height).toBeNull();
     expect(config.borderRadius).toBe(26);
+    // The inset is a single value for all four sides.
+    expect(config.padding).toBe(10);
     expect(config.theme).toBe('auto');
     expect(config.temperatureDecimals).toBe(1);
     expect(config.humidityDecimals).toBe(0);
@@ -200,6 +202,7 @@ describe('normalizeConfig', () => {
     const config = normalizeConfig({
       height: 99999,
       border_radius: -20,
+      card_padding: 99,
       temperature_decimals: 9,
       humidity_decimals: -3,
       chart_hours: 0,
@@ -207,6 +210,10 @@ describe('normalizeConfig', () => {
     });
     expect(config.height).toBe(2000);
     expect(config.borderRadius).toBe(0);
+    expect(config.padding).toBe(32);
+    expect(normalizeConfig({ card_padding: -5 }).padding).toBe(0);
+    // Fractions are rounded: the inset sits on the pixel grid.
+    expect(normalizeConfig({ card_padding: 12.6 }).padding).toBe(13);
     expect(config.temperatureDecimals).toBe(3);
     expect(config.humidityDecimals).toBe(0);
     expect(config.chart.hours).toBe(1);
@@ -309,6 +316,15 @@ describe('normalizeConfig', () => {
       chart_height: 100,
     });
     expect(preferredCardHeight(withChart)).toBeGreaterThan(preferredCardHeight(minimal));
+  });
+
+  it('counts the inset twice in the preferred height', () => {
+    const base = normalizeConfig({});
+    const narrow = normalizeConfig({ card_padding: 4 });
+    const wide = normalizeConfig({ card_padding: 24 });
+    // Top and bottom, nothing else changes.
+    expect(preferredCardHeight(base) - preferredCardHeight(narrow)).toBe(12);
+    expect(preferredCardHeight(wide) - preferredCardHeight(base)).toBe(28);
   });
 });
 

@@ -28,6 +28,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   /** Card height in pixels. `0` / `"auto"` (default) lets the content decide. */
   height?: number | 'auto';
   border_radius?: number;
+  /** Innenabstand zwischen Inhalt und Außenkante in px (0–32, Standard 10). */
+  card_padding?: number;
   theme?: ThemeMode;
 
   // Sensors
@@ -222,6 +224,8 @@ export interface ResolvedConfig {
   /** `null` means "automatic / content driven". */
   height: number | null;
   borderRadius: number;
+  /** Inset between the content and the card's outer edge, in pixels. */
+  padding: number;
   theme: ThemeMode;
   temperatureEntity?: string;
   humidityEntity?: string;
@@ -240,6 +244,10 @@ export interface ResolvedConfig {
   /** `more-info` opens the dialog of the climate entity on tap. */
   tapAction: TapAction;
 }
+
+/** Inset between content and card edge – the one value every block shares. */
+export const DEFAULT_CARD_PADDING = 10;
+export const CARD_PADDING_RANGE = { min: 0, max: 32 } as const;
 
 export const DEFAULT_OPEN_STATES = ['on', 'open', 'opening', 'tilted', 'gekippt'];
 export const DEFAULT_CLOSED_STATES = ['off', 'closed', 'closing'];
@@ -362,6 +370,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'icon',
   'height',
   'border_radius',
+  'card_padding',
   'theme',
   'temperature_entity',
   'humidity_entity',
@@ -492,6 +501,14 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     icon: asString(config.icon) ?? 'mdi:home-thermometer-outline',
     height,
     borderRadius: asNumber(config.border_radius, 0, 40, 26),
+    padding: Math.round(
+      asNumber(
+        config.card_padding,
+        CARD_PADDING_RANGE.min,
+        CARD_PADDING_RANGE.max,
+        DEFAULT_CARD_PADDING
+      )
+    ),
     theme,
     temperatureEntity,
     humidityEntity,
@@ -618,7 +635,8 @@ export function preferredCardHeight(config: ResolvedConfig): number {
   const header = 28;
   // Caption row plus its 4 px gap disappears completely when switched off.
   const labels = config.showSeriesLabels ? 20 : 0;
-  return 20 + header + 12 + labels + readings + 8 + statusRow + 12 + chartHeight + 20;
+  const inset = config.padding * 2;
+  return inset + header + 12 + labels + readings + 8 + statusRow + 12 + chartHeight;
 }
 
 export function resolveName(config: ResolvedConfig, hass?: HomeAssistant): string {
