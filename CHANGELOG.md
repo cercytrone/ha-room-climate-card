@@ -4,6 +4,33 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.12.0] – 2026-11-02
+
+### Behoben
+
+- **Minimum/Maximum fehlten, obwohl `chart_show_extremes: true` gesetzt war.** Drei Ursachen,
+  alle nachgemessen:
+  1. **Flache Kurve.** Standen Minimum und Maximum auf demselben Wert – der Normalfall in einem
+     gut eingeregelten Raum –, verwarf die Karte beide Marken. Jetzt wird der eine Wert einmal
+     angezeigt.
+  2. **Schwelle zu hoch.** Unter 200 px Kartenbreite bzw. 18 px Bandhöhe entfielen die Zahlen
+     ganz. Ein kompakter Chart (240 × 86 px) lag damit immer darunter. Jetzt gilt 150 px Breite
+     und 14 px Bandhöhe – die Zahlen passen sich weiterhin an, statt zu verschwinden.
+  3. **Stumm.** Fehlende Marken wurden ohne Hinweis weggelassen; das sah nach einem kaputten
+     Schalter aus. Die Karte schreibt jetzt **einmal** in die Konsole, welcher Grund greift
+     („schmale Karte“, „flaches Band“, „zu wenige Messwerte“).
+- **Lesbarkeit der Zahlen.** 9 px bei 55 % Deckkraft verschwanden auf dunklen Karten fast
+  vollständig. Jetzt 10 px, 80 % Deckkraft und ein breiterer Rand in Kartenfarbe.
+
+### Hinzugefügt
+
+- **`chart_show_setpoint`** (Standard `true`) – die gestrichelte Soll-Linie im Verlauf samt
+  „Soll“-Beschriftung lässt sich abschalten. Im Editor unter *Verlauf* → **Soll-Linie im
+  Verlauf** (ausgegraut, wenn keine Temperaturkurve gezeichnet wird). Das ist bewusst **nicht**
+  dasselbe wie `show_setpoint`, das die Solltemperatur in der Statuszeile unter dem Messwert
+  steuert. Soll-Linie aus heißt auch: „Soll“ steht nicht mehr in der Screenreader-Beschreibung –
+  Bild und Beschreibung bleiben deckungsgleich.
+
 ## [2.11.0] – 2026-11-02
 
 ### Geändert

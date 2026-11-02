@@ -370,6 +370,24 @@ describe('curve opacity and temperature bands', () => {
     expect(config.chart.bandTransition).toBe(1);
   });
 
+  it('keeps the chart target line by default and switches it off on request', () => {
+    expect(normalizeConfig({}).chart.showChartSetpoint).toBe(true);
+    expect(normalizeConfig({ chart_show_setpoint: false }).chart.showChartSetpoint).toBe(false);
+    expect(normalizeConfig({ chart_show_setpoint: true }).chart.showChartSetpoint).toBe(true);
+    // The row's own setpoint value is a separate switch.
+    expect(normalizeConfig({ show_setpoint: false }).thermostat.showSetpoint).toBe(false);
+    expect(normalizeConfig({ show_setpoint: false }).chart.showChartSetpoint).toBe(true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      resetUnknownKeyWarnings();
+      normalizeConfig({ chart_show_setpoint: false });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      resetUnknownKeyWarnings();
+    }
+  });
+
   it('keeps the time row by default and switches it off on request', () => {
     expect(normalizeConfig({}).chart.showAxis).toBe(true);
     expect(normalizeConfig({ chart_show_axis: false }).chart.showAxis).toBe(false);

@@ -341,6 +341,25 @@ describe('room climate card editor', () => {
     expect(emitted?.chart_show_extremes).toBe(false);
   });
 
+  it('offers a switch for the target line in the chart', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+
+    const line = selectorByLabel(editor, 'Soll-Linie im Verlauf');
+    expect(line.value).toBe(true);
+    expect(line.disabled).toBe(false);
+
+    line.emit(false);
+    await editor.updateComplete;
+    expect(emitted?.chart_show_setpoint).toBe(false);
+    // The setpoint in the status row is a different switch and stays untouched.
+    expect(emitted?.show_setpoint).toBeUndefined();
+  });
+
   it('offers a switch for the time row under the chart', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

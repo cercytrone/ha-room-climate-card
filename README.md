@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.11.0`.
+  `ROOM-CLIMATE-CARD v2.12.0`.
 
 ---
 
@@ -277,6 +277,7 @@ Tastatur-Pendant wäre eine Falle.
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
 | `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile entfällt, die Kurven bekommen den Platz. |
+| `chart_show_setpoint` | boolean | `true` | Gestrichelte Soll-Linie samt „Soll“-Beschriftung im Verlauf. Aus: nur Messwerte im Chart; die Solltemperatur bleibt in der Statuszeile (eigener Schalter `show_setpoint`). |
 | `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
 | `chart_show_extremes` | boolean | `true` | Minimum und Maximum der sichtbaren Kurven als dezente Zahlen neben der Kurve. |
 | `chart_opacity` | number | `100` | Deckkraft der Kurven in Prozent (15–100). Gilt für Linien, Flächen und Datenpunkte; darunter tritt der Verlauf ruhiger hinter die Messwerte zurück. |
@@ -304,7 +305,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, **Tippen auf die Karte** (Thermostat-Dialog öffnen / nichts), Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Soll-Linie im Verlauf**, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -458,7 +459,8 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   Assistant (`hass.config.time_zone`, `hass.locale`), nicht der Zone des Browsers. Auf einem
   Wandtablet mit falsch gestellter Zeitzone steht damit trotzdem die richtige Uhrzeit; bei
   `time_format: am_pm` erscheint die Achse im 12-Stunden-Format.
-- **Sollwert:** Die gestrichelte Soll-Linie wird in die Einheit des Temperatursensors umgerechnet
+- **Sollwert:** Die gestrichelte Soll-Linie (abschaltbar über `chart_show_setpoint`, Editor:
+  *Verlauf* → **Soll-Linie im Verlauf**) wird in die Einheit des Temperatursensors umgerechnet
   (22 °C am Thermostat, Sensor in °F → 71,6 °F), sonst läge sie weit neben der Kurve. Die Einheit
   stammt aus den Attributen der Climate-Entität, mit dem Systemstandard als Rückfall. Ist eine
   der beiden Einheiten unbekannt, entfällt die Linie – lieber keine Linie als eine an falscher
@@ -482,13 +484,19 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
      Dashboard, nur waagerechtes Erkunden gehört dem Chart. Nach dem Abheben eines Fingers
      bleibt die Anzeige vier Sekunden stehen (auf einem Wandtablet sonst unlesbar), beim
      Verlassen mit der Maus verschwindet sie sofort.
-- **Minimum/Maximum:** Die tiefste und höchste echte Messung des Zeitraums stehen als kleine
-  Zahl neben der Kurve (ohne Einheit – Farbe und Band sagen, welche Reihe gemeint ist). Liegen
-  beide Zahlen auf demselben Fleck, rücken sie an die Ränder ihres Bandes, statt eine zu
+- **Minimum/Maximum:** Die tiefste und höchste echte Messung des Zeitraums stehen als Zahl neben
+  der Kurve (ohne Einheit – Farbe und Band sagen, welche Reihe gemeint ist), in 10 px bei 80 %
+  Deckkraft und mit einem Rand in Kartenfarbe, damit die Linie nicht durch die Ziffern schlägt.
+  Liegen beide Zahlen auf demselben Fleck, rücken sie an die Ränder ihres Bandes, statt eine zu
   verschlucken; erst wenn selbst dafür kein Platz ist (Band flacher als eine Zeile) bleibt das
-  Maximum allein. Unter 200 px Breite entfallen die Zahlen ganz. Abschalten: im Editor unter
-  *Verlauf* → **Minimum/Maximum im Chart anzeigen** oder per `chart_show_extremes: false`. Für Screenreader stehen beide Werte zusätzlich in der
-  Beschreibung des Charts („Temperatur 18,2–23,4 °C“), weil dort kein Zeiger hinkommt.
+  Maximum allein. **Bewegt sich die Kurve überhaupt nicht** – der Normalfall in einem gut
+  eingeregelten Raum –, steht die eine Zahl einmal da, statt dass beide Marken verschwinden.
+  Gezeichnet wird ab 150 px Kartenbreite und 14 px Bandhöhe; darunter bleiben die Zahlen weg, und
+  die Karte sagt das einmal in der Browser-Konsole („Minimum/Maximum der Temperatur ausgeblendet:
+  schmale Karte“), statt den Schalter stumm wirken zu lassen. Abschalten: im Editor unter
+  *Verlauf* → **Minimum/Maximum im Chart anzeigen** oder per `chart_show_extremes: false`. Für
+  Screenreader stehen beide Werte zusätzlich in der Beschreibung des Charts
+  („Temperatur 18,2–23,4 °C“), weil dort kein Zeiger hinkommt.
 - **Fallbacks:** Ladezustand („Verlauf wird geladen …“), leerer Zeitraum („Keine
   Verlaufsdaten“) und Fehler („Verlauf konnte nicht geladen werden“).
 
@@ -576,7 +584,7 @@ Was die Grafikeinheit beim Neuzeichnen kostet, misst diese Tabelle ausdrücklich
 
 | Größe | Messwert | Bedeutung bei acht Karten |
 | --- | --- | --- |
-| Bundle | 167,4 kB, **47,3 kB gzip** | einmal geladen, nicht pro Karte |
+| Bundle | 169,2 kB, **47,8 kB gzip** | einmal geladen, nicht pro Karte |
 | DOM-Knoten je Karte | **269** (davon rund 150 im SVG) | ~2 150 für alle acht – ein HA-Dashboard liegt typisch im fünfstelligen Bereich |
 | SVG-Knoten je Chart | **150–157, unabhängig von der Punktzahl** | wächst nicht mit der Historie |
 | Messwerte je Kurve | gedeckelt auf 1 200 (`MAX_CHART_POINTS`) | 24 h oder 168 h erzeugen keine größeren Pfade |
@@ -724,7 +732,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 371 Tests in 13 Dateien aus (Stand 2.11.0):
+`npm test` führt 378 Tests in 13 Dateien aus (Stand 2.12.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

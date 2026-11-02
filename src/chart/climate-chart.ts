@@ -52,6 +52,29 @@ const FALLBACK_HEIGHT = 112;
 /** How long a touch readout stays visible after the finger lifts. */
 const TOOLTIP_HOLD_MS = 4000;
 
+/** Smallest chart the min/max marks are drawn into, in CSS pixel. */
+const MIN_EXTREME_WIDTH = 150;
+const MIN_EXTREME_BAND = 14;
+
+/**
+ * Why a min/max mark is missing, reported once per reason.
+ *
+ * The card used to drop the marks silently when a chart was narrow, a band flat
+ * or a curve perfectly straight – from the outside that looked like a broken
+ * switch. One line in the console is cheaper than guessing.
+ */
+const explainedExtremeSkips = new Set<string>();
+function explainExtremes(reason: string, series: string): void {
+  const key = `${reason}|${series}`;
+  if (explainedExtremeSkips.has(key)) return;
+  explainedExtremeSkips.add(key);
+  // eslint-disable-next-line no-console -- a visible hint beats a silent gap
+  console.info(
+    `[room-climate-card] Minimum/Maximum der ${series} ausgeblendet: ${reason}. ` +
+      'Die Zahlen brauchen Platz im Chart – eine höhere Chart-Höhe oder eine breitere Karte schafft ihn.'
+  );
+}
+
 /** Plot geometry, in fractions of the usable height. */
 const HUMIDITY_BAND_HEIGHT = 0.3;
 const TEMPERATURE_BAND_TOP = 0.44;
@@ -151,6 +174,7 @@ export class RoomClimateChart extends LitElement {
     bandTransition: { attribute: false },
     temperatureScale: { attribute: false },
     showAxis: { attribute: false },
+    showSetpoint: { attribute: false },
     cornerRadius: { attribute: false },
     showTooltip: { attribute: false },
     showExtremes: { attribute: false },
@@ -351,15 +375,21 @@ export class RoomClimateChart extends LitElement {
      * – otherwise the line strikes through it.
      */
     .extreme-label {
-      font-size: 9px;
+      font-size: 10px;
       font-weight: 500;
       fill: var(--rcc-text);
-      fill-opacity: 0.55;
+      /*
+       * 9 px at 55 % read as "nothing" on a dark card, especially on a screen
+       * that is not perfectly calibrated. The number is orientation, not
+       * decoration – it has to be legible, so it gets real contrast and a
+       * slightly wider halo in the card colour.
+       */
+      fill-opacity: 0.8;
       letter-spacing: 0.02em;
       font-variant-numeric: tabular-nums;
       paint-order: stroke;
       stroke: var(--rcc-chart-point-fill);
-      stroke-width: 1.4;
+      stroke-width: 2;
       stroke-linejoin: round;
     }
     @media (prefers-reduced-motion: reduce) {
@@ -420,6 +450,8 @@ export class RoomClimateChart extends LitElement {
   temperatureScale: 'C' | 'F' = 'C';
   /** Time labels under the plot (start, middle, "now"). */
   showAxis = true;
+  /** Dashed reference line at the thermostat's target value. */
+  showSetpoint = true;
   /** Card corner radius; keeps the axis labels clear of the rounded edges. */
   cornerRadius = 26;
   /** Crosshair readout while the pointer is over the plot. */
@@ -882,6 +914,7 @@ export class RoomClimateChart extends LitElement {
     const setpointY =
       setpointValue !== null && tempY ? tempY(setpointValue) : null;
     const showSetpoint =
+      this.showSetpoint &&
       setpointY !== null &&
       Number.isFinite(setpointY) &&
       setpointY >= temperatureTop - 0.5 &&
@@ -993,16 +1026,29 @@ export class RoomClimateChart extends LitElement {
       bandTop: number,
       bandBottom: number,
       color: string,
-      decimals: number
+      decimals: number,
+      seriesName: string
     ): void => {
-      if (!this.showExtremes || width < 200 || bandBottom - bandTop < 18) return;
+      if (!this.showExtremes) return;
+      const skip = (reason: string): void => explainExtremes(reason, seriesName);
+      if (width < MIN_EXTREME_WIDTH) return skip('schmale Karte');
+      if (bandBottom - bandTop < MIN_EXTREME_BAND) return skip('flaches Band');
       const extremes = seriesExtremes(samples);
-      if (!extremes || extremes.min.v === extremes.max.v) return;
-      if (samples.filter((sample) => sample.v !== null).length < 3) return;
-      const entries = [
-        { sample: extremes.max, isMax: true },
-        { sample: extremes.min, isMax: false },
-      ]
+      if (!extremes) return skip('keine Messwerte');
+      if (samples.filter((sample) => sample.v !== null).length < 3) return skip('zu wenige Messwerte');
+      /*
+       * A curve that never moved has one value, not two. It used to be skipped
+       * entirely, which is why a well-regulated room showed no numbers at all:
+       * both thresholds sat on the same value. Now the single level is printed
+       * once instead of twice.
+       */
+      const flat = extremes.min.v === extremes.max.v;
+      const entries = (flat
+        ? [{ sample: extremes.max, isMax: true }]
+        : [
+            { sample: extremes.max, isMax: true },
+            { sample: extremes.min, isMax: false },
+          ])
         .map(({ sample, isMax }) => {
           const cx = x(sample.t);
           const cy = projectY(sample.v as number);
@@ -1100,7 +1146,8 @@ export class RoomClimateChart extends LitElement {
         temperatureTop,
         temperatureBottom,
         this.accentColor,
-        this.temperatureDecimals
+        this.temperatureDecimals,
+        'Temperatur'
       );
     }
     if (humidityY) {
@@ -1110,7 +1157,8 @@ export class RoomClimateChart extends LitElement {
         humidityTop,
         humidityBottom,
         this.humidityColor,
-        this.humidityDecimals
+        this.humidityDecimals,
+        'Luftfeuchte'
       );
     }
 
