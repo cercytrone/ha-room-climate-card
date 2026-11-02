@@ -562,11 +562,12 @@ export function areaPath(points: Point[], baseline: number, smooth: boolean): st
  * Centred moving average over one contiguous run.
  *
  * History sensors report to one decimal and often jitter; drawn 1:1 the curve
- * turns into a sawtooth. A short centred window removes the noise without
- * changing the shape of the trend. The window shrinks at both ends and never
- * changes timestamps, so the newest sample still sits exactly at "now".
+ * turns into a sawtooth. A centred window removes the noise without changing the
+ * shape of the trend. The window shrinks at both ends and never changes
+ * timestamps, so the newest sample stays at "now" – its *value* is the average
+ * of its neighbours, which is why the end dot is taken from the drawn segment.
  *
- * The window has to stay small: a moving average flattens real extrema, and
+ * The window has to stay bounded: a moving average flattens real extrema, and
  * this chart exists to show what actually happened.
  */
 export interface SmoothingOptions {
@@ -588,12 +589,14 @@ export function movingAverage(
   if (size < 3 || samples.length < 3) return samples.map((sample) => ({ ...sample }));
   const radius = Math.floor(size / 2);
   const maxDelta = options.maxDeltaMs ?? Infinity;
-  // Precision of the measurement itself: at least one decimal (so the average of
-  // integers is not thrown away), at most two (so a fine sensor keeps its shape).
-  const precision = Math.min(
-    2,
-    Math.max(1, samples.reduce((max, sample) => Math.max(max, decimalsOf(sample.v)), 0))
-  );
+  /*
+   * Two decimals, never the grid of the sensor. Rounding the average back onto
+   * the 0.1 °C grid of the measurement swallowed every difference between the
+   * levels: a wider window produced the same curve, because 21.34 and 21.38 both
+   * became 21.3 again. Two decimals keep the average an average; the drawn path
+   * rounds its coordinates to two decimals anyway.
+   */
+  const precision = 2;
   return samples.map((sample, index) => {
     if (sample.v === null) return { ...sample };
     let sum = 0;
@@ -606,9 +609,6 @@ export function movingAverage(
       count += 1;
     }
     if (!count) return { ...sample };
-    // Round to the precision the sensor itself reports: a 0.1 °C sensor keeps
-    // 0.1, a fine-grained one keeps its second decimal. A fixed one decimal used
-    // to swallow every movement below 0.05 and flattened fine sensors visibly.
     return { t: sample.t, v: roundTo(sum / count, precision) };
   });
 }
@@ -634,41 +634,60 @@ export const SMOOTHING_LEVELS: readonly SmoothingLevel[] = [
 export const DEFAULT_SMOOTHING: SmoothingLevel = 'light';
 
 /**
- * Averaging window per level: `[shortRun, denseRun]`, in samples.
+ * Half-width of the averaging window per level, in **minutes**.
  *
- * Always odd so the average is centred; 1 means "no averaging at all".
+ * Time instead of a sample count: Home Assistant stores only changes, so "15
+ * samples" is five minutes on a chatty sensor and two hours on a quiet one –
+ * the levels then felt identical on some charts and far too strong on others.
+ * A time span keeps the same level the same at 3 h, 6 h and 24 h.
  */
-const SMOOTHING_WINDOWS: Record<SmoothingLevel, readonly [number, number]> = {
-  none: [1, 1],
-  light: [3, 5],
-  medium: [5, 9],
-  strong: [9, 15],
+export const SMOOTHING_SPANS: Record<SmoothingLevel, number> = {
+  none: 0,
+  light: 10,
+  medium: 30,
+  strong: 60,
 };
 
-/** Number of decimals a value is written with (capped at two). */
-function decimalsOf(value: number | null): number {
-  if (value === null || !Number.isFinite(value)) return 0;
-  const text = String(value);
-  const dot = text.indexOf('.');
-  if (dot === -1) return 0;
-  return Math.min(2, text.length - dot - 1);
-}
+/** Hard ceiling for the window in samples (a 1-minute sensor on 7 days). */
+const MAX_WINDOW = 121;
 
+/** Number of decimals an averaged value is written with. */
 function roundTo(value: number, decimals: number): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
 }
 
 /**
- * Window length for a run of `count` samples at the given level.
+ * Window length in samples for a series whose samples sit `spacingMs` apart.
  *
- * Runs shorter than five samples are never averaged: there is no neighbour to
- * compare with, and averaging would only invent a value.
+ * Always odd so the average is centred; `1` means "no averaging at all". The
+ * caller keeps runs under five samples untouched – there is no neighbour to
+ * average with, only a value to invent.
  */
-export function smoothingWindow(count: number, level: SmoothingLevel = DEFAULT_SMOOTHING): number {
-  if (count < 5) return 1;
-  const [shortRun, denseRun] = SMOOTHING_WINDOWS[level] ?? SMOOTHING_WINDOWS[DEFAULT_SMOOTHING];
-  return count < 60 ? shortRun : denseRun;
+export function smoothingWindow(
+  spacingMs: number,
+  level: SmoothingLevel = DEFAULT_SMOOTHING
+): number {
+  const span = SMOOTHING_SPANS[level] ?? SMOOTHING_SPANS[DEFAULT_SMOOTHING];
+  if (!(span > 0) || !Number.isFinite(spacingMs) || spacingMs <= 0) return 1;
+  // At least the direct neighbour: a sensor that only reports every 20 minutes
+  // must still react to "light" instead of being left completely untouched.
+  const radius = Math.max(1, Math.round((span * 60_000) / spacingMs));
+  return Math.min(MAX_WINDOW, radius * 2 + 1);
+}
+
+/**
+ * Longest distance (ms) a neighbour may have and still be averaged in.
+ *
+ * The configured window has to fit inside this distance, otherwise the guard
+ * silently shrinks it – that was the reason "medium" and "strong" drew the
+ * same curve. A real stillstand (hours without a value) still ends the average,
+ * so a measured step never turns into a ramp.
+ */
+export function smoothingGuard(window: number, spacingMs: number): number {
+  if (!Number.isFinite(spacingMs) || spacingMs <= 0) return Infinity;
+  const reach = Math.floor(Math.max(1, window) / 2) * spacingMs * 2;
+  return Math.min(90 * 60_000, Math.max(2 * 60_000, reach));
 }
 
 export function timeTicks(start: number, end: number, count: number): number[] {

@@ -4,6 +4,32 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.2] – 2026-11-02
+
+### Behoben
+
+- **Die Glättungsstufen unterschieden sich kaum.** Zwei Ursachen, beide gemessen:
+  1. Ein Zeitwächter begrenzte *jedes* Fenster auf Nachbarn innerhalb von 3 × Median-Abstand –
+     also auf ±3 Messwerte. Konfiguriert waren aber 9 und 15: „Mittel“ und „Stark“ zeichneten
+     **dieselbe Kurve** (nachgemessen: effektiv 6,9 vs. 6,9 Nachbarn bei 6 h, 7,0 vs. 7,0 bei
+     24 h). Der Wächter wächst jetzt mit dem Fenster (`±Fenster/2 × Abstand`, mindestens zwei
+     Minuten, höchstens 90 Minuten) – ein echter Stillstand von Stunden beendet das Mitteln
+     weiterhin, ein gemessener Sprung bleibt also stehen.
+  2. Der Mittelwert wurde auf die Nachkommastellen des Sensors gerundet (bei 0,1 °C-Sensoren
+     also auf 0,1). Damit fielen die Restunterschiede zwischen den Stufen weg. Jetzt bleiben
+     zwei Nachkommastellen erhalten – der gezeichnete Pfad rundet ohnehin auf zwei.
+
+### Geändert
+
+- **Glättungsstufen als Zeitfenster statt Punktzahl.** `light` mittelt über ±10 Minuten, `medium`
+  über ±30, `strong` über ±60; daraus wird pro Reihe die passende Punktzahl (immer ungerade,
+  höchstens 121, mindestens der direkte Nachbar). Vorher bedeutete dieselbe Punktzahl bei einem
+  geschwätzigen Sensor 15 Minuten und bei einem ruhigen zwei Stunden. Gemessen an der
+  Gesamtbewegung der gezeichneten Werte (6 h sichtbar, ±0,12 °C Rauschen, Rohwert 5,32 °C)
+  ergibt sich jetzt eine klare Leiter – vorher waren „Mittel“ und „Stark“ deckungsgleich:
+  **1,24 → 0,61 → 0,43 °C** statt 1,20 → 1,10 → 1,10 °C.
+- **Editor-Hilfetext** nennt die Zeitfenster, die README-Tabelle ebenso.
+
 ## [2.9.1] – 2026-11-02
 
 ### Behoben

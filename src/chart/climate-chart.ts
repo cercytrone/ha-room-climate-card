@@ -16,6 +16,7 @@ import {
   projectRun,
   seriesExtremes,
   seriesPath,
+  smoothingGuard,
   smoothingWindow,
   type SmoothingLevel,
   splitAtBridges,
@@ -703,11 +704,17 @@ export class RoomClimateChart extends LitElement {
     const smooth = this.curve === 'smooth';
     const smoothSeries = (series: ChartSample[]): ChartSample[] => {
       if (!smooth || series.length < 5) return series;
-      const window = smoothingWindow(series.length, this.smoothing);
-      if (window < 3) return series;
+      // The level defines a *time* span, which becomes a sample count here; the
+      // guard grows with that count, so a wide window is not cut down to ±3
+      // neighbours (which made "medium" and "strong" draw the same curve).
       const spacing = medianInterval(series);
+      const window = Math.min(
+        smoothingWindow(spacing, this.smoothing),
+        series.length % 2 ? series.length : series.length - 1
+      );
+      if (window < 3) return series;
       return movingAverage(series, window, {
-        maxDeltaMs: Math.max(60_000, spacing * 3),
+        maxDeltaMs: smoothingGuard(window, spacing),
       });
     };
     const tempSmoothed = smoothSeries(tempSeries);

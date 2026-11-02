@@ -16,6 +16,7 @@ import {
   padDomain,
   projectRun,
   seriesPath,
+  smoothingGuard,
   smoothingWindow,
   timeTicks,
   type ChartSample,
@@ -326,11 +327,10 @@ function renderCard(options: CardOptions): string {
   // quiet stretch stays a step instead of becoming a ramp.
   const runsOf = (series?: ChartSample[]) => {
     if (!series) return [];
-    const window = smoothingWindow(series.length);
+    const spacing = medianInterval(series);
+    const window = Math.min(smoothingWindow(spacing), series.length % 2 ? series.length : series.length - 1);
     const prepared =
-      window < 3
-        ? series
-        : movingAverage(series, window, { maxDeltaMs: Math.max(60_000, medianInterval(series) * 3) });
+      window < 3 ? series : movingAverage(series, window, { maxDeltaMs: smoothingGuard(window, spacing) });
     return buildSegments(prepared, segmentOptions).map((segment) => segment.samples);
   };
 
