@@ -4,6 +4,37 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.16.2] – 2026-11-02
+
+### Behoben
+
+- **Ohne Zeitangabe läuft der Verlauf bis zur unteren Kante.** Bisher blieb unter dem Plot ein
+  2-px-Streifen plus der Innenabstand (12 px bei Standardwerten) als leerer Saum stehen, obwohl
+  unter der Kurve keine Zeile mehr folgt. Jetzt gibt der Chart den Zeilenplatz komplett an die
+  Kurve ab und die Karte hebt den unteren Innenabstand auf – dasselbe Muster wie links und
+  rechts: `chartSlotBottomMargin()` in `src/config.ts` liefert `-card_padding`, die Karte schreibt
+  den Wert als Inline-Rand `margin-bottom` auf den Chart-Slot. Gilt nur für
+  `chart_show_axis: false` **und** bündigen Verlauf; mit Zeitzeile oder mit
+  `chart_full_bleed: false` bleibt es bei 0.
+- **Der rechte ungefüllte Streifen neben der „Jetzt“-Marke ist geschlossen.** Weil die
+  Zeitachse 2,8 px vor der Außenkante endet, damit die Marke ganz bleibt, hörten Linie und Fläche
+  dort ebenfalls auf – neben der Marke blieb ein leerer Saum bis zur Kante. Jetzt halten Kurve
+  und Flächenverlauf den letzten Messwert flach bis zur echten Kante (`edgeRight = width − 1`);
+  Gitterlinien, Achsen-Baseline, Achsenbeschriftung und die „Soll“-Beschriftung ziehen mit. Die
+  Marke selbst bleibt unverändert auf dem gezeichneten Endpunkt sitzen und wird nicht
+  beschnitten. Nur der bis „jetzt“ reichende Lauf bekommt die Verlängerung – ein historischer
+  Abschnitt, der vorher endet, wird nicht künstlich fortgeschrieben.
+- **Demo-Vorschau (`docs/images/`)** zeichnet Kante und Haltepunkt genauso wie die Karte.
+
+### Geprüft
+
+- `tests/chart.test.ts`: letzter Pfadpunkt liegt auf `width − 1`, der vorletzte 2,8 px davor,
+  beide mit demselben y-Wert (flacher Abschluss); der Flächenverlauf erreicht dieselbe Kante;
+  ohne Zeitachse liegt die Plot-Unterkante auf `height − 0.5` und die Fläche reicht dorthin;
+  die „Jetzt“-Marke sitzt weiterhin auf einem Kurvenpunkt.
+- `tests/card.test.ts`: `chartSlotBottomMargin()` und der Inline-Rand `margin-bottom` in allen
+  vier Kombinationen aus Zeitzeile und bündigem Verlauf.
+
 ## [2.16.1] – 2026-11-02
 
 ### Intern

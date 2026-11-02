@@ -267,7 +267,12 @@ function renderCard(options: CardOptions): string {
    * whole – same numbers as the web component.
    */
   const chartLeft = x + 1;
-  const chartRight = x + cardW - 1 - 2.8;
+  const chartEdge = x + cardW - 1;
+  /*
+   * The time scale ends one dot radius early so the "now" dot stays whole; the
+   * drawn line and its area hold the last value out to the card edge.
+   */
+  const chartRight = chartEdge - 2.8;
 
   const headerY = y + INSET;
   const labelsY = headerY + HEADER_H + SPACE_3;
@@ -346,15 +351,24 @@ function renderCard(options: CardOptions): string {
   const temperatureRuns = temperatureVisible ? runsOf(options.series) : [];
   const humidityRuns = humidityVisible ? runsOf(options.humiditySeries) : [];
 
+  /** Flat hold from the end of the time scale to the card edge (like the card). */
+  const holdToEdge = (run: ChartSample[], y: (value: number) => number): Point[] => {
+    const points: Point[] = projectRun(run, xScale, y);
+    if (!points.length) return points;
+    const last = points[points.length - 1];
+    if (last.x < chartRight - 0.75) return points;
+    return [...points, { x: chartEdge, y: last.y }];
+  };
+
   const temperatureArea = tempScale
     ? temperatureRuns
-        .map((run) => areaPath(projectRun(run, xScale, tempScale), chartBottom, smooth))
+        .map((run) => areaPath(holdToEdge(run, tempScale), chartBottom, smooth))
         .join(' ')
     : '';
   const temperatureLines = tempScale
     ? temperatureRuns
         .map((run) => {
-          const points: Point[] = projectRun(run, xScale, tempScale);
+          const points: Point[] = holdToEdge(run, tempScale);
           return `<path d="${seriesPath(points, smooth)}" fill="none" stroke="${
             options.bands ? `url(#${options.cardId}-temp-stroke)` : C.accent
           }" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"${fade} />`;
@@ -364,13 +378,13 @@ function renderCard(options: CardOptions): string {
 
   const humidityArea = humidityScale
     ? humidityRuns
-        .map((run) => areaPath(projectRun(run, xScale, humidityScale), humidityBandBottom, smooth))
+        .map((run) => areaPath(holdToEdge(run, humidityScale), humidityBandBottom, smooth))
         .join(' ')
     : '';
   const humidityLines = humidityScale
     ? humidityRuns
         .map((run) => {
-          const points: Point[] = projectRun(run, xScale, humidityScale);
+          const points: Point[] = holdToEdge(run, humidityScale);
           const dash = options.humidityDotted ? ' stroke-dasharray="0.1 5.5"' : '';
           return `<path d="${seriesPath(points, smooth)}" fill="none" stroke="${
             C.secondary
@@ -400,7 +414,7 @@ function renderCard(options: CardOptions): string {
     ? [1, 2]
         .map((index) => {
           const lineY = chartTop + (plotHeight * index) / 3;
-          return `<line x1="${chartLeft}" x2="${chartRight}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(
+          return `<line x1="${chartLeft}" x2="${chartEdge}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(
             1
           )}" stroke="${C.text}" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="2 6" />`;
         })
@@ -803,7 +817,7 @@ function renderCard(options: CardOptions): string {
       ${humidityLines}
       ${temperatureLines}
       ${dots}
-      <line x1="${chartLeft}" x2="${chartRight}" y1="${chartBottom}" y2="${chartBottom}" stroke="${
+      <line x1="${chartLeft}" x2="${chartEdge}" y1="${chartBottom}" y2="${chartBottom}" stroke="${
         C.text
       }" stroke-opacity="0.1" />
       ${endDots}

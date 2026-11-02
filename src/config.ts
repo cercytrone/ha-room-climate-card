@@ -618,6 +618,18 @@ export function chartSlotMargin(config: ResolvedConfig): number {
   return config.chart.fullBleed ? -config.padding : 0;
 }
 
+/**
+ * Bottom margin of the chart inside the card, in pixels.
+ *
+ * Without the time row there is no text under the plot, so the chart may run
+ * into the bottom edge as well – but only while full bleed is on, otherwise the
+ * chart keeps sharing the text edge on all sides.
+ */
+export function chartSlotBottomMargin(config: ResolvedConfig): number {
+  const bottomFree = !config.chart.showAxis;
+  return config.chart.fullBleed && bottomFree ? -config.padding : 0;
+}
+
 /** All entity ids this configuration listens to. */
 export function configEntityIds(config: ResolvedConfig): string[] {
   const ids = [

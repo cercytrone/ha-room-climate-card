@@ -24,6 +24,7 @@ import {
   timeTicks,
   type ChartSample,
   type GapMode,
+  type Point,
   type SeriesSegment,
 } from './geometry';
 import { BAND_COLD, BAND_HOT, BAND_WARM, bandColorAt, bandStops } from './bands';
@@ -609,7 +610,12 @@ export class RoomClimateChart extends LitElement {
     // Below this height the labels would collide with the curves, so they are
     // dropped; the editor switch removes them on purpose and frees the space.
     const showAxis = this.showAxis && chartHeight >= 62;
-    const axisSpace = showAxis ? 20 : 2;
+    /*
+     * Without the time row there is no text below the plot, so the plot runs to
+     * the bottom edge (half a pixel keeps the 1 px baseline visible). The card
+     * cancels its bottom inset in that case.
+     */
+    const axisSpace = showAxis ? 20 : 0.5;
     const top = 6;
     const bottom = chartHeight - axisSpace;
     const plotHeight = Math.max(6, bottom - top);
@@ -623,6 +629,13 @@ export class RoomClimateChart extends LitElement {
      */
     const right = width - 1 - END_DOT_RADIUS;
     /*
+     * The data is drawn to the very edge, only the time scale ends a dot radius
+     * early. "Hold" the last value over that strip, so the line and its area
+     * reach the edge instead of leaving an unfilled 3 px band next to the
+     * "now" dot.
+     */
+    const edgeRight = width - 1;
+    /*
      * The "Soll" caption is text, and the chart now touches the card's edge:
      * without a couple of pixels it would sit right on that edge.
      */
@@ -631,7 +644,10 @@ export class RoomClimateChart extends LitElement {
     const x = linearScale([this.start, this.end], [left, right]);
     // The curves may run into the rounded corners, the labels may not.
     const cornerInset = showAxis ? Math.min(Math.max(this.cornerRadius, 0), 30) + 2 : 0;
-    const labelX = linearScale([this.start, this.end], [left + cornerInset, right - cornerInset]);
+    const labelX = linearScale(
+      [this.start, this.end],
+      [left + cornerInset, edgeRight - cornerInset]
+    );
     const labelBaseline = chartHeight - 6;
 
     /*
@@ -803,7 +819,7 @@ export class RoomClimateChart extends LitElement {
     if (this.showGrid) {
       for (let i = 1; i < 3; i++) {
         const y = top + (plotHeight * i) / 3;
-        gridLines.push(svg`<line class="grid-line" x1=${left} x2=${right} y1=${y} y2=${y} />`);
+        gridLines.push(svg`<line class="grid-line" x1=${left} x2=${edgeRight} y1=${y} y2=${y} />`);
       }
     }
 
@@ -819,8 +835,16 @@ export class RoomClimateChart extends LitElement {
       </text>`;
     });
 
+    const holdToEdge = (points: Point[]): Point[] => {
+      if (points.length < 2) return points;
+      const last = points[points.length - 1];
+      // Only the run that actually reaches "now" gets the flat tail.
+      if (last.x < right - 0.75) return points;
+      return [...points, { x: edgeRight, y: last.y }];
+    };
+
     const projectPoints = (samples: ChartSample[], y: (value: number) => number) =>
-      projectRun(samples, x, y);
+      holdToEdge(projectRun(samples, x, y));
 
     const linePaths = (segment: SeriesSegment, y: (value: number) => number) => {
       // Dashed gap style: interpolated stretches are drawn as separate paths so
@@ -1113,7 +1137,7 @@ export class RoomClimateChart extends LitElement {
          * edge instead of the 2 px that were enough while it always sat inside
          * the card inset.
          */
-        if (anchor === 'start' && labelX + textWidth > right - EXTREME_EDGE_GAP) {
+        if (anchor === 'start' && labelX + textWidth > edgeRight - EXTREME_EDGE_GAP) {
           labelX = entry.cx - 6;
           anchor = 'end';
         } else if (anchor === 'end' && labelX - textWidth < left + EXTREME_EDGE_GAP) {
@@ -1122,7 +1146,7 @@ export class RoomClimateChart extends LitElement {
         }
         // "Soll" lives at the very edge of the plot: step aside instead of
         // printing two numbers on top of each other.
-        const captionX = captionOnRight ? right - captionInset : left + captionInset;
+        const captionX = captionOnRight ? edgeRight - captionInset : left + captionInset;
         const captionClash = (x: number): boolean =>
           showSetpoint &&
           setpointY !== null &&
@@ -1138,7 +1162,7 @@ export class RoomClimateChart extends LitElement {
         // Whatever the flips did: the number keeps its gap to the chart edge.
         labelX =
           anchor === 'start'
-            ? Math.min(labelX, right - EXTREME_EDGE_GAP - textWidth)
+            ? Math.min(labelX, edgeRight - EXTREME_EDGE_GAP - textWidth)
             : Math.max(labelX, left + EXTREME_EDGE_GAP + textWidth);
         extremeMarks.push(
           svg`<circle
@@ -1251,14 +1275,14 @@ export class RoomClimateChart extends LitElement {
           ></line>
           <text
             class="setpoint-caption"
-            x=${captionOnRight ? right - captionInset : left + captionInset}
+            x=${captionOnRight ? edgeRight - captionInset : left + captionInset}
             y=${setpointY - 5}
             text-anchor=${captionOnRight ? 'end' : 'start'}
           >
             ${this.labels.setpoint}
           </text>`
         : nothing}
-      <line class="baseline" x1=${left} x2=${right} y1=${bottom} y2=${bottom} />
+      <line class="baseline" x1=${left} x2=${edgeRight} y1=${bottom} y2=${bottom} />
       ${humidityPaths} ${tempPaths} ${pointMarkers}
       ${lastHumidity && humidityY
         ? svg`<circle
