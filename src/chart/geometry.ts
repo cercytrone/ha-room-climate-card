@@ -470,11 +470,15 @@ function overshoot(y0: number, y1: number, m0: number, m1: number, dx: number): 
   return worst;
 }
 
-export function smoothPath(points: Point[]): string {
-  if (points.length === 0) return '';
-  if (points.length === 1) return `M ${round(points[0].x)} ${round(points[0].y)}`;
-  if (points.length === 2) return linePath(points);
-
+/**
+ * Tangents of the drawn curve (one per point) plus the horizontal gaps.
+ *
+ * Shared by `smoothPath` (one `d` for the whole curve) and `seriesPieces` (one
+ * `d` per interval, used where every piece needs its own colour). Pulling the
+ * maths out keeps both variants the *same* curve – a coloured curve must not
+ * bulge differently from a single-colour one.
+ */
+function curveTangents(points: Point[]): { dx: number[]; tangents: number[] } {
   const count = points.length;
   const dx: number[] = [];
   const slope: number[] = [];
@@ -532,6 +536,16 @@ export function smoothPath(points: Point[]): string {
     for (let i = 0; i < count; i++) factors[i] *= limits[i];
   }
   for (let i = 0; i < count; i++) tangents[i] *= factors[i];
+  return { dx, tangents };
+}
+
+export function smoothPath(points: Point[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${round(points[0].x)} ${round(points[0].y)}`;
+  if (points.length === 2) return linePath(points);
+
+  const count = points.length;
+  const { dx, tangents } = curveTangents(points);
 
   let path = `M ${round(points[0].x)} ${round(points[0].y)}`;
   for (let i = 0; i < count - 1; i++) {
@@ -548,6 +562,62 @@ export function smoothPath(points: Point[]): string {
 
 export function seriesPath(points: Point[], smooth: boolean): string {
   return smooth ? smoothPath(points) : linePath(points);
+}
+
+/**
+ * One interval of the drawn curve.
+ *
+ * `command` continues a path that already sits on `from`; joining the commands
+ * of a run – `M from.x from.y` plus one command per piece – reproduces exactly
+ * the `d` that `seriesPath` would have written for the same run.
+ */
+export interface CurvePiece {
+  from: Point;
+  to: Point;
+  command: string;
+}
+
+/**
+ * The same curve as `seriesPath`, cut into its intervals.
+ *
+ * Needed where a single `d` cannot carry the paint: the temperature bands give
+ * every piece of the curve a colour of its own, and one path can only have one
+ * `stroke`. The pieces use the identical tangents, so the assembled curve is not
+ * a redrawn approximation.
+ */
+export function seriesPieces(points: Point[], smooth: boolean): CurvePiece[] {
+  if (points.length < 2) return [];
+  const pieces: CurvePiece[] = [];
+  if (!smooth || points.length === 2) {
+    for (let i = 1; i < points.length; i++) {
+      const from = points[i - 1];
+      const to = points[i];
+      pieces.push({
+        from,
+        to,
+        command: `L ${round(to.x)} ${round(to.y)}`,
+      });
+    }
+    return pieces;
+  }
+
+  const { dx, tangents } = curveTangents(points);
+  for (let i = 0; i < points.length - 1; i++) {
+    const from = points[i];
+    const to = points[i + 1];
+    const firstX = from.x + dx[i] / 3;
+    const firstY = from.y + (tangents[i] * dx[i]) / 3;
+    const secondX = to.x - dx[i] / 3;
+    const secondY = to.y - (tangents[i + 1] * dx[i]) / 3;
+    pieces.push({
+      from,
+      to,
+      command: `C ${round(firstX)} ${round(firstY)}, ${round(secondX)} ${round(secondY)}, ${round(
+        to.x
+      )} ${round(to.y)}`,
+    });
+  }
+  return pieces;
 }
 
 export function areaPath(points: Point[], baseline: number, smooth: boolean): string {

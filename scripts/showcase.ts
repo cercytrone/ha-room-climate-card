@@ -22,7 +22,14 @@ import {
   type ChartSample,
   type Point,
 } from '../src/chart/geometry';
-import { BAND_COLD, BAND_HOT, BAND_WARM, bandColorAt, bandStops } from '../src/chart/bands';
+import {
+  BAND_COLD,
+  BAND_HOT,
+  BAND_WARM,
+  bandColorAtOffset,
+  bandStops,
+  bandStrokeRuns,
+} from '../src/chart/bands';
 
 const W = 1000;
 const PAD = 24;
@@ -266,8 +273,9 @@ function renderCard(options: CardOptions): string {
    * chart) and keeps one dot radius free on the right, so the "now" dot stays
    * whole – same numbers as the web component.
    */
-  const chartLeft = x + 1;
-  const chartEdge = x + cardW - 1;
+  // Zero on both sides: the slot already sits inside the card's hairline.
+  const chartLeft = x;
+  const chartEdge = x + cardW;
   /*
    * The time scale ends one dot radius early so the "now" dot stays whole; the
    * drawn line and its area hold the last value out to the card edge.
@@ -331,6 +339,15 @@ function renderCard(options: CardOptions): string {
   const bandColors = { cold: BAND_COLD, normal: C.accent, warm: BAND_WARM, hot: BAND_HOT };
   const bandGradient =
     options.bands && tempDomain ? bandStops(tempDomain, bandLimits, bandColors) : null;
+  /*
+   * The card paints the banded curve in solid runs instead of handing the stroke
+   * a gradient (some WebViews drop it). Same here, so the previews show what the
+   * card really draws.
+   */
+  const bandOffsetAt = (y: number): number =>
+    chartBottom === temperatureBandTop
+      ? 0
+      : (y - temperatureBandTop) / (chartBottom - temperatureBandTop);
   const humidityScale = humidityDomain
     ? linearScale(humidityDomain, [humidityBandBottom, chartTop])
     : null;
@@ -369,9 +386,25 @@ function renderCard(options: CardOptions): string {
     ? temperatureRuns
         .map((run) => {
           const points: Point[] = holdToEdge(run, tempScale);
-          return `<path d="${seriesPath(points, smooth)}" fill="none" stroke="${
-            options.bands ? `url(#${options.cardId}-temp-stroke)` : C.accent
-          }" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"${fade} />`;
+          if (bandGradient) {
+            /*
+             * Butt caps between the runs (round ones paint a disc of the old
+             * colour on every joint) and one opacity for the whole group: the
+             * runs overlap a fraction of a pixel, and per-path opacity would show
+             * every overlap as a darker spot.
+             */
+            const paints = bandStrokeRuns(points, smooth, bandGradient, bandOffsetAt);
+            const group = alpha < 1 ? ` opacity="${alpha}"` : '';
+            return `<g${group}>${paints
+              .map(
+                (paint, index) =>
+                  `<path d="${paint.d}" fill="none" stroke="${paint.color}" stroke-width="1.9" stroke-linecap="${
+                    index === 0 || index === paints.length - 1 ? 'round' : 'butt'
+                  }" stroke-linejoin="round" />`
+              )
+              .join('')}</g>`;
+          }
+          return `<path d="${seriesPath(points, smooth)}" fill="none" stroke="${C.accent}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"${fade} />`;
         })
         .join('')
     : '';
@@ -593,12 +626,12 @@ function renderCard(options: CardOptions): string {
       ? (() => {
           const run = temperatureRuns[temperatureRuns.length - 1];
           const last = run[run.length - 1];
+          // Same source as the card: the dot takes the ramp colour at its own height.
+          const dotY = tempScale(valueOf(last));
           const dotColor = bandGradient
-            ? bandColorAt(valueOf(last), bandLimits, bandColors)
+            ? bandColorAtOffset(bandGradient, bandOffsetAt(dotY))
             : C.accent;
-          return `<circle cx="${xScale(last.t).toFixed(1)}" cy="${tempScale(
-            valueOf(last)
-          ).toFixed(1)}" r="2.8" fill="${dotColor}" fill-opacity="${alpha}" stroke="${
+          return `<circle cx="${xScale(last.t).toFixed(1)}" cy="${dotY.toFixed(1)}" r="2.8" fill="${dotColor}" fill-opacity="${alpha}" stroke="${
             C.card
           }" stroke-width="1.4" />`;
         })()
@@ -772,15 +805,6 @@ function renderCard(options: CardOptions): string {
         <stop offset="1" stop-color="${C.accent}" stop-opacity="0" />`
         }
       </linearGradient>
-      ${
-        bandGradient
-          ? `<linearGradient id="${options.cardId}-temp-stroke" gradientUnits="userSpaceOnUse" x1="0" y1="${temperatureBandTop}" x2="0" y2="${chartBottom}">
-        ${bandGradient
-          .map((stop) => `<stop offset="${stop.offset}" stop-color="${stop.color}" />`)
-          .join('')}
-      </linearGradient>`
-          : ''
-      }
       <linearGradient id="${options.cardId}-area-humidity" gradientUnits="userSpaceOnUse" x1="0" y1="${chartTop}" x2="0" y2="${humidityBandBottom}">
         <stop offset="0" stop-color="${C.secondary}" stop-opacity="${Math.min(1, 0.2 * area).toFixed(3)}" />
         <stop offset="0.6" stop-color="${C.secondary}" stop-opacity="${Math.min(1, 0.07 * area).toFixed(3)}" />

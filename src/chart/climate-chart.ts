@@ -27,7 +27,15 @@ import {
   type Point,
   type SeriesSegment,
 } from './geometry';
-import { BAND_COLD, BAND_HOT, BAND_WARM, bandColorAt, bandStops } from './bands';
+import {
+  BAND_COLD,
+  BAND_HOT,
+  BAND_WARM,
+  bandColorAt,
+  bandColorAtOffset,
+  bandStops,
+  bandStrokeRuns,
+} from './bands';
 
 /**
  * Decimates a segment for rendering but keeps the `bridged` flags aligned with
@@ -619,7 +627,12 @@ export class RoomClimateChart extends LitElement {
     const top = 6;
     const bottom = chartHeight - axisSpace;
     const plotHeight = Math.max(6, bottom - top);
-    const left = 1;
+    /*
+     * Zero, not one: the slot already starts on the inside of the card's
+     * hairline, and every extra pixel of its own showed up as a light gap
+     * between the fill and the side of the card on a large screen.
+     */
+    const left = 0;
     /*
      * The chart runs to the card's outer edge (the card cancels its inset for
      * the chart), so the last dot would otherwise be cut in half by that edge.
@@ -634,7 +647,7 @@ export class RoomClimateChart extends LitElement {
      * reach the edge instead of leaving an unfilled 3 px band next to the
      * "now" dot.
      */
-    const edgeRight = width - 1;
+    const edgeRight = width;
     /*
      * The "Soll" caption is text, and the chart now touches the card's edge:
      * without a couple of pixels it would sit right on that edge.
@@ -713,7 +726,17 @@ export class RoomClimateChart extends LitElement {
             this.bandTransition
           )
         : null;
-    const temperatureColor = bandGradient ? `url(#${this.uid}-temp-stroke)` : this.accentColor;
+    /*
+     * `stroke:url(#…)` is not reliable: in some WebViews (the Home Assistant
+     * app among them) the *stroke* of a path silently ignores the paint server
+     * and the curve comes out in one flat colour while the area underneath keeps
+     * its gradient. The curve is therefore painted in short runs of solid
+     * colour, read from the very same stops as the area gradient.
+     */
+    const bandOffsetAt = (y: number): number =>
+      temperatureBottom === temperatureTop
+        ? 0
+        : (y - temperatureTop) / (temperatureBottom - temperatureTop);
     const opacityStyle = opacityFactor < 1 ? `;stroke-opacity:${opacityFactor}` : '';
     /*
      * The area strength is a multiplier on top of the built-in falloff, so the
@@ -846,41 +869,87 @@ export class RoomClimateChart extends LitElement {
     const projectPoints = (samples: ChartSample[], y: (value: number) => number) =>
       holdToEdge(projectRun(samples, x, y));
 
-    const linePaths = (segment: SeriesSegment, y: (value: number) => number) => {
-      // Dashed gap style: interpolated stretches are drawn as separate paths so
-      // they can be recognised as "no measurement here".
+    /*
+     * A series as drawn: whole paths, or – with the bands on – runs of solid
+     * colour. Dashed gap style already splits interpolated stretches into their
+     * own paths so they read as "no measurement here"; the runs follow that
+     * split instead of undoing it.
+     */
+    const linePaints = (
+      segment: SeriesSegment,
+      y: (value: number) => number,
+      banded: boolean
+    ): Array<{ d: string; color?: string }> => {
       const parts =
         this.gapStyle === 'dashed' ? splitAtBridges(segment) : [segment.samples];
       return parts
         .filter((part) => part.length > 1)
-        .map((part) => seriesPath(projectPoints(part, y), smooth))
-        .filter((path) => path.length > 0);
+        .flatMap((part) => {
+          const points = projectPoints(part, y);
+          if (!banded || !bandGradient) {
+            return [{ d: seriesPath(points, smooth).concat() }];
+          }
+          return bandStrokeRuns(points, smooth, bandGradient, bandOffsetAt);
+        })
+        .filter((paint) => paint.d.length > 0);
     };
 
     const seriesElement = (
       segment: SeriesSegment,
       y: (value: number) => number,
       stroke: string,
-      options: { color?: string; dashed?: boolean; width?: number } = {}
+      options: {
+        color?: string;
+        dashed?: boolean;
+        width?: number;
+        banded?: boolean;
+      } = {}
     ): TemplateResult[] => {
-      const paths = linePaths(segment, y);
-      return paths.map((path) => {
+      const paints = linePaints(segment, y, options.banded === true);
+      /*
+       * Colour runs are grouped and dimmed *as a group*: neighbouring runs
+       * overlap by a fraction of a pixel (otherwise anti-aliasing leaves a
+       * dotted seam), and per-path opacity would show every overlap as a darker
+       * spot. A group is composited once, so the overlaps stay invisible.
+       */
+      const groupStyle = opacityFactor < 1 ? `opacity:${opacityFactor}` : '';
+      const paths = paints.map(({ d, color }, index) => {
+        /*
+         * Colour runs butt against each other: the curve is C1 continuous, so
+         * the flat ends of two neighbouring runs share their normal and close
+         * without a seam. Round caps would put a small disc of the old colour on
+         * every joint – at one run per sample that reads as a dotted line.
+         * Only the two visible ends of the whole curve stay round.
+         */
+        const cap =
+          options.banded && paints.length > 1
+            ? `stroke-linecap:${index === 0 || index === paints.length - 1 ? 'round' : 'butt'};`
+            : '';
         const style = [
-          options.color ? `stroke:${options.color}` : `stroke:${stroke}`,
+          `stroke:${color ?? options.color ?? stroke}`,
+          cap,
           options.width ? `stroke-width:${options.width}` : '',
           options.dashed ? 'stroke-dasharray:0.1 5.5' : '',
-          opacityStyle.replace(/^;/, ''),
+          options.banded ? '' : opacityStyle.replace(/^;/, ''),
         ]
           .filter(Boolean)
           .join(';');
-        return svg`<path class="series-line" d=${path} style=${style}></path>`;
+        return svg`<path class="series-line" d=${d} style=${style}></path>`;
       });
+      if (!options.banded || paints.length < 2) return paths;
+      return [svg`<g class="series-runs" style=${groupStyle}>${paths}</g>`];
     };
 
-    // One colour, drawn straight: the old gradient had two identical stops and
-    // therefore never changed anything – it only forced a `url(#…)` indirection.
+    /*
+     * One colour (the accent) or – with the bands on – the same ramp the area
+     * uses, cut into solid runs. Either way the stroke carries a real colour and
+     * never a paint server, which is what the app's WebView drops.
+     */
     const tempPaths = tempSegments.flatMap((segment) =>
-      seriesElement(segment, tempY!, temperatureColor, { color: temperatureColor })
+      seriesElement(segment, tempY!, this.accentColor, {
+        color: this.accentColor,
+        banded: bandGradient !== null,
+      })
     );
 
     // Restrained area fills, one per series and each one inside its own band.
@@ -1245,15 +1314,6 @@ export class RoomClimateChart extends LitElement {
               svg`<stop offset=${stop.offset} stop-color=${stop.color} stop-opacity=${stop.opacity} />`
           )}
         </linearGradient>
-        ${
-          bandGradient
-            ? svg`<linearGradient id=${`${this.uid}-temp-stroke`} x1="0" y1=${temperatureTop} x2="0" y2=${temperatureBottom} gradientUnits="userSpaceOnUse">
-                ${bandGradient.map(
-                  (stop) => svg`<stop offset=${stop.offset} stop-color=${stop.color} />`
-                )}
-              </linearGradient>`
-            : nothing
-        }
         <linearGradient id=${`${this.uid}-humidity-fill`} x1="0" y1=${humidityTop} x2="0" y2=${humidityBottom} gradientUnits="userSpaceOnUse">
           ${humidityFillStops.map(
             (stop) =>
@@ -1282,7 +1342,16 @@ export class RoomClimateChart extends LitElement {
             ${this.labels.setpoint}
           </text>`
         : nothing}
-      <line class="baseline" x1=${left} x2=${edgeRight} y1=${bottom} y2=${bottom} />
+      ${
+        /*
+         * With the time row the baseline separates plot and labels. Without it
+         * the plot ends on the card's own edge – a second line there read as a
+         * thicker border than the sides.
+         */
+        showAxis
+          ? svg`<line class="baseline" x1=${left} x2=${edgeRight} y1=${bottom} y2=${bottom} />`
+          : nothing
+      }
       ${humidityPaths} ${tempPaths} ${pointMarkers}
       ${lastHumidity && humidityY
         ? svg`<circle
@@ -1301,11 +1370,7 @@ export class RoomClimateChart extends LitElement {
             cy=${tempY(lastTemp.v as number)}
             style=${`fill:${
               bandGradient
-                ? bandColorAt(
-                    lastTemp.v as number,
-                    { coldBelow: this.bandCold, warmAbove: this.bandWarm, hotAbove: this.bandHot },
-                    { cold: BAND_COLD, normal: this.accentColor, warm: BAND_WARM, hot: BAND_HOT }
-                  )
+                ? bandColorAtOffset(bandGradient, bandOffsetAt(tempY(lastTemp.v as number)))
                 : this.accentColor
             };fill-opacity:${opacityFactor}`}
           />`

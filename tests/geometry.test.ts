@@ -17,6 +17,7 @@ import {
   padDomain,
   seriesExtremes,
   seriesPath,
+  seriesPieces,
   MAX_OVERSHOOT,
   smoothPath,
   SMOOTHING_LEVELS,
@@ -778,5 +779,46 @@ describe('axis helpers', () => {
     expect(extremes?.min.t).toBe(180_000);
     expect(seriesExtremes([{ t: 0, v: null }])).toBeNull();
     expect(seriesExtremes([])).toBeNull();
+  });
+});
+
+describe('series pieces', () => {
+  const points = [
+    { x: 0, y: 40 },
+    { x: 20, y: 30 },
+    { x: 40, y: 34 },
+    { x: 70, y: 12 },
+    { x: 90, y: 26 },
+  ];
+
+  it('rebuilds exactly the curve of seriesPath', () => {
+    /* One `d` per interval is what a per-colour curve needs; it must not be a
+     * redrawn curve, so the assembled path has to match character by character. */
+    const pieces = seriesPieces(points, true);
+    const rebuilt = `M ${points[0].x} ${points[0].y} ${pieces.map((piece) => piece.command).join(' ')}`;
+    expect(rebuilt).toBe(seriesPath(points, true));
+  });
+
+  it('continues from piece to piece without a jump', () => {
+    const pieces = seriesPieces(points, true);
+    expect(pieces).toHaveLength(points.length - 1);
+    pieces.forEach((piece, index) => {
+      expect(piece.from).toEqual(points[index]);
+      expect(piece.to).toEqual(points[index + 1]);
+    });
+  });
+
+  it('draws straight lines when smoothing is off', () => {
+    const pieces = seriesPieces(points, false);
+    expect(pieces.map((piece) => piece.command)).toEqual([
+      'L 20 30',
+      'L 40 34',
+      'L 70 12',
+      'L 90 26',
+    ]);
+  });
+
+  it('returns nothing for a single point', () => {
+    expect(seriesPieces([{ x: 3, y: 4 }], true)).toEqual([]);
   });
 });
