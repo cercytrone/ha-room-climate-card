@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.16.2`.
+  `ROOM-CLIMATE-CARD v2.16.3`.
 
 ---
 
@@ -282,13 +282,13 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 | `chart_humidity_area_opacity` | number | `100` | Dasselbe für den Flächenverlauf unter der Feuchtekurve (10–300), unabhängig von der Temperatur. |
 | `chart_show_points` | boolean | `false` | Dezente Datenpunkte. |
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
-| `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile entfällt, die Kurven bekommen den Platz und laufen bis zur unteren Kartenkante (bei bündigem Verlauf). |
+| `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile **und** die Haarlinie darüber entfallen, die Kurven bekommen den Platz und laufen bis zur unteren Kartenkante (bei bündigem Verlauf). |
 | `chart_full_bleed` | boolean | `true` | Der Verlauf läuft bündig bis zur Außenkante (Kurven und Flächen werden von der Rundung beschnitten). `false` lässt ihn auf derselben Kante wie den Text enden – Editor: *Verlauf* → **Verlauf bündig zur Kartenkante**. |
 | `chart_show_setpoint` | boolean | `true` | Gestrichelte Soll-Linie samt „Soll“-Beschriftung im Verlauf. Aus: nur Messwerte im Chart; die Solltemperatur bleibt in der Statuszeile (eigener Schalter `show_setpoint`). |
 | `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
 | `chart_show_extremes` | boolean | `true` | Minimum und Maximum der sichtbaren Kurven als dezente Zahlen neben der Kurve. |
 | `chart_opacity` | number | `100` | Deckkraft der Kurven in Prozent (15–100). Gilt für Linien, Flächen und Datenpunkte; darunter tritt der Verlauf ruhiger hinter die Messwerte zurück. |
-| `chart_temperature_bands` | boolean | `false` | Temperaturkurve nach Bereich einfärben: kalt / normal / warm / heiß, als ein weicher Verlauf. |
+| `chart_temperature_bands` | boolean | `false` | Temperaturkurve nach Bereich einfärben: kalt / normal / warm / heiß, als ein weicher Verlauf (Kurve und Fläche in denselben Farben). |
 | `chart_band_cold_below` | number | `18` | Grenze „kalt“ in °C. Darunter blau. |
 | `chart_band_warm_above` | number | `24` | Grenze „warm“ in °C. Darüber amber. |
 | `chart_band_hot_above` | number | `27` | Grenze „heiß“ in °C. Darüber das gedämpfte Rot der Flamme. |
@@ -342,12 +342,13 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
   rechts auf, Kurven und Flächenverläufe berühren also die Kante der Karte; die Rundung
   beschneidet sie. Abschaltbar über `chart_full_bleed: false` (Editor: *Verlauf* → **Verlauf
   bündig zur Kartenkante**) – dann endet der Verlauf auf derselben Kante wie der Text.
-  Die Zeitachse endet einen Markenradius (2,8 px) vor der Außenkante, damit die „Jetzt“-Marke
-  nicht halb in der Kante verschwindet und exakt auf dem gezeichneten Endpunkt sitzt; Kurve und
-  Flächenverlauf halten den letzten Wert aber flach bis zur echten Kante, so dass neben der
-  Marke kein leerer Streifen bleibt. Die Zeitachse behält ihren eigenen Sicherheitsabstand zum
-  Eckenradius (28 px im Chart), die „Soll“-Beschriftung rückt 3 px und jede Min/Max-Zahl 6 px von
-  der Kante ab.
+  Links wie rechts ohne einen Pixel Zwischenraum: der Chart beginnt auf der Innenseite der
+  Haarlinie bei `x = 0` und endet auf der Außenkante. Die Zeitachse endet einen Markenradius
+  (2,8 px) vor dieser Kante, damit die „Jetzt“-Marke nicht halb darin verschwindet und exakt auf
+  dem gezeichneten Endpunkt sitzt; Kurve und Flächenverlauf halten den letzten Wert aber flach
+  bis zur echten Kante, so dass neben der Marke kein leerer Streifen bleibt. Die Zeitachse
+  behält ihren eigenen Sicherheitsabstand zum Eckenradius (28 px im Chart), die
+  „Soll“-Beschriftung rückt 3 px und jede Min/Max-Zahl 6 px von der Kante ab.
 - **Tabellenziffern:** `tnum` plus negatives Tracking – der große Wert springt bei
   Aktualisierungen nicht mehr. Einheiten sind eigene, kleinere Sekundärschrift, Labels stehen
   in Versalien mit 0,09 em Laufweite.
@@ -359,7 +360,9 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
   „Sa 05:40 · So 05:40 · Jetzt“. Abschaltbar: `chart_show_axis: false` (Editor: *Verlauf* →
   **Zeitangaben unter dem Verlauf**) entfernt die unterste Zeile vollständig; die Kurven nutzen
   den freien Platz und laufen bis zur unteren Kartenkante durch (nur bei bündigem Verlauf), die
-  Zeit steht weiterhin im Tooltip und in der Screenreader-Beschreibung.
+  Zeit steht weiterhin im Tooltip und in der Screenreader-Beschreibung. Mit der Zeile entfällt
+  auch die Haarlinie: sie trennte Plot und Beschriftung, auf der Kartenkante selbst würde sie
+  wie ein dickerer unterer Rahmen wirken.
 - **Hell und dunkel:** beide Varianten sind vollständig ausgestaltet und respektieren
   `theme: auto` (HA-Theme). Die Akzentfarben bleiben in beiden Themes identisch – das
   Erscheinungsbild ändert sich, die Bedeutung der Farben nicht.
@@ -539,10 +542,16 @@ Die Temperaturkurve trägt standardmäßig **eine** Farbe: den Akzent. Auf Wunsc
 | **heiß** | das gedämpfte Rot der Flamme `#D16A62` | ab 27 °C |
 
 - **Ein Verlauf, keine Blöcke.** Die Farben liegen als senkrechter Verlauf über der ganzen
-  Temperaturfläche. Jeder Punkt der Kurve nimmt automatisch die Farbe seines eigenen Werts an;
-  die Farbe fließt über den **ganzen Abstand zwischen zwei Grenzen**, statt an der Grenze
-  umzuschalten. Die Kurve bleibt dabei **ein** SVG-Pfad – keine zusätzlichen Knoten, kein Sprung
-  bei Aktualisierungen.
+  Temperaturfläche; die *Kurve* bekommt dieselben Farben in kurzen, lückenlos aneinander
+  schließenden Stücken (rund 1/32 des Verlaufs pro Stufe, an den Stößen überlappt um
+  Bruchteile eines Pixels). Jeder Punkt der Kurve trägt so die Farbe seines eigenen Werts, die
+  Farbe fließt über den **ganzen Abstand zwischen zwei Grenzen**, statt an der Grenze
+  umzuschalten.
+- **Warum nicht `stroke: url(#…)`?** Ein Farbverlauf als *Linienfarbe* wird nicht von jeder
+  WebView gezeichnet – in der Home Assistant App kam die Kurve deshalb einfarbig heraus,
+  während die Fläche darunter korrekt verlief. Die Stücke sind derselbe Verlauf, nur vorher
+  ausgelesen; sie kosten keine zusätzlichen Rechenoperationen und sehen in jedem Browser gleich
+  aus.
 - **Übergang regelbar.** `chart_band_transition` (Editor: *Verlauf* → **Übergang zwischen den
   Bereichen**, ein Schieberegler) stellt ein, wie weich der Wechsel ist: `0` zeichnet harte
   Stufen genau an den Grenzen, `100` (Standard) lässt die Farbe durchgehend fließen, jeder Wert
@@ -559,7 +568,8 @@ Die Temperaturkurve trägt standardmäßig **eine** Farbe: den Akzent. Auf Wunsc
   automatisch umgerechnet (18 °C → 64,4 °F), damit der Verlauf zur gezeichneten Kurve passt.
 - **Zugänglich.** Ein Farbverlauf allein sagt einem Screenreader nichts; deshalb steht der
   Bereich in der Beschreibung des Charts: „Temperatur 16,9–28,9 °C (kalt – heiß)“.
-- **Ausschalten** entfernt den Verlauf vollständig: die Kurve ist wieder einfarbig im Akzent.
+- **Ausschalten** entfernt den Verlauf vollständig: die Kurve ist wieder einfarbig im Akzent –
+  ein einziger Pfad, wie zuvor.
 
 **Deckkraft.** `chart_opacity` (Editor: *Deckkraft der Kurven*, 15–100 %) skaliert Linien,
 Flächen, Endpunkte und Datenpunkte gemeinsam. Die Flächenverläufe behalten dabei ihre relative
@@ -753,7 +763,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 385 Tests in 13 Dateien aus (Stand 2.16.2):
+`npm test` führt 399 Tests in 13 Dateien aus (Stand 2.16.3):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
@@ -761,7 +771,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 | `tests/states.test.ts` | Sensor-/Fenster-/Bewegungs-/Thermostat-Auswertung inkl. `unavailable`, `unknown`, fehlendem `hvac_action` |
 | `tests/history.test.ts` | WebSocket- und REST-Parsing, Lücken, Sortierung, Caching, parallele Requests, Fehler |
 | `tests/geometry.test.ts` | Skalen, Aufbereitung/Clipping, Ausfall-Erkennung, Interpolation überbrückter Abschnitte, Kantenverlängerung, Aufteilen an Brücken, Pfade, Überschwingfreiheit, Farbverläufe, Achsen, Dezimierung mit erhaltenem Minimum/Maximum, Suche nach dem nächsten Messwert (lückenüberspringend), Reihen-Extrema |
-| `tests/bands.test.ts` | Sortieren und Auseinanderziehen der Bereichsgrenzen, Farbwahl je Wert, Gradientverlauf (Reihenfolge, Abdeckung aller Stufen, schmale Übergänge), Randfälle ohne Spannweite |
+| `tests/bands.test.ts` | Sortieren und Auseinanderziehen der Bereichsgrenzen, Farbwahl je Wert, Gradientverlauf (Reihenfolge, Abdeckung aller Stufen, schmale Übergänge), Auslesen der Kurvenfarben aus dem Verlauf, Stücke der eingefärbten Kurve (Überlappung, Zusammenfassen, Stufen), Randfälle ohne Spannweite |
 | `tests/chart.test.ts` | Leer-/Lade-/Fehlerzustand, gepunktete Feuchtekurve, SVG-Größe, Resize ohne Verzerrung, durchgehende Linie bei konstanten Phasen und kurzen Ausfällen, `break`-Modus, maximale Brücke, eine Fläche trotz echtem Loch, gestrichelte Brücken, Label-Abstand zu den Ecken, Soll-Referenzlinie, Feuchteband, Einzelkurve mit ganzer Plotfläche, Achsenbeschriftung inkl. Zeitzone/12-h-Format, Sollwert und Messbereich im `aria-label`, Punkte, Gitter, Wertanzeige auf den echten Messwerten, Verhalten bei Berührung, Min/Max-Marken, einfarbige vs. bereichsgefärbte Kurve, Deckkraft für Linie/Fläche/Punkt, Stärke je Fläche (und ihre Multiplikation mit der Deckkraft), Bereichsnamen im `aria-label` |
 | `tests/card.test.ts` | Rendering, Formatierung, Akzent-/Sekundärfarbe, unabhängige Schriftgrößen/-arten je Messwert, 4-px-Raster, Heizzeile (rot/grün/grau/unbekannt), Messwerte als Text, alle optionalen Bereiche an/aus, Höhe/Dichte, Historien-Laden, Fehlerfälle, Aufräumen der Observer, Pausieren außerhalb des Sichtfelds, Sollwert-Umrechnung, Einheiten und Nachkommastellen für die Wertanzeige, Öffnen des Thermostat-Dialogs (Tippen auf Karte/Messwert/Zeile, Tastatur, Karte als Tastaturziel, abschaltbar) |
 | `tests/editor.test.ts` | Abschnitte, Selektoren (inkl. Linienart Feuchte), Werte, `config-changed`, deaktivierte Felder, Persistenz, getrennte Typografie-Felder, Entwürfe für leere/unvollständige Eingaben, Farb-/Zahlen-Konvertierung, EN-Lokalisierung |

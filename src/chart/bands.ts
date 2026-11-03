@@ -1,3 +1,6 @@
+import { seriesPieces } from './geometry';
+import type { Point } from './geometry';
+
 /**
  * Colour bands for the temperature curve.
  *
@@ -168,4 +171,141 @@ export function bandStops(
   stops[0].offset = 0;
   stops[stops.length - 1].offset = 1;
   return stops;
+}
+
+/** Steps a stroke run is quantised to before neighbouring runs are merged. */
+export const BAND_LEVELS = 32;
+
+function parseHex(color: string): [number, number, number] | null {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return null;
+  const value = match[1];
+  const full =
+    value.length === 3
+      ? value
+          .split('')
+          .map((part) => part + part)
+          .join('')
+      : value;
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+}
+
+function toHex(channels: [number, number, number]): string {
+  return `#${channels
+    .map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/**
+ * Colour at one offset of the gradient, interpolated the way SVG paints it.
+ *
+ * The chart cannot hand the stroke of the temperature curve to a gradient
+ * (`stroke:url(#…)` is dropped by some WebViews – the curve then falls back to
+ * one flat colour while the *area* keeps its gradient), so the curve is painted
+ * in short runs of solid colour. This is the function that decides those
+ * colours; it reads the very same stops the area gradient uses.
+ */
+export function bandColorAtOffset(stops: readonly BandStop[], offset: number): string {
+  if (!stops.length) return '#ffffff';
+  const clamped = Math.min(1, Math.max(0, Number.isFinite(offset) ? offset : 0));
+  let before = stops[0];
+  let after = stops[stops.length - 1];
+  for (let index = 0; index < stops.length; index++) {
+    if (stops[index].offset <= clamped) before = stops[index];
+    if (stops[index].offset >= clamped) {
+      after = stops[index];
+      break;
+    }
+  }
+  const start = parseHex(before.color);
+  const end = parseHex(after.color);
+  if (!start || !end) return before.color;
+  const span = after.offset - before.offset;
+  const ratio = span <= 0 ? 0 : (clamped - before.offset) / span;
+  return toHex([
+    start[0] + (end[0] - start[0]) * ratio,
+    start[1] + (end[1] - start[1]) * ratio,
+    start[2] + (end[2] - start[2]) * ratio,
+  ]);
+}
+
+export interface StrokeRun {
+  /** Path data of this run – a run is as many curve pieces as share a colour. */
+  d: string;
+  color: string;
+}
+
+/**
+ * Cuts the curve into runs of equal colour.
+ *
+ * One path per *interval* would be hundreds of tiny elements (and hundreds of
+ * round line caps), so neighbouring intervals are merged while their quantised
+ * colour stays the same: a flat stretch becomes one path, a curve through the
+ * whole ramp a handful of them. The steps between two runs are a 32nd of the
+ * ramp, which is below what a 1.9 px line shows.
+ *
+ * `offsetAt` maps a y coordinate to the gradient offset (0 = top / hottest).
+ */
+export function bandStrokeRuns(
+  points: readonly Point[],
+  smooth: boolean,
+  stops: readonly BandStop[],
+  offsetAt: (y: number) => number
+): StrokeRun[] {
+  /*
+   * Neighbouring runs overlap by this much. Two abutting paths are antialiased
+   * separately, so their shared edge is drawn at ~50 % coverage twice – on a dark
+   * card that leaves a dotted seam. A short straight stub in the direction of the
+   * curve (it is C1 continuous there, so the stub is invisible) closes it.
+   */
+  const OVERLAP = 0.8;
+  const pieces = seriesPieces([...points], smooth);
+  const runs: StrokeRun[] = [];
+  let current: { pieces: typeof pieces; level: number } | null = null;
+
+  /** Point on the line a→b, `dist` px past `a` (negative = before `a`). */
+  const alongPoint = (a: Point, b: Point, dist: number): string => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy);
+    if (!(length > 0)) return roundPoint(a);
+    return roundPoint({ x: a.x + (dx / length) * dist, y: a.y + (dy / length) * dist });
+  };
+
+  const push = (run: { pieces: typeof pieces; level: number }): void => {
+    const first = run.pieces[0];
+    const last = run.pieces[run.pieces.length - 1];
+    const head = alongPoint(first.from, first.to, -OVERLAP);
+    const tail = alongPoint(last.to, last.from, -OVERLAP);
+    const body = run.pieces.map((piece) => piece.command).join(' ');
+    runs.push({
+      d: `M ${head} L ${roundPoint(first.from)} ${body} L ${tail}`,
+      color: bandColorAtOffset(stops, run.level / BAND_LEVELS),
+    });
+  };
+
+  for (const piece of pieces) {
+    // The middle of the interval decides: a piece may cross one level, it never
+    // crosses more than a couple of them.
+    const middle = (piece.from.y + piece.to.y) / 2;
+    const level = Math.round(Math.min(1, Math.max(0, offsetAt(middle))) * BAND_LEVELS);
+    if (current && current.level === level) {
+      current.pieces.push(piece);
+      continue;
+    }
+    if (current) push(current);
+    current = { pieces: [piece], level };
+  }
+  if (current) push(current);
+  return runs;
+}
+
+function roundPoint(point: Point): string {
+  const format = (value: number): string =>
+    Number.isFinite(value) ? (Math.round(value * 100) / 100).toString() : '0';
+  return `${format(point.x)} ${format(point.y)}`;
 }

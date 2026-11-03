@@ -65,6 +65,15 @@ function verticesOf(path: string): Array<{ x: number; y: number }> {
   return points;
 }
 
+/** Lowest y of the temperature area – the plot's own bottom edge. */
+function areaBottom(chart: RoomClimateChart): number {
+  const area = chart.shadowRoot!.querySelector('path.series-area')!.getAttribute('d') ?? '';
+  const ys = (area.match(/-?\d+(?:\.\d+)?/g) ?? [])
+    .map(Number)
+    .filter((_, index) => index % 2 === 1);
+  return Math.max(...ys);
+}
+
 function tooltipOf(chart: RoomClimateChart): HTMLElement {
   return chart.shadowRoot!.querySelector('.tooltip') as HTMLElement;
 }
@@ -781,11 +790,13 @@ describe('climate chart', () => {
     setSize(withoutAxis, 320, 112);
     await withoutAxis.updateComplete;
     expect(withoutAxis.shadowRoot!.querySelectorAll('.axis-label')).toHaveLength(0);
-    // The plot now reaches down to the bottom edge instead of stopping 20 px above it.
-    const baselineWithout = Number(
-      withoutAxis.shadowRoot!.querySelector('.baseline')!.getAttribute('y1')
-    );
-    expect(baselineWithout).toBeGreaterThan(baselineWith + 10);
+    /*
+     * The plot now reaches down to the bottom edge instead of stopping 20 px
+     * above it – and the hairline is gone with it: on the card's own edge a
+     * second line read as a thicker bottom border.
+     */
+    expect(withoutAxis.shadowRoot!.querySelector('.baseline')).toBeNull();
+    expect(areaBottom(withoutAxis)).toBeGreaterThan(baselineWith + 10);
     // Data and interaction stay untouched.
     expect(withoutAxis.shadowRoot!.querySelectorAll('.series-line').length).toBeGreaterThan(0);
     expect(withoutAxis.shadowRoot!.querySelectorAll('.end-dot').length).toBeGreaterThan(0);
@@ -811,7 +822,8 @@ describe('climate chart', () => {
       .map((path) => path.getAttribute('d') ?? '')
       .sort((a, b) => b.length - a.length)[0];
     const vertices = verticesOf(longest);
-    expect(vertices[vertices.length - 1].x).toBeCloseTo(width - 1, 1);
+    // Flush means flush: the last point sits on the outer edge of the chart box.
+    expect(vertices[vertices.length - 1].x).toBeCloseTo(width, 1);
     expect(vertices[vertices.length - 2].x).toBeCloseTo(width - 1 - 2.8, 1);
     // The hold is flat: both vertices carry the last value.
     expect(vertices[vertices.length - 1].y).toBeCloseTo(vertices[vertices.length - 2].y, 3);
@@ -820,7 +832,10 @@ describe('climate chart', () => {
     const area = chart.shadowRoot!.querySelector('path.series-area')!.getAttribute('d') ?? '';
     const areaNumbers = (area.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
     const areaXs = areaNumbers.filter((_, index) => index % 2 === 0);
-    expect(Math.max(...areaXs)).toBeCloseTo(width - 1, 1);
+    expect(Math.max(...areaXs)).toBeCloseTo(width, 1);
+    // …and on the left side the same, with no 1 px seam either.
+    expect(Math.min(...areaXs)).toBe(0);
+    expect(vertices[0].x).toBe(0);
 
     // Both end dots stay completely inside the chart area, right at the edge.
     const dots = Array.from(chart.shadowRoot!.querySelectorAll('.end-dot')) as SVGCircleElement[];
@@ -901,15 +916,13 @@ describe('climate chart', () => {
     setSize(withoutAxis, 340, 112);
     await withoutAxis.updateComplete;
     expect(withoutAxis.shadowRoot!.querySelectorAll('.axis-label')).toHaveLength(0);
-    // Without the row the plot runs to the bottom edge (0.5 px keeps the line).
-    expect(
-      Number(
-        (withoutAxis.shadowRoot!.querySelector('.baseline') as SVGLineElement).getAttribute('y1')
-      )
-    ).toBe(height - 0.5);
-    const area = withoutAxis.shadowRoot!.querySelector('path.series-area')!.getAttribute('d') ?? '';
-    const ys = (area.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter((_, index) => index % 2 === 1);
-    expect(Math.max(...ys)).toBe(height - 0.5);
+    /*
+     * Without the row the plot runs to the bottom edge (0.5 px keeps its own
+     * hairline inside the box) and the separator is dropped: the card's border
+     * is the lower edge, so it stays as thin as the sides and the top.
+     */
+    expect(withoutAxis.shadowRoot!.querySelector('.baseline')).toBeNull();
+    expect(areaBottom(withoutAxis)).toBe(height - 0.5);
   });
 
   it('hides axis labels when there is not enough height', async () => {
@@ -1202,9 +1215,9 @@ describe('climate chart', () => {
     expect(line.style.stroke).toBe('#4FD1A5');
   });
 
-  it('paints the temperature curve with one vertical gradient when the bands are on', async () => {
+  it('paints the temperature curve in solid colour runs instead of one gradient stroke', async () => {
     const chart = createChart({
-      temperature: samples([17, 22, 28]),
+      temperature: samples(Array.from({ length: 12 }, (_, index) => 17 + index)),
       accentColor: '#4FD1A5',
       temperatureBands: true,
       bandCold: 18,
@@ -1213,25 +1226,60 @@ describe('climate chart', () => {
     });
     setSize(chart, 360, 130);
     await chart.updateComplete;
-    const gradient = chart.shadowRoot!.querySelector('[id$="-temp-stroke"]');
-    expect(gradient).not.toBeNull();
-    // One gradient, not one path per stage: the curve stays a single element.
-    expect(chart.shadowRoot!.querySelectorAll('.series-line')).toHaveLength(1);
-    const line = chart.shadowRoot!.querySelector('.series-line') as SVGPathElement;
-    expect(line.style.stroke).toContain('temp-stroke');
 
-    const stops = Array.from(gradient!.querySelectorAll('stop')).map((stop) => ({
-      offset: Number(stop.getAttribute('offset')),
-      color: stop.getAttribute('stop-color'),
-    }));
-    // Top of the band = the hot end, bottom = the cold end.
-    expect(stops[0].color).toBe('#D16A62');
-    expect(stops[stops.length - 1].color).toBe('#7FA6D9');
-    // Normal stage wears the accent, so nothing new enters the palette.
-    expect(stops.map((stop) => stop.color)).toContain('#4FD1A5');
-    for (let index = 1; index < stops.length; index++) {
-      expect(stops[index].offset).toBeGreaterThanOrEqual(stops[index - 1].offset);
+    /*
+     * `stroke:url(#…)` is dropped by some WebViews (the Home Assistant app among
+     * them): the curve then comes out in one flat colour while the area keeps its
+     * gradient. The curve is painted in solid runs instead – no paint server on a
+     * stroke anywhere.
+     */
+    expect(chart.shadowRoot!.querySelector('[id$="-temp-stroke"]')).toBeNull();
+    for (const line of chart.shadowRoot!.querySelectorAll('.series-line')) {
+      expect((line as SVGPathElement).style.stroke).not.toContain('url(');
     }
+
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    expect(lines.length).toBeGreaterThan(2);
+    const colours = lines.map((line) => line.style.stroke);
+    for (const colour of colours) expect(colour).toMatch(/^#[0-9a-f]{6}$/);
+    expect(new Set(colours).size).toBeGreaterThan(2);
+
+    /* The curve rises from 17 to 28 °C: it starts cold, passes mint and ends hot. */
+    const channels = (colour: string): number[] => [
+      parseInt(colour.slice(1, 3), 16),
+      parseInt(colour.slice(3, 5), 16),
+      parseInt(colour.slice(5, 7), 16),
+    ];
+    const distance = (a: string, b: string): number => {
+      const [x, y] = [channels(a), channels(b)];
+      return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+    };
+    const first = colours[0];
+    const last = colours[colours.length - 1];
+    expect(distance(first, '#7fa6d9')).toBeLessThan(distance(first, '#d16a62'));
+    expect(distance(last, '#d16a62')).toBeLessThan(distance(last, '#7fa6d9'));
+    // Normal stage wears the accent, so nothing new enters the palette.
+    expect(colours.some((colour) => distance(colour, '#4fd1a5') < 24)).toBe(true);
+
+    /* One curve, not a staircase: the runs are wrapped as one painted group. */
+    const groups = chart.shadowRoot!.querySelectorAll('g.series-runs');
+    expect(groups).toHaveLength(1);
+    expect(groups[0].querySelectorAll('path.series-line')).toHaveLength(lines.length);
+    // Every joint is butt-capped, only the two visible ends of the curve are round.
+    const caps = lines.map((line) => line.style.strokeLinecap);
+    expect(caps[0]).toBe('round');
+    expect(caps[caps.length - 1]).toBe('round');
+    expect(caps.slice(1, -1).every((cap) => cap === 'butt')).toBe(true);
+
+    /* The area keeps its vertical gradient – that one paints fine everywhere. */
+    const gradient = chart.shadowRoot!.querySelector('[id$="-temp-fill"]');
+    expect(gradient).not.toBeNull();
+    const stops = Array.from(gradient!.querySelectorAll('stop')).map((stop) =>
+      (stop.getAttribute('stop-color') ?? '').toLowerCase()
+    );
+    expect(stops[0]).toBe('#d16a62');
+    expect(stops[stops.length - 1]).toBe('#7fa6d9');
+    expect(stops).toContain('#4fd1a5');
   });
 
   it('names the bands in the accessible description instead of leaving a gradient', async () => {
@@ -1282,6 +1330,26 @@ describe('climate chart', () => {
     expect(humidityStops[0]).toBeCloseTo(0.2 * 0.4, 3);
   });
 
+  it('dims a banded curve as one group so the overlaps do not darken', async () => {
+    const chart = createChart({
+      temperature: samples(Array.from({ length: 12 }, (_, index) => 17 + index)),
+      chartOpacity: 40,
+      temperatureBands: true,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    /*
+     * The colour runs overlap by a fraction of a pixel to hide the anti-aliasing
+     * seam. Per-path opacity would turn every overlap into a darker spot, so the
+     * group carries the opacity and the paths stay fully opaque.
+     */
+    const group = chart.shadowRoot!.querySelector('g.series-runs') as SVGGElement;
+    expect(group.style.opacity).toBe('0.4');
+    for (const line of group.querySelectorAll('path.series-line')) {
+      expect((line as SVGPathElement).style.strokeOpacity).toBe('');
+    }
+  });
+
   it('leaves the full opacity untouched at 100 %', async () => {
     const chart = createChart({ temperature: samples([20, 21, 22]), chartOpacity: 100 });
     setSize(chart, 360, 130);
@@ -1299,7 +1367,7 @@ describe('climate chart', () => {
     expect(line.style.strokeOpacity).toBe('0.15');
   });
 
-  it('picks the band colour of its own value for the end dot', async () => {
+  it('reads the end dot from the same ramp as the curve it sits on', async () => {
     const chart = createChart({
       temperature: samples([17, 22, 28]),
       temperatureBands: true,
@@ -1312,8 +1380,17 @@ describe('climate chart', () => {
     const dot = Array.from(chart.shadowRoot!.querySelectorAll('.end-dot')).find((node) =>
       (node.getAttribute('style') ?? '').includes('#')
     ) as SVGCircleElement;
-    // The last value is 28 °C, i.e. hot.
-    expect(dot.style.fill).toBe('#D16A62');
+    /*
+     * The dot ends the drawn line, so it takes the colour of the ramp at exactly
+     * that height – not the flat colour of the stage. Otherwise the dot can sit
+     * on the curve in a slightly different red.
+     */
+    expect(dot.style.fill).toMatch(/^#[0-9a-f]{6}$/);
+    const lines = Array.from(chart.shadowRoot!.querySelectorAll('.series-line')) as SVGPathElement[];
+    const lastColour = lines[lines.length - 1].style.stroke.toLowerCase();
+    expect(dot.style.fill.toLowerCase()).toBe(lastColour);
+    // The last value is 28 °C: the dot is firmly in the hot end of the ramp.
+    expect(parseInt(dot.style.fill.slice(1, 3), 16)).toBeGreaterThan(180);
   });
 
   it('draws a visibly different curve for every smoothing level', async () => {

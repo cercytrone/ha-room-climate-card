@@ -6,8 +6,11 @@ import {
   DEFAULT_BAND_LIMITS,
   DEFAULT_BAND_SOFTNESS,
   MIN_BAND_GAP,
+  BAND_LEVELS,
   bandColorAt,
+  bandColorAtOffset,
   bandStops,
+  bandStrokeRuns,
   orderBandLimits,
 } from '../src/chart/bands';
 
@@ -195,5 +198,115 @@ describe('band gradient', () => {
     expect(bandStops([10, 35], limits, colors, Number.NaN)).toEqual(
       bandStops([10, 35], limits, colors, 100)
     );
+  });
+});
+
+describe('gradient sampling', () => {
+  const limits = { coldBelow: 18, warmAbove: 24, hotAbove: 27 };
+
+  it('reads the very stops the area gradient uses', () => {
+    const stops = bandStops([10, 35], limits, colors);
+    expect(bandColorAtOffset(stops, 0)).toBe(BAND_HOT.toLowerCase());
+    expect(bandColorAtOffset(stops, 1)).toBe(BAND_COLD.toLowerCase());
+  });
+
+  it('interpolates linearly between two stops', () => {
+    const stops = [
+      { offset: 0, color: '#000000' },
+      { offset: 1, color: '#ffffff' },
+    ];
+    expect(bandColorAtOffset(stops, 0.5)).toBe('#808080');
+    expect(bandColorAtOffset(stops, 0.25)).toBe('#404040');
+  });
+
+  it('clamps an offset outside the gradient', () => {
+    const stops = [
+      { offset: 0.2, color: '#102030' },
+      { offset: 0.8, color: '#405060' },
+    ];
+    expect(bandColorAtOffset(stops, -1)).toBe('#102030');
+    expect(bandColorAtOffset(stops, 2)).toBe('#405060');
+  });
+
+  it('survives a colour it cannot parse', () => {
+    const stops = [
+      { offset: 0, color: 'currentColor' },
+      { offset: 1, color: '#ffffff' },
+    ];
+    expect(bandColorAtOffset(stops, 0.5)).toBe('currentColor');
+  });
+});
+
+describe('band stroke runs', () => {
+  const limits = { coldBelow: 18, warmAbove: 24, hotAbove: 27 };
+  const stops = bandStops([10, 35], limits, colors);
+  // y 0 = 35 °C (hot), y 100 = 10 °C (cold) – the gradient is defined that way.
+  const offsetAt = (y: number) => (y - 0) / (100 - 0);
+  const points = Array.from({ length: 21 }, (_, index) => ({
+    x: index * 10,
+    y: 10 + index * 4,
+  }));
+
+  it('splits the curve into contiguous runs with a solid colour each', () => {
+    const runs = bandStrokeRuns(points, true, stops, offsetAt);
+    expect(runs.length).toBeGreaterThan(2);
+    expect(runs.length).toBeLessThan(points.length);
+    for (const run of runs) {
+      expect(run.d.startsWith('M ')).toBe(true);
+      expect(run.color).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it('merges neighbouring intervals of the same colour', () => {
+    // A flat run of points shares one colour: one path, not twenty.
+    const flat = Array.from({ length: 20 }, (_, index) => ({ x: index * 5, y: 50 }));
+    const runs = bandStrokeRuns(flat, true, stops, offsetAt);
+    expect(runs).toHaveLength(1);
+  });
+
+  it('walks from cold to hot as the curve rises towards the warm end', () => {
+    const runs = bandStrokeRuns(points, true, stops, offsetAt);
+    const channels = (color: string) => [
+      parseInt(color.slice(1, 3), 16),
+      parseInt(color.slice(3, 5), 16),
+      parseInt(color.slice(5, 7), 16),
+    ];
+    const distance = (a: string, b: string) => {
+      const [x, y] = [channels(a), channels(b)];
+      return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+    };
+    const first = runs[0].color;
+    const last = runs[runs.length - 1].color;
+    // Offset 0 is the hot end: the curve starts up there and sinks to the cold one.
+    expect(distance(first, BAND_HOT)).toBeLessThan(distance(first, BAND_COLD));
+    expect(distance(last, BAND_COLD)).toBeLessThan(distance(last, BAND_HOT));
+    // Red body at the hot end, blue body at the cold one.
+    const red = (color: string) => parseInt(color.slice(1, 3), 16);
+    expect(red(runs[0].color)).toBeGreaterThan(180);
+    expect(red(runs[runs.length - 1].color)).toBeLessThan(140);
+  });
+
+  it('overlaps neighbouring runs so no seam shows', () => {
+    const runs = bandStrokeRuns(points, true, stops, offsetAt);
+    const startOf = (d: string) => d.split('L')[1].trim().split(/\s+/).map(Number);
+    const endOf = (d: string) => {
+      const tail = d.split(' L ').pop() ?? '';
+      return tail.trim().split(/\s+/).map(Number);
+    };
+    for (let index = 1; index < runs.length; index++) {
+      const previousEnd = endOf(runs[index - 1].d);
+      const start = startOf(runs[index].d);
+      // The next run starts slightly *before* the previous one ends … 
+      expect(start[0]).toBeLessThanOrEqual(previousEnd[0] + 0.01);
+      // … but never by more than the overlap (well below a pixel of blur).
+      expect(previousEnd[0] - start[0]).toBeLessThan(2);
+    }
+  });
+
+  it('quantises the colour into the documented number of steps', () => {
+    const runs = bandStrokeRuns(points, true, stops, offsetAt);
+    expect(BAND_LEVELS).toBe(32);
+    const unique = new Set(runs.map((run) => run.color));
+    expect(unique.size).toBeLessThanOrEqual(BAND_LEVELS);
   });
 });

@@ -4,6 +4,39 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.16.3] – 2026-11-03
+
+### Behoben
+
+- **Die Temperaturkurve trägt die Bereichsfarben jetzt auch in der Home Assistant App.** Bisher
+  bekam die Linie ihre Farbe über `stroke: url(#…)` – ein Farbverlauf als *Linienfarbe*. Einige
+  WebViews (unter anderem der der HA-App) zeichnen das nicht: die Fläche darunter verlief
+  korrekt, die Kurve kam einfarbig heraus. Die Kurve wird jetzt in kurzen Stücken aus **soliden**
+  Farben gezeichnet, die aus genau denselben Stopps gelesen werden wie der Flächenverlauf
+  (`bandColorAtOffset()`, 32 Stufen). Benachbarte Stücke mit gleicher Stufe werden
+  zusammengefasst, die Stöße überlappen um Bruchteile eines Pixels (keine Naht), sind stumpf
+  verkappt (keine Punkte) und tragen ihre Deckkraft als **Gruppe**, damit die Überlappungen nicht
+  dunkler werden. Ohne Farbbereiche bleibt es bei **einem** Pfad im Akzent.
+- **Keine Trennlinie mehr, wenn die Zeitbeschriftung ausgeschaltet ist.** Die Haarlinie über der
+  Zeitzeile blieb stehen und saß ohne Zeile direkt auf der Kartenkante – die Unterkante wirkte
+  dicker als Seiten und Oben. Sie wird jetzt nur noch mit der Zeitzeile gezeichnet; die Fläche
+  läuft bis 0,5 px an die Kante.
+- **Der Chart steht links und rechts nicht mehr 1–2 px ab.** Der Plot begann bei `x = 1` und
+  endete bei `width − 1` – auf einem großen Monitor als heller Saum neben der Fläche sichtbar.
+  Jetzt `x = 0` bis `width`: der Chart sitzt innen auf der Haarlinie, ohne Zwischenraum.
+
+### Geprüft
+
+- `tests/chart.test.ts`: keine `url(…)`-Linienfarbe mehr, Kurve besteht aus mehreren soliden
+  Stücken von kalt nach heiß, Stücke liegen in einer Gruppe mit einer Deckkraft, stumpfe Kappen
+  innen und runde nur an den beiden Enden, Fläche beginnt bei 0 und endet auf der Kante, ohne
+  Zeitzeile keine `.baseline` und Area-Unterkante bei `height − 0.5`.
+- `tests/bands.test.ts`: Farbauslesen aus dem Verlauf (Stützstellen, Interpolation, Klemmen,
+  unlesbare Farbe), Stückbildung (Zusammenfassen, Überlappung, Stufenanzahl).
+- `tests/geometry.test.ts`: `seriesPieces()` ergibt zusammengesetzt **exakt** den Pfad von
+  `seriesPath()` – die eingefärbte Kurve ist keine nachgezeichnete Näherung.
+- Demo-Vorschauen (`docs/images/`) zeichnen Kurve, Kante und Haarlinie wie die Karte.
+
 ## [2.16.2] – 2026-11-02
 
 ### Behoben
