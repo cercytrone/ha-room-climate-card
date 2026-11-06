@@ -15,12 +15,15 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 > Screenshots einer Installation und keine Live-Daten. Die Editor-Abbildung ist ein Nachbau der
 > Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert.
 > Nach der Installation zeigt die Karte ausschließlich echte Entitäts- und Historienwerte.
+> Browser-Screenshots der echten Karte (ebenfalls mit Demo-Daten) stehen unter
+> [Screenshots](#screenshots).
 
 ---
 
 ## Inhalt
 
 - [Funktionen](#funktionen)
+- [Screenshots](#screenshots)
 - [Installation](#installation)
   - [Über HACS als benutzerdefiniertes Repository](#über-hacs-als-benutzerdefiniertes-repository)
   - [Manuell](#manuell)
@@ -59,6 +62,28 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Optik** | Ruhige Kachel im Rahmen des Themes (`ha-card`, Radius und Rand wie die übrigen Karten), ein Akzent pro Aussage – mit `theme: dark` / `light` eigene Fläche mit Haarlinie und Lichtverlauf. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
 | **Robustheit** | `unavailable`/`unknown`/fehlende Entitäten, fehlende Attribute, kaputtes YAML – die Karte stürzt nicht ab. |
+
+---
+
+## Screenshots
+
+Browser-Screenshots der **echten Karte** – derselbe Lit-Code, der in `dist/` ausgeliefert
+wird –, aufgenommen in der Entwicklungsumgebung (`npm run dev`) mit Chromium. Die Messwerte
+und Verläufe sind **simulierte Testdaten** aus `dev/mock-hass.ts`, keine Live-Daten einer
+Installation. Neu erzeugen mit `npm run screenshots`.
+
+**Dunkel** – Heizen mit Bewegung, Fenster offen, Thermostat aus, nur Luftfeuchte:
+
+![Screenshot: vier Karten im dunklen Theme](docs/images/screenshot-dark.png)
+
+**Hell:**
+
+![Screenshot: zwei Karten im hellen Theme](docs/images/screenshot-light.png)
+
+**Visueller Editor mit Live-Vorschau** (die Formularelemente sind in der Entwicklungsumgebung
+durch einfache Platzhalter der HA-Selektoren ersetzt):
+
+![Screenshot: visueller Editor mit Live-Vorschau](docs/images/screenshot-editor.png)
 
 ---
 
@@ -769,6 +794,7 @@ npm run typecheck  # TypeScript
 npm test           # Vitest (jsdom)
 npm run build      # erzeugt dist/ha-room-climate-card.js (+ Sourcemap)
 npm run showcase   # rendert showcase.{svg,png} (dunkel), showcase-light.* und editor.*
+npm run screenshots # Browser-Screenshots der echten Karte (Playwright/Chromium) nach docs/images/screenshot-*.png
 ```
 
 ### Release
@@ -852,7 +878,8 @@ dist/                      Gebautes Bundle (HACS-Download)
 - HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
   `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
 - Die README-Bilder sind gerendert (Demo-Daten), keine Screenshots einer echten Installation;
-  die Editor-Abbildung ist ein Nachbau der Oberfläche.
+  die Editor-Abbildung ist ein Nachbau der Oberfläche. Die Bilder unter *Screenshots* zeigen
+  die echte Karte, aber ebenfalls mit simulierten Daten in der Entwicklungsumgebung.
 
 ---
 
