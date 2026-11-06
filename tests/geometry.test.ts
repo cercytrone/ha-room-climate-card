@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  stepPath,
+  stepRuns,
   areaPath,
   buildRuns,
   buildSegments,
@@ -919,5 +921,56 @@ describe('placeSetpointCaption', () => {
   it('interpolates polylines', () => {
     expect(polylineYAt([{ x: 0, y: 0 }, { x: 10, y: 20 }], 5)).toBe(10);
     expect(polylineYAt([{ x: 0, y: 0 }, { x: 10, y: 20 }], 11)).toBeNull();
+  });
+});
+
+describe('stepRuns / stepPath', () => {
+  const h = 3600_000;
+
+  it('holds each target until the next one and starts with the value in force', () => {
+    const parts = stepRuns(
+      [
+        { t: -2 * h, v: 19 },
+        { t: 2 * h, v: 21 },
+        { t: 4 * h, v: 21 },
+      ],
+      0,
+      6 * h
+    );
+    expect(parts).toEqual([
+      [
+        { from: 0, to: 2 * h, v: 19 },
+        { from: 2 * h, to: 6 * h, v: 21 },
+      ],
+    ]);
+  });
+
+  it('breaks the line where the thermostat has no target', () => {
+    const parts = stepRuns(
+      [
+        { t: 0, v: 21 },
+        { t: 2 * h, v: null },
+        { t: 3 * h, v: 18 },
+      ],
+      0,
+      6 * h
+    );
+    expect(parts).toEqual([[{ from: 0, to: 2 * h, v: 21 }], [{ from: 3 * h, to: 6 * h, v: 18 }]]);
+  });
+
+  it('draws horizontal runs joined by vertical risers', () => {
+    const parts = stepRuns(
+      [
+        { t: 0, v: 20 },
+        { t: 5, v: 22 },
+      ],
+      0,
+      10
+    );
+    expect(stepPath(parts, (t) => t * 10, (v) => 100 - v)).toBe('M 0 80 H 50 V 78 H 100');
+  });
+
+  it('returns nothing for an empty window', () => {
+    expect(stepRuns([{ t: 0, v: 20 }], 10, 10)).toEqual([]);
   });
 });

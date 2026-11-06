@@ -104,6 +104,7 @@ export class RoomClimateCard extends LitElement {
     hass: { attribute: false },
     _config: { state: true },
     _history: { state: true },
+    _setpointHistory: { state: true },
     _historyLoading: { state: true },
     _historyError: { state: true },
     _density: { state: true },
@@ -116,6 +117,8 @@ export class RoomClimateCard extends LitElement {
 
   _config?: ResolvedConfig;
   _history: HistoryMap = {};
+  /** Thermostat target over the chart window (step series, thermostat unit). */
+  _setpointHistory: ChartSample[] = [];
   _historyLoading = false;
   _historyError?: string;
   _density: Density = 'md';
@@ -327,10 +330,18 @@ export class RoomClimateCard extends LitElement {
     return ids;
   }
 
+  /** Thermostat whose target is drawn as a curve, if the chart shows one. */
+  private setpointEntityId(config: ResolvedConfig): string | undefined {
+    if (!config.thermostat.enabled || !config.chart.showChartSetpoint) return undefined;
+    if (!config.chart.showTemperature || !config.temperatureEntity) return undefined;
+    return config.thermostat.entity;
+  }
+
   private historyKeyFor(config: ResolvedConfig): string {
     const ids = this.historyEntityIds(config);
     if (!ids.length) return '';
-    return `${ids.sort().join('|')}@${config.chart.hours}`;
+    const setpointEntity = this.setpointEntityId(config);
+    return `${ids.sort().join('|')}@${config.chart.hours}${setpointEntity ? `#sp:${setpointEntity}` : ''}`;
   }
 
   private ensureHistory(): void {
@@ -342,6 +353,7 @@ export class RoomClimateCard extends LitElement {
       if (this.historyKey) {
         this.historyKey = '';
         this._history = {};
+        this._setpointHistory = [];
         this._historyLoading = false;
         this._historyError = undefined;
       }
@@ -375,6 +387,18 @@ export class RoomClimateCard extends LitElement {
     const start = end - config.chart.hours * 60 * 60 * 1000;
     try {
       const repository = sharedHistoryRepository(hass) ?? this.ownRepository;
+      const setpointEntity = this.setpointEntityId(config);
+      /*
+       * The target history is an extra: when it cannot be loaded the chart falls
+       * back to the flat line at the current target instead of showing an error.
+       */
+      const setpointRequest = setpointEntity
+        ? repository
+            .loadAttribute(hass, setpointEntity, 'temperature', config.chart.hours, end, {
+              ...(fresh ? { maxAgeMs: 0 } : {}),
+            })
+            .catch(() => [] as ChartSample[])
+        : Promise.resolve([] as ChartSample[]);
       const data = await repository.load(
         hass,
         ids,
@@ -385,8 +409,10 @@ export class RoomClimateCard extends LitElement {
           source: historySourceFor(config.chart.hours),
         }
       );
+      const setpointHistory = await setpointRequest;
       if (this.historyKey !== key) return;
       this._history = data;
+      this._setpointHistory = setpointHistory;
       this._historyWindow = { start, end };
       this.historyFetchedAt = Date.now();
       this.retryDelay = 0;
@@ -429,6 +455,37 @@ export class RoomClimateCard extends LitElement {
     const value = parseNumericState(state.state);
     if (last.v === value) return samples;
     return [...samples, { t, v: value }];
+  }
+
+  /**
+   * The target history, closed with the current target (like
+   * {@link withLiveState}) and converted to the scale of the temperature
+   * sensor. Climate entities change `last_updated`, not `last_changed`, when
+   * only an attribute such as the target moves.
+   */
+  private setpointSeries(
+    current: number | null,
+    fromUnit: string,
+    toUnit: string,
+    end: number
+  ): ChartSample[] | undefined {
+    const config = this._config;
+    const entityId = config ? this.setpointEntityId(config) : undefined;
+    if (!entityId || !this._setpointHistory.length) return undefined;
+    let samples = this._setpointHistory;
+    const state = this.hass?.states?.[entityId];
+    const updated = state ? Date.parse(state.last_updated ?? state.last_changed) : NaN;
+    const last = samples[samples.length - 1];
+    if (Number.isFinite(updated) && last.v !== current) {
+      const t = Math.max(Math.min(updated, end), last.t + 1);
+      samples = [...samples, { t, v: current }];
+    }
+    const convert = (value: number | null): number | null => {
+      if (value === null) return null;
+      if (fromUnit === toUnit) return value;
+      return convertTemperature(value, fromUnit, toUnit);
+    };
+    return samples.map((sample) => ({ t: sample.t, v: convert(sample.v) }));
   }
 
   private updateDensity(measuredHeight: number): void {
@@ -1128,6 +1185,9 @@ export class RoomClimateCard extends LitElement {
         ? null
         : convertTemperature(rawSetpoint, thermostat.unit, temperatureUnitOfSensor);
     const setpoint = convertedSetpoint ?? (thermostat?.unit === temperatureUnitOfSensor ? rawSetpoint : null);
+    const setpointHistory = thermostat
+      ? this.setpointSeries(rawSetpoint, thermostat.unit, temperatureUnitOfSensor, end)
+      : undefined;
     /*
      * The band thresholds are stored in °C (the editor always says °C), but the
      * curve plots the raw values of the sensor. A °F sensor therefore needs the
@@ -1171,6 +1231,7 @@ export class RoomClimateCard extends LitElement {
         .accentColor=${config.accentColor}
         .humidityColor=${config.humidity.color}
         .setpoint=${setpoint}
+        .setpointHistory=${setpointHistory}
         .setpointUnit=${temperatureUnitOfSensor}
         .start=${start}
         .end=${end}

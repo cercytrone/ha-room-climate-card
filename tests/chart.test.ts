@@ -1655,4 +1655,76 @@ describe('axis, caption and keyboard', () => {
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(hover.hidden).toBe(true);
   });
+
+  describe('target history', () => {
+    const h = 3600_000;
+    const pathOf = (chart: RoomClimateChart) =>
+      chart.shadowRoot!.querySelector('path.setpoint-line')?.getAttribute('d') ?? '';
+
+    it('draws the target that applied at each moment as a step line', async () => {
+      const chart = createChart({
+        temperature: samples([19, 20, 21, 22, 21, 20], h),
+        setpoint: 22,
+        setpointHistory: [
+          { t: now - 8 * h, v: 18 },
+          { t: now - 3 * h, v: 22 },
+        ],
+      });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      expect(chart.shadowRoot!.querySelector('line.setpoint-line')).toBeNull();
+      const d = pathOf(chart);
+      // One horizontal run per target, joined by one riser.
+      expect(d).toMatch(/^M [\d.]+ [\d.]+ H [\d.]+ V [\d.]+ H [\d.]+$/);
+      const [, y18, , y22] = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+      // 18 °C sits lower in the plot than 22 °C.
+      expect(y18).toBeGreaterThan(y22);
+      // The caption stays at the edge and sits at today's target.
+      const caption = chart.shadowRoot!.querySelector('.setpoint-caption')!;
+      const baseline = Number(caption.getAttribute('y'));
+      const nearestLine = Math.abs(baseline - y22) < Math.abs(baseline - y18) ? 'right' : 'left';
+      expect(caption.getAttribute('text-anchor') === 'end' ? 'right' : 'left').toBe(nearestLine);
+    });
+
+    it('leaves a gap while the thermostat had no target', async () => {
+      const chart = createChart({
+        temperature: samples([19, 20, 21, 22, 21, 20], h),
+        setpoint: 21,
+        setpointHistory: [
+          { t: now - 6 * h, v: 21 },
+          { t: now - 4 * h, v: null },
+          { t: now - 2 * h, v: 21 },
+        ],
+      });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      expect(pathOf(chart).match(/M /g)?.length).toBe(2);
+    });
+
+    it('puts the caption on the side that still has a line', async () => {
+      const chart = createChart({
+        temperature: samples([19, 20, 21, 22, 21, 20], h),
+        setpoint: null,
+        setpointHistory: [
+          { t: now - 6 * h, v: 21 },
+          { t: now - 2 * h, v: null },
+        ],
+      });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      const caption = chart.shadowRoot!.querySelector('.setpoint-caption')!;
+      expect(caption.getAttribute('text-anchor')).toBe('start');
+    });
+
+    it('falls back to the flat line without a history', async () => {
+      const chart = createChart({
+        temperature: samples([19, 20, 21]),
+        setpoint: 21,
+        setpointHistory: [],
+      });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      expect(chart.shadowRoot!.querySelector('line.setpoint-line')).not.toBeNull();
+    });
+  });
 });

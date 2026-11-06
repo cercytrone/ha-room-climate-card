@@ -91,6 +91,17 @@ const fullConfig: RoomClimateCardConfig = {
   humidity_decimals: 1,
 };
 
+
+/**
+ * History requests for the sensor curves. The thermostat target is fetched in
+ * a request of its own (with attributes) and is not counted here.
+ */
+function sensorRequests(send: { mock: { calls: unknown[][] } }): number {
+  return send.mock.calls.filter(
+    ([message]) => (message as { no_attributes?: boolean } | undefined)?.no_attributes !== false
+  ).length;
+}
+
 describe('room climate card', () => {
   beforeEach(() => {
     document.body.replaceChildren();
@@ -934,24 +945,24 @@ describe('room climate card', () => {
 
       const card = mount(fullConfig, hass);
       await vi.advanceTimersByTimeAsync(200);
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(sensorRequests(send)).toBe(1);
 
       // State updates during the backoff do not start another request.
       card.hass = { ...hass };
       await vi.advanceTimersByTimeAsync(1000);
       card.hass = { ...hass };
       await vi.advanceTimersByTimeAsync(5000);
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(sensorRequests(send)).toBe(1);
 
       // After the first backoff step (15 s) exactly one retry is made.
       await vi.advanceTimersByTimeAsync(15 * 1000);
-      expect(send).toHaveBeenCalledTimes(2);
+      expect(sensorRequests(send)).toBe(2);
 
       // The next one waits twice as long.
       await vi.advanceTimersByTimeAsync(15 * 1000);
-      expect(send).toHaveBeenCalledTimes(2);
+      expect(sensorRequests(send)).toBe(2);
       await vi.advanceTimersByTimeAsync(15 * 1000);
-      expect(send).toHaveBeenCalledTimes(3);
+      expect(sensorRequests(send)).toBe(3);
     } finally {
       vi.useRealTimers();
     }
@@ -968,7 +979,7 @@ describe('room climate card', () => {
 
       const card = mount(fullConfig, hass);
       await vi.advanceTimersByTimeAsync(200);
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(sensorRequests(send)).toBe(1);
 
       // Three minutes later (past the cache TTL) a wall tablet wakes up.
       await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
@@ -978,13 +989,13 @@ describe('room climate card', () => {
       });
       document.dispatchEvent(new Event('visibilitychange'));
       await vi.advanceTimersByTimeAsync(200);
-      expect(send).toHaveBeenCalledTimes(2);
+      expect(sensorRequests(send)).toBe(2);
 
       // The listener is removed with the card.
       card.remove();
       document.dispatchEvent(new Event('visibilitychange'));
       await vi.advanceTimersByTimeAsync(200);
-      expect(send).toHaveBeenCalledTimes(2);
+      expect(sensorRequests(send)).toBe(2);
     } finally {
       if (original) Object.defineProperty(Document.prototype, 'visibilityState', original);
       vi.useRealTimers();
@@ -1001,17 +1012,17 @@ describe('room climate card', () => {
 
       const card = mount(fullConfig, hass);
       await vi.advanceTimersByTimeAsync(300);
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(sensorRequests(send)).toBe(1);
 
       // Scrolled away: the five-minute timer stays quiet.
       setVisible(card, false);
       await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(sensorRequests(send)).toBe(1);
 
       // Back on screen: it catches up immediately instead of waiting for the tick.
       setVisible(card, true);
       await vi.advanceTimersByTimeAsync(300);
-      expect(send).toHaveBeenCalledTimes(2);
+      expect(sensorRequests(send)).toBe(2);
     } finally {
       vi.useRealTimers();
     }
@@ -1681,7 +1692,7 @@ describe('room climate card', () => {
         mount(fullConfig, hass);
         mount({ ...fullConfig, name: 'Zweite Karte' }, hass);
         await vi.advanceTimersByTimeAsync(300);
-        expect(send).toHaveBeenCalledTimes(1);
+        expect(sensorRequests(send)).toBe(1);
       } finally {
         vi.useRealTimers();
       }
@@ -1697,14 +1708,14 @@ describe('room climate card', () => {
 
         const card = mount(fullConfig, hass);
         await vi.advanceTimersByTimeAsync(300);
-        expect(send).toHaveBeenCalledTimes(1);
+        expect(sensorRequests(send)).toBe(1);
 
         // Well inside the two-minute cache: the connection drops and returns.
         card.hass = { ...hass, connected: false };
         await vi.advanceTimersByTimeAsync(1000);
         card.hass = { ...hass, connected: true };
         await vi.advanceTimersByTimeAsync(300);
-        expect(send).toHaveBeenCalledTimes(2);
+        expect(sensorRequests(send)).toBe(2);
       } finally {
         vi.useRealTimers();
       }
@@ -1928,6 +1939,78 @@ describe('room climate card', () => {
         { entity_id: 'climate.thermostat' }
       );
       expect(q(card, '.climate-row')?.getAttribute('aria-label')).toContain('Aktion ausführen');
+    });
+  });
+
+  describe('target history', () => {
+    it('loads the thermostat target over the window and hands it to the chart', async () => {
+      vi.useFakeTimers();
+      try {
+        const history = historyFor(['sensor.temp', 'sensor.humidity']);
+        const climate = {
+          'climate.thermostat': [
+            { s: 'heat', a: { temperature: 19 }, lu: Math.floor((now - 5 * 3600_000) / 1000) },
+            { s: 'heat', a: { temperature: 22 }, lu: Math.floor((now - 2 * 3600_000) / 1000) },
+          ],
+        };
+        const send = vi.fn(async (message: Record<string, unknown>) =>
+          message.no_attributes === false ? climate : history
+        );
+        const hass = createHass({ states: baseStates(), history });
+        hass.connection!.sendMessagePromise = send;
+        const card = mount(fullConfig, hass);
+        await vi.advanceTimersByTimeAsync(300);
+        await card.updateComplete;
+        const chart = q(card, 'room-climate-chart') as HTMLElement & {
+          setpointHistory?: Array<{ t: number; v: number | null }>;
+        };
+        expect(chart.setpointHistory?.map((sample) => sample.v)).toEqual([19, 22]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the flat line when the target history cannot be loaded', async () => {
+      vi.useFakeTimers();
+      try {
+        const history = historyFor(['sensor.temp', 'sensor.humidity']);
+        const send = vi.fn(async (message: Record<string, unknown>) => {
+          if (message.no_attributes === false) throw new Error('no attributes');
+          return history;
+        });
+        const hass = createHass({ states: baseStates(), history });
+        hass.connection!.sendMessagePromise = send;
+        hass.callApi = async () => {
+          throw new Error('no REST');
+        };
+        const card = mount(fullConfig, hass);
+        await vi.advanceTimersByTimeAsync(300);
+        await card.updateComplete;
+        const chart = q(card, 'room-climate-chart') as HTMLElement & {
+          setpoint?: number | null;
+          setpointHistory?: unknown;
+        };
+        expect(card._historyError).toBeFalsy();
+        expect(chart.setpointHistory).toBeUndefined();
+        expect(chart.setpoint).toBe(22);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not ask for the target when the chart hides the target line', async () => {
+      vi.useFakeTimers();
+      try {
+        const history = historyFor(['sensor.temp', 'sensor.humidity']);
+        const send = vi.fn(async () => history);
+        const hass = createHass({ states: baseStates(), history });
+        hass.connection!.sendMessagePromise = send;
+        mount({ ...fullConfig, chart_show_setpoint: false }, hass);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(send).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

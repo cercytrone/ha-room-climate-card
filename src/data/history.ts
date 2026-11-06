@@ -103,6 +103,105 @@ export function parseHistoryResponse(response: unknown, entityIds: string[]): Hi
   return result;
 }
 
+function attributeValue(item: unknown, attribute: string): number | null {
+  if (!isRecord(item)) return null;
+  const attributes = isRecord(item.a) ? item.a : isRecord(item.attributes) ? item.attributes : undefined;
+  const raw = attributes?.[attribute];
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string') return parseNumericState(raw);
+  return null;
+}
+
+/**
+ * Turns the states of one entity into a step series of one numeric attribute
+ * (the thermostat's `temperature` = its target). A state that carries no such
+ * attribute – thermostat off, unavailable – becomes `null`, i.e. a gap.
+ *
+ * Climate entities write a new state row whenever *any* attribute changes
+ * (current temperature, valve position, …); only the rows where the value
+ * itself changes are kept, so a day of a chatty thermostat stays a handful of
+ * steps.
+ */
+export function normalizeAttributeSamples(items: unknown, attribute: string): ChartSample[] {
+  if (!Array.isArray(items)) return [];
+  const samples: ChartSample[] = [];
+  for (const item of items) {
+    const t = sampleTime(item);
+    if (t === undefined || !Number.isFinite(t)) continue;
+    samples.push({ t, v: attributeValue(item, attribute) });
+  }
+  samples.sort((a, b) => a.t - b.t);
+  const steps: ChartSample[] = [];
+  for (const sample of samples) {
+    const previous = steps[steps.length - 1];
+    if (previous && previous.t === sample.t) {
+      steps[steps.length - 1] = sample;
+      if (steps.length > 1 && steps[steps.length - 2].v === sample.v) steps.pop();
+    } else if (!previous || previous.v !== sample.v) {
+      steps.push(sample);
+    }
+  }
+  return steps;
+}
+
+/**
+ * History of one attribute of one entity. Unlike {@link fetchHistory} this has
+ * to ask for the attributes and for full (non-minimal) rows: the minimal
+ * response drops the attributes of every row but the first.
+ */
+export async function fetchAttributeHistory(
+  hass: HomeAssistant,
+  entityId: string,
+  attribute: string,
+  options: FetchOptions
+): Promise<ChartSample[]> {
+  const startIso = new Date(options.start).toISOString();
+  const endIso = new Date(options.end).toISOString();
+  const connection = hass.connection;
+  if (connection && typeof connection.sendMessagePromise === 'function') {
+    try {
+      const response = await connection.sendMessagePromise({
+        type: 'history/history_during_period',
+        start_time: startIso,
+        end_time: endIso,
+        entity_ids: [entityId],
+        minimal_response: false,
+        no_attributes: false,
+        significant_changes_only: false,
+        include_start_time_state: true,
+      });
+      return normalizeAttributeSamples(attributeBucket(response, entityId), attribute);
+    } catch (error) {
+      if (typeof hass.callApi !== 'function') throw error;
+    }
+  }
+  if (typeof hass.callApi !== 'function') return [];
+  const path =
+    `history/period/${encodeURIComponent(startIso)}` +
+    `?filter_entity_id=${encodeURIComponent(entityId)}` +
+    `&end_time=${encodeURIComponent(endIso)}`;
+  const response = await hass.callApi('GET', path);
+  return normalizeAttributeSamples(attributeBucket(response, entityId), attribute);
+}
+
+/** The rows of one entity from either response shape (see parseHistoryResponse). */
+function attributeBucket(response: unknown, entityId: string): unknown[] {
+  if (Array.isArray(response)) {
+    for (const bucket of response) {
+      if (!Array.isArray(bucket) || !bucket.length) continue;
+      const first = bucket[0];
+      if (isRecord(first) && first.entity_id === entityId) return bucket;
+    }
+    return [];
+  }
+  if (isRecord(response)) {
+    const bucket = response[entityId];
+    if (Array.isArray(bucket)) return bucket;
+    if (isRecord(bucket) && Array.isArray(bucket.data)) return bucket.data;
+  }
+  return [];
+}
+
 function mergeSamples(a: ChartSample[], b: ChartSample[]): ChartSample[] {
   if (!a.length) return b;
   if (!b.length) return a;
@@ -286,6 +385,8 @@ export interface LoadOptions {
 export class HistoryRepository {
   private cache = new Map<string, CacheEntry>();
   private inflight = new Map<string, Promise<HistoryMap>>();
+  private attributeCache = new Map<string, { fetchedAt: number; data: ChartSample[] }>();
+  private attributeInflight = new Map<string, Promise<ChartSample[]>>();
 
   async load(
     hass: HomeAssistant,
@@ -327,9 +428,47 @@ export class HistoryRepository {
     return promise;
   }
 
+  /**
+   * Step series of one attribute (the thermostat target), cached like the
+   * sensor curves. Kept apart from {@link load}: it needs full rows with
+   * attributes, which would make the sensor request needlessly heavy.
+   */
+  async loadAttribute(
+    hass: HomeAssistant,
+    entityId: string,
+    attribute: string,
+    hours: number,
+    now = Date.now(),
+    options: Pick<LoadOptions, 'maxAgeMs'> = {}
+  ): Promise<ChartSample[]> {
+    const key = `${entityId}@${hours}#attr:${attribute}`;
+    const maxAge = Math.max(0, options.maxAgeMs ?? HISTORY_CACHE_TTL_MS);
+    const cached = this.attributeCache.get(key);
+    if (cached && maxAge > 0 && now - cached.fetchedAt < maxAge) return cached.data;
+    const pending = this.attributeInflight.get(key);
+    if (pending) return pending;
+    const window = { start: now - hours * 60 * 60 * 1000, end: now };
+    const promise = fetchAttributeHistory(hass, entityId, attribute, window)
+      .then((data) => {
+        this.attributeCache.set(key, { fetchedAt: Date.now(), data });
+        if (this.attributeCache.size > 24) {
+          const oldest = this.attributeCache.keys().next();
+          if (!oldest.done) this.attributeCache.delete(oldest.value);
+        }
+        return data;
+      })
+      .finally(() => {
+        this.attributeInflight.delete(key);
+      });
+    this.attributeInflight.set(key, promise);
+    return promise;
+  }
+
   clear(): void {
     this.cache.clear();
     this.inflight.clear();
+    this.attributeCache.clear();
+    this.attributeInflight.clear();
   }
 }
 
