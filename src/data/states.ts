@@ -1,7 +1,7 @@
 import { DEFAULT_CLOSED_STATES, type ResolvedConfig } from '../config';
 import type { Translator } from '../localize';
 import type { HassEntity, HomeAssistant } from '../types';
-import { parseNumericState, temperatureUnit } from '../utils/format';
+import { parseNumericState, temperatureScale, temperatureUnit } from '../utils/format';
 
 export type ReadingStatus = 'ok' | 'unavailable' | 'missing' | 'invalid';
 
@@ -111,8 +111,13 @@ export function readThermostat(
   const entityId = config.thermostat.entity;
   // The entity's own unit wins over the unit system: an integration may report
   // its target temperature in a different scale than the system default.
+  // Climate entities normally carry no `unit_of_measurement`, so the unit system
+  // decides. Home Assistant stores the symbol there ("°C" / "°F"), not a name.
+  const systemTemperature = hass?.config?.unit_system?.temperature;
   const systemUnit = temperatureUnit(
-    hass?.config?.unit_system?.temperature === 'us_customary' ? '°F' : undefined
+    typeof systemTemperature === 'string' && temperatureScale(systemTemperature)
+      ? systemTemperature
+      : undefined
   );
   const entityUnit = hass?.states[entityId ?? '']?.attributes?.unit_of_measurement;
   const unit = temperatureUnit(typeof entityUnit === 'string' ? entityUnit : systemUnit);

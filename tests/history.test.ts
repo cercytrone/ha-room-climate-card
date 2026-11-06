@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   HistoryRepository,
+  sharedHistoryRepository,
   fetchHistory,
   historyCacheKey,
   normalizeSamples,
@@ -221,6 +222,31 @@ describe('HistoryRepository caching', () => {
     repository.clear();
     await repository.load(hass, ['sensor.temp'], 6, now);
     expect(sendMessagePromise).toHaveBeenCalledTimes(2);
+  });
+
+  it('bypasses the cache when asked for a fresh answer', async () => {
+    const sendMessagePromise = vi.fn(async () => ({ 'sensor.temp': [] }));
+    const hass = createHass();
+    hass.connection!.sendMessagePromise = sendMessagePromise;
+    const repository = new HistoryRepository();
+
+    await repository.load(hass, ['sensor.temp'], 6, now);
+    await repository.load(hass, ['sensor.temp'], 6, now + 1000);
+    expect(sendMessagePromise).toHaveBeenCalledTimes(1);
+
+    // After a reconnect the cached curve may predate the outage.
+    await repository.load(hass, ['sensor.temp'], 6, now + 2000, { maxAgeMs: 0 });
+    expect(sendMessagePromise).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares one repository per connection', () => {
+    const first = createHass();
+    const second = createHass();
+    expect(sharedHistoryRepository(first)).toBe(sharedHistoryRepository({ ...first }));
+    expect(sharedHistoryRepository(first)).not.toBe(sharedHistoryRepository(second));
+    const offline = createHass();
+    delete offline.connection;
+    expect(sharedHistoryRepository(offline)).toBeUndefined();
   });
 
   it('builds stable cache keys', () => {

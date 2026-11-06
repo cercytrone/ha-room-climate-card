@@ -219,7 +219,7 @@ das genau wissen will, nutzt einen echten Kontaktsensor; die Karte behandelt bei
 | `show_setpoint` | boolean | `true` | Solltemperatur in der Statuszeile anzeigen. |
 | `show_hvac_status` | boolean | `true` | Flamme samt Statuswort anzeigen (Farbe = Zustand). |
 | `show_hvac_mode` | boolean | `false` | Statt des Statusworts den HVAC-Modus („Automatik“) in derselben Zeile anzeigen. |
-| `tap_action` | `more-info` \| `none` | `more-info` | Tippen/Klicken auf die Karte öffnet den Home-Assistant-Dialog der Climate-Entität (Solltemperatur, Modus, alles, was die Integration anbietet). `none` schaltet das ab. |
+| `tap_action` | `more-info` \| `none` | `more-info` | Tippen/Klicken auf die Karte öffnet den Home-Assistant-Dialog der Climate-Entität (Solltemperatur, Modus, alles, was die Integration anbietet). `none` schaltet das ab. Die Objektform anderer Karten (`tap_action: { action: none }`) wird ebenfalls verstanden. |
 | `heating_color` | color | `#d16a62` (gedämpftes Rot) | Flammenfarbe – **nur** solange tatsächlich geheizt wird (`hvac_action: heating`). |
 | `heating_idle_color` | color | Akzentfarbe (`#4FD1A5`) | Flammenfarbe beim Warten/Bereitstehen – standardmäßig exakt das Grün des Verlaufs. |
 | `heating_off_color` | color | Farbe des Soll-Werts (`--rcc-muted`) | Flammenfarbe bei ausgeschaltetem oder nicht verfügbarem Thermostat. |

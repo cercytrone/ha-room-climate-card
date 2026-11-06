@@ -28,7 +28,11 @@ import {
   type SensorReading,
   type ThermostatReading,
 } from './data/states';
-import { HistoryRepository, type HistoryMap } from './data/history';
+import {
+  HistoryRepository,
+  sharedHistoryRepository,
+  type HistoryMap,
+} from './data/history';
 import { createTranslator, type Translator } from './localize';
 import type { HomeAssistant } from './types';
 import {
@@ -45,6 +49,36 @@ import type { ChartSample } from './chart/geometry';
 import './editor/room-climate-editor';
 
 type Density = 'xs' | 'sm' | 'md';
+
+/**
+ * Time zone and 12/24-hour clock for the chart axis, as Home Assistant's own
+ * frontend resolves them. `locale.time_zone` is a *setting* ("local" or
+ * "server"), not a zone: "server" means the instance zone from `config`,
+ * "local" means the browser's own (no explicit zone). `locale.time_format` is
+ * "12", "24", "language" or "system"; only the first two force a clock.
+ */
+export function resolveChartClock(hass?: HomeAssistant): { timeZone?: string; hour12?: boolean } {
+  const locale = hass?.locale;
+  const setting = locale?.time_zone;
+  const serverZone = hass?.config?.time_zone || undefined;
+  let timeZone: string | undefined;
+  if (setting === 'local') timeZone = undefined;
+  else if (setting === 'server' || !setting) timeZone = serverZone;
+  // Anything else is taken as an IANA zone only if the runtime accepts it.
+  else timeZone = isValidTimeZone(setting) ? setting : serverZone;
+  const format = locale?.time_format;
+  const hour12 = format === '12' || format === 'am_pm' ? true : format === '24' ? false : undefined;
+  return { timeZone, hour12 };
+}
+
+function isValidTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const WINDOW_OPEN_COLOR = '#fbbf24';
 const MOTION_ACTIVE_COLOR = '#34d399';
@@ -80,7 +114,8 @@ export class RoomClimateCard extends LitElement {
     end: Date.now(),
   };
 
-  private readonly repository = new HistoryRepository();
+  /** Fallback when there is no connection to share a cache on (tests, previews). */
+  private readonly ownRepository = new HistoryRepository();
   private refreshTimer?: ReturnType<typeof setInterval>;
   private tickTimer?: ReturnType<typeof setInterval>;
   private resizeObserver?: ResizeObserver;
@@ -268,11 +303,7 @@ export class RoomClimateCard extends LitElement {
    * the locale default instead of the user's 12/24-hour preference.
    */
   private chartClock(): { timeZone?: string; hour12?: boolean } {
-    const locale = this.hass?.locale;
-    const timeZone = locale?.time_zone || this.hass?.config?.time_zone || undefined;
-    const format = locale?.time_format;
-    const hour12 = format === 'am_pm' ? true : format === '24' ? false : undefined;
-    return { timeZone, hour12 };
+    return resolveChartClock(this.hass);
   }
 
   private historyEntityIds(config: ResolvedConfig): string[] {
@@ -313,7 +344,12 @@ export class RoomClimateCard extends LitElement {
     }, 60);
   }
 
-  private async loadHistory(key: string, force = false): Promise<void> {
+  /**
+   * @param force  re-render even if the data object did not change.
+   * @param fresh  bypass the shared cache (after a reconnect the cached curve
+   *               may predate the outage).
+   */
+  private async loadHistory(key: string, force = false, fresh = false): Promise<void> {
     const config = this._config;
     const hass = this.hass;
     if (!config || !hass || !key) return;
@@ -324,7 +360,14 @@ export class RoomClimateCard extends LitElement {
     const end = Date.now();
     const start = end - config.chart.hours * 60 * 60 * 1000;
     try {
-      const data = await this.repository.load(hass, ids, config.chart.hours, end);
+      const repository = sharedHistoryRepository(hass) ?? this.ownRepository;
+      const data = await repository.load(
+        hass,
+        ids,
+        config.chart.hours,
+        end,
+        fresh ? { maxAgeMs: 0 } : {}
+      );
       if (this.historyKey !== key) return;
       this._history = data;
       this._historyWindow = { start, end };
@@ -372,6 +415,16 @@ export class RoomClimateCard extends LitElement {
   }
 
   private updateDensity(measuredHeight: number): void {
+    /*
+     * Density only answers a height the user fixed. With automatic height the
+     * measured box *is* the content: a card without chart is short by nature,
+     * and shrinking its type would only make it shorter still – it would lock
+     * itself into the smallest step.
+     */
+    if (!this._config?.height) {
+      if (this._density !== 'md') this._density = 'md';
+      return;
+    }
     const height =
       measuredHeight > 0
         ? measuredHeight
@@ -391,7 +444,7 @@ export class RoomClimateCard extends LitElement {
       const connected = this.hass?.connected !== false;
       if (connected && !this.lastConnected) {
         this.historyFetchedAt = 0;
-        this.loadHistory(this.historyKey, true);
+        this.loadHistory(this.historyKey, true, true);
       }
       this.lastConnected = connected;
       this.ensureHistory();
@@ -565,7 +618,7 @@ export class RoomClimateCard extends LitElement {
       title="${label}"
       aria-label="${label}"
       role="img"
-      >${icons.motion()}</span
+      >${active ? icons.motion() : icons.motionOff()}</span
     >`;
   }
 
@@ -1301,8 +1354,10 @@ export class RoomClimateCard extends LitElement {
       position: absolute;
       inset: -6px -4px;
     }
+    /* Text colour at low strength: visible on dark and light themes alike. */
     button.climate-row:hover {
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(127, 127, 127, 0.08);
+      background: color-mix(in srgb, var(--rcc-text) 6%, transparent);
     }
     button.climate-row:focus-visible {
       outline: 2px solid var(--rcc-accent);

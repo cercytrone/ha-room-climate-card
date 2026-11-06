@@ -78,7 +78,7 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
    * What a tap on the card (or Enter on the status row) does: open the
    * more-info dialog of the climate entity, or nothing. Default `more-info`.
    */
-  tap_action?: TapAction;
+  tap_action?: TapAction | { action?: string };
   show_setpoint?: boolean;
   show_hvac_status?: boolean;
   show_hvac_mode?: boolean;
@@ -299,6 +299,13 @@ export const DEFAULT_NAME_FONT_SIZE = 15;
 export const NAME_FONT_SIZE_RANGE = { min: 11, max: 32 } as const;
 
 const ENTITY_ID_RE = /^[a-z0-9_]+\.[a-z0-9_]+$/;
+/**
+ * Characters a CSS colour value may contain: hex, rgb()/hsl()/color-mix(),
+ * var(--token, fallback) and named colours. Anything that could end the
+ * declaration (`;`, braces, quotes, `:`) or open markup is rejected, because
+ * the value is written into an inline `style` attribute.
+ */
+const COLOR_RE = /^[-a-zA-Z0-9#(),.%\s/]+$/;
 const FONT_FAMILY_RE = /^[-a-zA-Z0-9 ,'"_.()]+$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -330,11 +337,26 @@ export function asBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function asColor(value: unknown, fallback: string): string {
+export function asColor(value: unknown, fallback: string): string {
   const color = asString(value);
   if (!color) return fallback;
-  // Guard against accidental YAML objects/long garbage.
-  return color.length <= 64 ? color : fallback;
+  // Guard against accidental YAML objects/long garbage and against values that
+  // would inject further declarations into the inline style.
+  if (color.length > 64 || !COLOR_RE.test(color)) return fallback;
+  return color;
+}
+
+/**
+ * Reads `tap_action` in both spellings: the short string of earlier versions
+ * (`tap_action: none`) and the object form every Home Assistant card uses
+ * (`tap_action: { action: none }`). Only `none` switches the tap off; every
+ * other action keeps the built-in more-info dialog.
+ */
+export function asTapAction(value: unknown): TapAction {
+  const action = isRecord(value) ? value.action : value;
+  return typeof action === 'string' && action.trim().toLowerCase() === 'none'
+    ? 'none'
+    : 'more-info';
 }
 
 /**
@@ -442,6 +464,12 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'chart_band_warm_above',
   'chart_band_hot_above',
   'chart_band_transition',
+  // Written by Home Assistant itself (sections view, visibility conditions,
+  // layout-card) – part of every card's config, never a typo.
+  'grid_options',
+  'layout_options',
+  'visibility',
+  'view_layout',
 ];
 
 /** Keys already reported, so a re-render does not flood the console. */
@@ -621,7 +649,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       // the dashed helper lines are opt-in now.
       showGrid: asBoolean(config.chart_show_grid) ?? false,
     },
-    tapAction: config.tap_action === 'none' ? 'none' : 'more-info',
+    tapAction: asTapAction(config.tap_action),
   };
 }
 

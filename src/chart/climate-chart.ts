@@ -264,6 +264,22 @@ export class RoomClimateChart extends LitElement {
       opacity: 0.7;
       margin-bottom: 2px;
     }
+    /* Quiet corner mark: the curve shown is the last good one, not live. */
+    .stale {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      display: inline-flex;
+      color: var(--rcc-muted, rgba(255, 255, 255, 0.5));
+      pointer-events: auto;
+    }
+    .stale svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+    }
     /* Reduced axis: 10.5 px at 32 % – present, never loud. */
     .axis-label {
       font-size: 10.5px;
@@ -607,7 +623,25 @@ export class RoomClimateChart extends LitElement {
     // hairline baseline so the card does not look broken.
     const { chart, geometry } = this.renderChart(width, height);
     this.hoverGeometry = geometry;
-    return html`<div class="wrap">${chart}${this.renderOverlay(geometry)}</div>`;
+    return html`<div class="wrap">
+      ${chart}${this.renderOverlay(geometry)}${this.renderStaleMark(errorIcon)}
+    </div>`;
+  }
+
+  /**
+   * The last good curve stays visible when a refresh fails – but it must not
+   * pass for live data. A small mark in the corner says so; hover or a screen
+   * reader gets the reason.
+   */
+  private renderStaleMark(icon: TemplateResult): TemplateResult | typeof nothing {
+    if (!this.error) return nothing;
+    return html`<span
+      class="stale"
+      role="status"
+      title=${this.labels.error}
+      aria-label=${this.labels.error}
+      >${icon}</span
+    >`;
   }
 
   private renderChart(
