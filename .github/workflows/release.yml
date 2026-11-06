@@ -1,24 +1,26 @@
 name: Release
 
-# Ein Release braucht nur noch einen Tag (oder einen Klick unter Actions):
+# Release durch Merge: Sobald auf main ein CHANGELOG liegt, dessen oberste
+# Version noch keinen Tag hat, entsteht daraus ein Release.
 #
-#   git tag v2.18.1 && git push origin v2.18.1
+#   1. Ein Pull Request benennt "## [Unreleased]" in "## [X.Y.Z] – Datum" um.
+#   2. Der Merge auf main startet diesen Workflow.
+#   3. Er setzt die Version in package.json, package-lock.json und README, baut
+#      dist/, prüft alles, committet das Ergebnis auf main, legt den Tag vX.Y.Z
+#      an und veröffentlicht das Release mit dem Bundle.
 #
-# Der Workflow setzt die Version in package.json, package-lock.json und README,
-# benennt "## [Unreleased]" im CHANGELOG in die neue Version um, baut dist/,
-# prüft alles, committet das Ergebnis auf main, setzt den Tag auf diesen Commit
-# und veröffentlicht das Release mit dem Bundle. dist/ muss also nie mehr von
-# Hand gebaut werden.
+# Jeder andere Push auf main (Version schon getaggt, nur "[Unreleased]") endet
+# nach wenigen Sekunden ohne Release. Manuell geht es weiterhin unter
+# Actions → Release → Run workflow.
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version ohne "v", z. B. 2.18.1'
-        required: true
+        description: 'Version ohne "v", z. B. 2.18.2 (leer = oberste Version im CHANGELOG)'
+        required: false
 
 permissions:
   contents: write
@@ -29,100 +31,117 @@ concurrency:
 
 jobs:
   release:
-    name: Build, commit and publish release
+    name: Release if the changelog names a new version
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve version
-        id: version
-        env:
-          EVENT: ${{ github.event_name }}
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          if [ "$EVENT" = "workflow_dispatch" ]; then RAW="$INPUT_VERSION"; else RAW="$REF_NAME"; fi
-          VERSION="${RAW#v}"
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::\"$RAW\" ist keine Version der Form 1.2.3"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      # Gebaut wird immer main: dorthin wird das Ergebnis auch committet.
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Tag must point into main
-        if: github.event_name == 'push'
+      - name: Decide whether to release
+        id: plan
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if ! git merge-base --is-ancestor "${{ github.sha }}" HEAD; then
-            echo "::error::Der Tag zeigt auf einen Commit, der nicht auf main liegt."
+          git fetch --tags --force --quiet
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="${INPUT_VERSION#v}"
+            # A manual run may still carry its notes under [Unreleased].
+            if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
+              DATE="$(TZ=Europe/Berlin date +%F)"
+              sed -i "0,/^## \[Unreleased\].*/s//## [$VERSION] – $DATE/" CHANGELOG.md
+            fi
+          else
+            VERSION="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ')"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Keine Version im CHANGELOG gefunden (\"$VERSION\")."
             exit 1
           fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "v$VERSION ist bereits veröffentlicht – kein Release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          HEAD_VERSION="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ')"
+          if [ "$HEAD_VERSION" != "$VERSION" ]; then
+            echo "::error::CHANGELOG beginnt mit $HEAD_VERSION statt $VERSION."
+            exit 1
+          fi
+          # Never go backwards: HACS always offers the highest version.
+          LATEST="$(git tag -l 'v*.*.*' | sed 's/^v//' | sort -V | tail -n1)"
+          if [ -n "$LATEST" ] && [ "$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]; then
+            echo "::error::$VERSION ist nicht neuer als die letzte Version $LATEST."
+            exit 1
+          fi
+          echo "Release v$VERSION wird erstellt."
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
+        if: steps.plan.outputs.release == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
 
       - name: Install dependencies
+        if: steps.plan.outputs.release == 'true'
         run: npm ci
 
-      - name: Set version in package.json, README and CHANGELOG
+      - name: Set version in package.json and README
+        if: steps.plan.outputs.release == 'true'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.plan.outputs.version }}
         run: |
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           sed -i -E "s/ROOM-CLIMATE-CARD v[0-9]+\.[0-9]+\.[0-9]+/ROOM-CLIMATE-CARD v$VERSION/" README.md
-          DATE="$(TZ=Europe/Berlin date +%F)"
-          if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
-            sed -i "0,/^## \[Unreleased\].*/s//## [$VERSION] – $DATE/" CHANGELOG.md
-          fi
-          HEAD_VERSION="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ')"
-          if [ "$HEAD_VERSION" != "$VERSION" ]; then
-            echo "::error::CHANGELOG beginnt mit $HEAD_VERSION statt $VERSION – bitte einen Abschnitt \"## [Unreleased]\" oder \"## [$VERSION]\" anlegen."
-            exit 1
-          fi
 
       - name: Build
+        if: steps.plan.outputs.release == 'true'
         run: npm run build
 
-      # Nach dem Build: version.test.ts prüft, dass das Bundle die neue Version trägt.
+      # After the build: version.test.ts checks the new version inside the bundle.
       - name: Typecheck and tests
+        if: steps.plan.outputs.release == 'true'
         run: |
           npm run typecheck
           npm test
 
+      # Commits made with GITHUB_TOKEN start no new workflow runs, so this
+      # push cannot trigger the release a second time.
       - name: Commit release files to main
+        if: steps.plan.outputs.release == 'true'
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.plan.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json README.md CHANGELOG.md dist
           if git diff --cached --quiet; then
-            echo "Nichts zu committen – main ist bereits auf dem Stand von $TAG."
+            echo "Nichts zu committen."
           else
             git commit -m "Release $TAG"
             git push origin HEAD:main
           fi
 
-      # Der Tag muss auf den Commit mit dem gebauten Bundle zeigen: HACS lädt den
-      # Stand des Tags, falls es das Release-Asset nicht nimmt.
-      - name: Point tag at the release commit
+      # The tag points at the commit with the built bundle: HACS falls back to
+      # the tagged tree when it does not use the release asset.
+      - name: Tag the release commit
+        if: steps.plan.outputs.release == 'true'
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.plan.outputs.tag }}
         run: |
-          git tag -f "$TAG"
-          git push -f origin "refs/tags/$TAG"
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
 
       - name: Release notes from CHANGELOG
+        if: steps.plan.outputs.release == 'true'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.plan.outputs.version }}
         run: |
           awk -v v="$VERSION" '
             index($0, "## [" v "]") == 1 { found = 1; next }
@@ -141,10 +160,11 @@ jobs:
           NOTES
 
       - name: Publish GitHub release
+        if: steps.plan.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ steps.plan.outputs.tag }}
+          name: ${{ steps.plan.outputs.tag }}
           body_path: release-notes.md
           make_latest: true
           files: |

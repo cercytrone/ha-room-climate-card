@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Geändert
+
+- **Release durch Merge.** Ein Release braucht keinen Tag mehr: Nennt der CHANGELOG auf `main`
+  oben eine Version ohne Tag, baut, testet, taggt und veröffentlicht der Release-Workflow sie
+  selbst. Eine Version, die älter ist als die letzte, wird abgelehnt.
+
 ## [2.18.1] – 2026-11-06
 
 ### Behoben
