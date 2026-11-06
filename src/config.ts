@@ -4,6 +4,12 @@ import {
   type SmoothingLevel,
 } from './chart/geometry';
 import { DEFAULT_BAND_LIMITS, DEFAULT_BAND_SOFTNESS, orderBandLimits, type BandLimits } from './chart/bands';
+import { resolveActions, type ResolvedActions } from './actions';
+import {
+  DEFAULT_HUMIDITY_LIMITS,
+  orderHumidityLimits,
+  type HumidityLimits,
+} from './utils/climate';
 import type { HomeAssistant, LovelaceCardConfig } from './types';
 
 export type ThemeMode = 'auto' | 'dark' | 'light';
@@ -27,6 +33,7 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   icon?: string;
   /** Card height in pixels. `0` / `"auto"` (default) lets the content decide. */
   height?: number | 'auto';
+  /** Corner radius in px; without it the card follows `--ha-card-border-radius`. */
   border_radius?: number;
   /** Innenabstand zwischen Inhalt und Außenkante in px (0–32, Standard 10). */
   card_padding?: number;
@@ -47,6 +54,14 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   humidity_font_family?: string;
   /** Caption row above the values ("TEMPERATUR" / "LUFTFEUCHTE"). Default on. */
   show_series_labels?: boolean;
+  /** Rate the humidity (dry / comfortable / humid) below its value. Default off. */
+  humidity_comfort?: boolean;
+  /** Below this value (%) the air is rated dry. Default 40. */
+  humidity_dry_below?: number;
+  /** Above this value (%) the air is rated humid. Default 60. */
+  humidity_humid_above?: number;
+  /** Dew point computed from temperature and humidity. Default off. */
+  show_dew_point?: boolean;
 
   // Series colours (one accent + one subdued secondary)
   /** Accent of the primary value: its dot and the temperature curve. */
@@ -63,6 +78,8 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   show_window?: boolean;
   window_entity?: string;
   window_open_states?: string[];
+  /** Warn in the card while a window is open and the heating runs. Default on. */
+  show_window_warning?: boolean;
 
   // Motion
   show_motion?: boolean;
@@ -75,10 +92,13 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   /** Whole heating/status row below the readings. Default on. */
   show_climate_row?: boolean;
   /**
-   * What a tap on the card (or Enter on the status row) does: open the
-   * more-info dialog of the climate entity, or nothing. Default `more-info`.
+   * Standard Home Assistant actions. A tap (or Enter) defaults to the more-info
+   * dialog of the thermostat, else of the temperature/humidity sensor. The old
+   * short form `tap_action: none` keeps working.
    */
-  tap_action?: TapAction | { action?: string };
+  tap_action?: string | Record<string, unknown>;
+  hold_action?: Record<string, unknown>;
+  double_tap_action?: Record<string, unknown>;
   show_setpoint?: boolean;
   show_hvac_status?: boolean;
   show_hvac_mode?: boolean;
@@ -140,6 +160,8 @@ export interface ResolvedWindowConfig {
   enabled: boolean;
   entity?: string;
   openStates: string[];
+  /** Hint "window open – heating is on" when both are true. */
+  warnWhileHeating: boolean;
 }
 
 export interface ResolvedMotionConfig {
@@ -161,8 +183,6 @@ export interface ResolvedThermostatConfig {
   offColor: string;
 }
 
-/** Tap on the card: open Home Assistant's more-info dialog, or nothing. */
-export type TapAction = 'more-info' | 'none';
 
 export interface ResolvedChartConfig {
   showTemperature: boolean;
@@ -221,6 +241,10 @@ export interface TypographyConfig {
 export interface HumidityConfig {
   /** Dot + curve colour of the secondary series. */
   color: string;
+  /** Rating below the value; `null` = off. */
+  comfort: HumidityLimits | null;
+  /** Dew point under the temperature (needs both sensors). */
+  showDewPoint: boolean;
 }
 
 export interface ResolvedConfig {
@@ -231,7 +255,8 @@ export interface ResolvedConfig {
   icon: string;
   /** `null` means "automatic / content driven". */
   height: number | null;
-  borderRadius: number;
+  /** `null` = the theme's card radius (`--ha-card-border-radius`). */
+  borderRadius: number | null;
   /** Inset between the content and the card's outer edge, in pixels. */
   padding: number;
   theme: ThemeMode;
@@ -249,9 +274,15 @@ export interface ResolvedConfig {
   motion: ResolvedMotionConfig;
   thermostat: ResolvedThermostatConfig;
   chart: ResolvedChartConfig;
-  /** `more-info` opens the dialog of the climate entity on tap. */
-  tapAction: TapAction;
+  /** Tap, hold and double tap in Home Assistant's action format. */
+  actions: ResolvedActions;
 }
+
+/**
+ * Radius Home Assistant gives its own cards when the theme sets none. Used where
+ * a number is needed (the chart's label inset) while the card follows the theme.
+ */
+export const THEME_CARD_RADIUS = 12;
 
 /** Inset between content and card edge – the one value every block shares. */
 export const DEFAULT_CARD_PADDING = 10;
@@ -347,16 +378,12 @@ export function asColor(value: unknown, fallback: string): string {
 }
 
 /**
- * Reads `tap_action` in both spellings: the short string of earlier versions
- * (`tap_action: none`) and the object form every Home Assistant card uses
- * (`tap_action: { action: none }`). Only `none` switches the tap off; every
- * other action keeps the built-in more-info dialog.
+ * Entity a more-info tap opens when the action names none: the thermostat (its
+ * dialog sets the target), else the temperature sensor, else the humidity one.
  */
-export function asTapAction(value: unknown): TapAction {
-  const action = isRecord(value) ? value.action : value;
-  return typeof action === 'string' && action.trim().toLowerCase() === 'none'
-    ? 'none'
-    : 'more-info';
+export function defaultActionEntity(config: ResolvedConfig): string | undefined {
+  if (config.thermostat.enabled && config.thermostat.entity) return config.thermostat.entity;
+  return config.temperatureEntity ?? config.humidityEntity;
 }
 
 /**
@@ -418,12 +445,17 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'humidity_font_size',
   'humidity_font_family',
   'show_series_labels',
+  'humidity_comfort',
+  'humidity_dry_below',
+  'humidity_humid_above',
+  'show_dew_point',
   'accent_color',
   'humidity_color',
   'temperature_comfort_color',
   'show_window',
   'window_entity',
   'window_open_states',
+  'show_window_warning',
   'show_motion',
   'motion_entity',
   'motion_show_last_changed',
@@ -431,6 +463,8 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'climate_entity',
   'show_climate_row',
   'tap_action',
+  'hold_action',
+  'double_tap_action',
   'show_setpoint',
   'show_hvac_status',
   'show_hvac_mode',
@@ -555,7 +589,12 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     nameFontSize: clampNameSize(config.name_font_size),
     icon: asString(config.icon) ?? 'mdi:home-thermometer-outline',
     height,
-    borderRadius: asNumber(config.border_radius, 0, 40, 26),
+    borderRadius:
+      config.border_radius === undefined ||
+      config.border_radius === null ||
+      (config.border_radius as unknown) === ''
+        ? null
+        : asNumber(config.border_radius, 0, 40, THEME_CARD_RADIUS),
     padding: Math.round(
       asNumber(
         config.card_padding,
@@ -586,11 +625,21 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     accentColor,
     humidity: {
       color: asColor(config.humidity_color, DEFAULT_COLORS.humidity),
+      comfort:
+        (asBoolean(config.humidity_comfort) ?? false) && humidityEntity
+          ? orderHumidityLimits(
+              asNumber(config.humidity_dry_below, 0, 100, DEFAULT_HUMIDITY_LIMITS.dryBelow),
+              asNumber(config.humidity_humid_above, 0, 100, DEFAULT_HUMIDITY_LIMITS.humidAbove)
+            )
+          : null,
+      showDewPoint:
+        (asBoolean(config.show_dew_point) ?? false) && Boolean(temperatureEntity && humidityEntity),
     },
     window: {
       enabled: showWindow && Boolean(windowEntity),
       entity: windowEntity,
       openStates: openStates.length ? openStates : [...DEFAULT_OPEN_STATES],
+      warnWhileHeating: asBoolean(config.show_window_warning) ?? true,
     },
     motion: {
       enabled: showMotion && Boolean(motionEntity),
@@ -649,7 +698,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       // the dashed helper lines are opt-in now.
       showGrid: asBoolean(config.chart_show_grid) ?? false,
     },
-    tapAction: asTapAction(config.tap_action),
+    actions: resolveActions(config as Record<string, unknown>),
   };
 }
 
@@ -746,15 +795,24 @@ export function preferredCardHeight(config: ResolvedConfig): number {
   const header = Math.max(28, nameLineHeight(config.nameFontSize) + 8);
   // Caption row plus its 4 px gap disappears completely when switched off.
   const labels = config.showSeriesLabels ? 20 : 0;
+  // Humidity rating / dew point: one 16 px line plus its 4 px gap.
+  const meta = hasReadingMeta(config) ? 20 : 0;
   const inset = config.padding * 2;
-  return inset + header + 12 + labels + readings + 8 + statusRow + 12 + chartHeight;
+  return inset + header + 12 + labels + readings + meta + 8 + statusRow + 12 + chartHeight;
+}
+
+/** Whether the line under the readings (rating, dew point) is shown. */
+export function hasReadingMeta(config: ResolvedConfig): boolean {
+  return config.humidity.comfort !== null || config.humidity.showDewPoint;
 }
 
 export function resolveName(config: ResolvedConfig, hass?: HomeAssistant): string {
   if (config.name) return config.name;
-  if (config.temperatureEntity) {
-    const entity = hass?.states[config.temperatureEntity];
-    const friendly = entity?.attributes?.friendly_name;
+  // The temperature sensor names the room; a humidity-only card (a bathroom)
+  // borrows the humidity sensor's name instead of a generic title.
+  for (const entityId of [config.temperatureEntity, config.humidityEntity]) {
+    if (!entityId) continue;
+    const friendly = hass?.states[entityId]?.attributes?.friendly_name;
     if (typeof friendly === 'string' && friendly.trim().length) return friendly;
   }
   return 'Raumklima';

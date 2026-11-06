@@ -666,8 +666,10 @@ describe('climate chart', () => {
     const chart = createChart({ temperature: samples([20, 21]), cornerRadius: 4 });
     setSize(chart, 320, 100);
     await chart.updateComplete;
-    const first = chart.shadowRoot!.querySelector('.axis-label')!;
-    expect(Number(first.getAttribute('x'))).toBeLessThan(20);
+    const labels = Array.from(chart.shadowRoot!.querySelectorAll('.axis-label'));
+    const nowLabel = labels[labels.length - 1];
+    // A small radius lets "Jetzt" move close to the edge (radius + 2 px).
+    expect(Number(nowLabel.getAttribute('x'))).toBe(320 - 6);
   });
 
   it('extends the series to both window edges', async () => {
@@ -1534,4 +1536,123 @@ describe('climate chart', () => {
     expect(Math.max(...stops)).toBeLessThanOrEqual(1);
   });
 
+});
+
+describe('axis, caption and keyboard', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  const axisLabels = (chart: RoomClimateChart): string[] =>
+    Array.from(chart.shadowRoot!.querySelectorAll('.axis-label')).map(
+      (label) => label.textContent?.trim() ?? ''
+    );
+
+  it('puts the axis labels on full hours instead of the window start', async () => {
+    const start = Date.UTC(2026, 9, 24, 6, 13);
+    const end = Date.UTC(2026, 9, 24, 12, 13);
+    const chart = createChart({
+      temperature: [
+        { t: start, v: 20 },
+        { t: end, v: 21 },
+      ],
+      start,
+      end,
+      timeZone: 'UTC',
+    });
+    setSize(chart, 420, 140);
+    await chart.updateComplete;
+    // Not "Sa 06:13": round times, and "Jetzt" at the right end.
+    expect(axisLabels(chart)).toEqual(['Sa 08:00', 'Sa 10:00', 'Jetzt']);
+  });
+
+  it('rounds to full hours of the configured time zone', async () => {
+    const start = Date.UTC(2026, 9, 24, 6, 13);
+    const end = Date.UTC(2026, 9, 24, 12, 13);
+    const chart = createChart({
+      temperature: [
+        { t: start, v: 20 },
+        { t: end, v: 21 },
+      ],
+      start,
+      end,
+      timeZone: 'Europe/Berlin',
+    });
+    setSize(chart, 420, 140);
+    await chart.updateComplete;
+    // 08:13–14:13 in Berlin (summer time): 10:00 and 12:00 local.
+    expect(axisLabels(chart)).toEqual(['Sa 10:00', 'Sa 12:00', 'Jetzt']);
+  });
+
+  it('labels a week by weekday at midnight', async () => {
+    const end = Date.UTC(2026, 9, 24, 12, 13);
+    const start = end - 7 * 24 * 3600_000;
+    const chart = createChart({
+      temperature: [
+        { t: start, v: 20 },
+        { t: end, v: 21 },
+      ],
+      start,
+      end,
+      timeZone: 'UTC',
+    });
+    setSize(chart, 420, 140);
+    await chart.updateComplete;
+    const labels = axisLabels(chart);
+    expect(labels[labels.length - 1]).toBe('Jetzt');
+    expect(labels.length).toBeGreaterThanOrEqual(3);
+    for (const label of labels.slice(0, -1)) expect(label).toMatch(/^[A-Z][a-z]$/);
+  });
+
+  it('moves the "Soll" caption off the curve near its end', async () => {
+    const start = now - 6 * 3600_000;
+    const series: ChartSample[] = Array.from({ length: 31 }, (_, index) => ({
+      t: start + index * 12 * 60_000,
+      // On the target the whole time, just above it at the end.
+      v: index > 25 ? 21.04 : 21,
+    }));
+    const chart = createChart({
+      temperature: series,
+      setpoint: 21,
+      showSetpoint: true,
+      curve: 'linear',
+      showExtremes: false,
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const line = chart.shadowRoot!.querySelector('.setpoint-line')!;
+    const caption = chart.shadowRoot!.querySelector('.setpoint-caption')!;
+    const lineY = Number(line.getAttribute('y1'));
+    // Above the line at either end the letters would touch the curve: below it.
+    expect(Number(caption.getAttribute('y'))).toBeGreaterThan(lineY);
+  });
+
+  it('lets the keyboard walk through the measured values', async () => {
+    const chart = createChart({
+      temperature: samples([20, 21, 22, 23]),
+      humidity: samples([40, 41, 42, 43]),
+      labels: { ...labels, explore: 'Verlauf: Pfeiltasten wählen einen Messwert' },
+    });
+    setSize(chart, 360, 130);
+    await chart.updateComplete;
+    const overlay = chart.shadowRoot!.querySelector('.overlay') as HTMLElement;
+    expect(overlay.getAttribute('tabindex')).toBe('0');
+    expect(overlay.getAttribute('aria-label')).toBe('Verlauf: Pfeiltasten wählen einen Messwert');
+    const hover = chart.shadowRoot!.querySelector('.hover') as HTMLElement;
+    const live = chart.shadowRoot!.querySelector('[aria-live="polite"]') as HTMLElement;
+
+    overlay.dispatchEvent(new FocusEvent('focus'));
+    expect(hover.hidden).toBe(false);
+    expect(live.textContent).toContain('23,0');
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    expect(live.textContent).toContain('22,0');
+    expect(live.textContent).toContain('42,0');
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(live.textContent).toContain('20,0');
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(hover.hidden).toBe(true);
+  });
 });

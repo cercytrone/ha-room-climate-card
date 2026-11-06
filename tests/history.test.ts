@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   HistoryRepository,
+  fetchStatistics,
+  historySourceFor,
+  parseStatisticsResponse,
   sharedHistoryRepository,
   fetchHistory,
   historyCacheKey,
@@ -254,3 +257,82 @@ describe('HistoryRepository caching', () => {
     expect(historyCacheKey(['a'], 6)).not.toBe(historyCacheKey(['a'], 12));
   });
 });
+
+describe('long windows from the recorder statistics', () => {
+  it('switches to statistics beyond 48 hours', () => {
+    expect(historySourceFor(24)).toBe('history');
+    expect(historySourceFor(48)).toBe('history');
+    expect(historySourceFor(72)).toBe('statistics');
+    expect(historySourceFor(168)).toBe('statistics');
+  });
+
+  it('places each five-minute mean in the middle of its bucket', () => {
+    const start = now - 10 * 60_000;
+    const parsed = parseStatisticsResponse(
+      {
+        'sensor.temp': [
+          { start: start + 5 * 60_000, end: start + 10 * 60_000, mean: 21.5 },
+          { start, end: start + 5 * 60_000, mean: 21 },
+          { start: start + 10 * 60_000, mean: null },
+        ],
+      },
+      ['sensor.temp', 'sensor.humidity']
+    );
+    expect(parsed['sensor.temp']).toEqual([
+      { t: start + 2.5 * 60_000, v: 21 },
+      { t: start + 7.5 * 60_000, v: 21.5 },
+      { t: start + 12.5 * 60_000, v: null },
+    ]);
+    expect(parsed['sensor.humidity']).toEqual([]);
+  });
+
+  it('asks for five-minute means and fills sensors without statistics from the history', async () => {
+    const messages: Array<Record<string, unknown>> = [];
+    const hass = createHass();
+    hass.connection!.sendMessagePromise = async (message: Record<string, unknown>) => {
+      messages.push(message);
+      if (message.type === 'recorder/statistics_during_period') {
+        return { 'sensor.temp': [{ start: now - 5 * 60_000, end: now, mean: 22 }] };
+      }
+      return { 'sensor.humidity': [{ s: '50', lu: Math.floor(now / 1000) }] };
+    };
+    const result = await fetchStatistics(hass, ['sensor.temp', 'sensor.humidity'], {
+      start: now - 72 * 3600_000,
+      end: now,
+    });
+    expect(messages[0]).toMatchObject({
+      type: 'recorder/statistics_during_period',
+      period: '5minute',
+      types: ['mean'],
+      statistic_ids: ['sensor.temp', 'sensor.humidity'],
+    });
+    expect(messages[1]).toMatchObject({
+      type: 'history/history_during_period',
+      entity_ids: ['sensor.humidity'],
+    });
+    expect(result['sensor.temp']).toEqual([{ t: now - 2.5 * 60_000, v: 22 }]);
+    expect(result['sensor.humidity']).toEqual([{ t: now, v: 50 }]);
+  });
+
+  it('falls back to the history when statistics are not available', async () => {
+    const hass = createHass({ history: { 'sensor.temp': [{ s: '21', lu: Math.floor(now / 1000) }] } });
+    // The helper rejects every message except the history request.
+    const result = await fetchStatistics(hass, ['sensor.temp'], { start: now - 1000, end: now });
+    expect(result['sensor.temp']).toEqual([{ t: now, v: 21 }]);
+  });
+
+  it('keeps statistics and raw history apart in the cache', async () => {
+    const types: string[] = [];
+    const hass = createHass();
+    hass.connection!.sendMessagePromise = async (message: Record<string, unknown>) => {
+      types.push(String(message.type));
+      return { 'sensor.temp': [] };
+    };
+    const repository = new HistoryRepository();
+    await repository.load(hass, ['sensor.temp'], 72, now, { source: 'statistics' });
+    await repository.load(hass, ['sensor.temp'], 72, now);
+    expect(types[0]).toBe('recorder/statistics_during_period');
+    expect(types).toContain('history/history_during_period');
+  });
+});
+

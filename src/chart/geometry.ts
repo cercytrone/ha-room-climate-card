@@ -894,3 +894,168 @@ export function decimate(samples: ChartSample[], maxPoints: number): ChartSample
   if (samples.length <= maxPoints || maxPoints < 3) return samples;
   return decimateIndices(samples, maxPoints).map((index) => samples[index]);
 }
+
+// ---------------------------------------------------------------- axis ticks
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+/** Steps the axis may use, from fine to coarse; up to a day they divide it evenly. */
+export const ROUND_TICK_STEPS: readonly number[] = [
+  30 * MINUTE,
+  HOUR,
+  2 * HOUR,
+  3 * HOUR,
+  4 * HOUR,
+  6 * HOUR,
+  12 * HOUR,
+  24 * HOUR,
+  // Week views: every second or third midnight.
+  48 * HOUR,
+  72 * HOUR,
+];
+
+export interface RoundTickOptions {
+  /** Most labels the axis may show besides "now". */
+  maxTicks: number;
+  /** Time near "now" that stays free for its label, in ms. */
+  endClearanceMs: number;
+  /** Smallest time between two labels, in ms (keeps them apart on the axis). */
+  minSpacingMs: number;
+  /**
+   * Offset of the displayed time zone at a moment, in ms (local = utc + offset).
+   * Ticks fall on full local hours, so a Berlin chart reads 03:00, not 02:00.
+   */
+  offsetAt?: (time: number) => number;
+}
+
+/**
+ * Ticks on round local times ("03:00", "06:00") instead of wherever the window
+ * happens to start ("02:55"). Picks the finest step that still fits into
+ * `maxTicks` labels; "now" is labelled separately by the chart.
+ */
+export function roundTimeTicks(start: number, end: number, options: RoundTickOptions): number[] {
+  if (!(end > start) || options.maxTicks < 1) return [];
+  const offsetAt = options.offsetAt ?? (() => 0);
+  const last = end - Math.max(0, options.endClearanceMs);
+  for (const step of ROUND_TICK_STEPS) {
+    if (step < options.minSpacingMs) continue;
+    const ticks: number[] = [];
+    const startOffset = offsetAt(start);
+    let local = Math.ceil((start + startOffset) / step) * step;
+    for (let guard = 0; guard < 400; guard += 1) {
+      // Re-evaluate the offset at the tick itself: a DST switch moves it.
+      const time = local - offsetAt(local - startOffset);
+      if (time > last) break;
+      if (time >= start) ticks.push(time);
+      local += step;
+    }
+    if (ticks.length >= 1 && ticks.length <= options.maxTicks) return ticks;
+  }
+  return [start];
+}
+
+// --------------------------------------------------------- setpoint caption
+
+/** Linear interpolation of a polyline (sorted by x) at `x`, or `null` outside it. */
+export function polylineYAt(points: Point[], x: number): number | null {
+  if (!points.length) return null;
+  if (x < points[0].x || x > points[points.length - 1].x) return null;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    if (x <= b.x) {
+      if (b.x === a.x) return Math.min(a.y, b.y);
+      return a.y + ((x - a.x) / (b.x - a.x)) * (b.y - a.y);
+    }
+  }
+  return points[points.length - 1].y;
+}
+
+export interface CaptionPlacement {
+  side: 'left' | 'right';
+  /** `true` = above the reference line, `false` = below it. */
+  above: boolean;
+  /** Free pixels between the caption box and the nearest curve. */
+  clearance: number;
+}
+
+export interface CaptionOptions {
+  /** y of the dashed reference line. */
+  lineY: number;
+  /** Horizontal extent the caption may use. */
+  left: number;
+  right: number;
+  /** Width and height of the caption text box. */
+  width: number;
+  height: number;
+  /** Plot area the caption must stay inside. */
+  top: number;
+  bottom: number;
+  /** Drawn curves (pixel polylines) and dots (with radius) to keep clear of. */
+  curves: Point[][];
+  dots?: Array<Point & { r: number }>;
+  /** Side tried first; the other side wins only when it is clearly better. */
+  preferredSide: 'left' | 'right';
+}
+
+/** Gap the caption keeps to the reference line. */
+const CAPTION_LINE_GAP = 3;
+/** Clearance that counts as "free": the curve does not touch the letters. */
+const CAPTION_FREE = 4;
+
+/**
+ * Finds the spot for the "Soll" caption: one of the two ends of the reference
+ * line, above or below it. The caption used to pick a side by the measured
+ * values only, so it could sit right on the "now" dot. This looks at the drawn
+ * curves and dots instead and takes the first candidate that keeps clear of
+ * them – or, if none does, the one with the most room.
+ */
+export function placeSetpointCaption(options: CaptionOptions): CaptionPlacement {
+  const other = options.preferredSide === 'right' ? 'left' : 'right';
+  const candidates: Array<{ side: 'left' | 'right'; above: boolean }> = [
+    { side: options.preferredSide, above: true },
+    { side: other, above: true },
+    { side: options.preferredSide, above: false },
+    { side: other, above: false },
+  ];
+  let best: CaptionPlacement | null = null;
+  for (const candidate of candidates) {
+    const boxTop = candidate.above
+      ? options.lineY - CAPTION_LINE_GAP - options.height
+      : options.lineY + CAPTION_LINE_GAP;
+    const boxBottom = boxTop + options.height;
+    // A caption that would leave the plot is not a candidate.
+    if (boxTop < options.top - 1 || boxBottom > options.bottom + 1) continue;
+    const boxLeft = candidate.side === 'left' ? options.left : options.right - options.width;
+    const boxRight = boxLeft + options.width;
+    const clearance = boxClearance(boxLeft, boxRight, boxTop, boxBottom, options);
+    const placement = { ...candidate, clearance };
+    if (clearance >= CAPTION_FREE) return placement;
+    if (!best || clearance > best.clearance) best = placement;
+  }
+  return best ?? { side: options.preferredSide, above: true, clearance: 0 };
+}
+
+function boxClearance(
+  left: number,
+  right: number,
+  top: number,
+  bottom: number,
+  options: CaptionOptions
+): number {
+  let clearance = Number.POSITIVE_INFINITY;
+  const distance = (y: number): number => (y < top ? top - y : y > bottom ? y - bottom : 0);
+  for (const curve of options.curves) {
+    for (let x = left; x <= right + 0.001; x += 2) {
+      const y = polylineYAt(curve, Math.min(x, right));
+      if (y !== null) clearance = Math.min(clearance, distance(y));
+    }
+  }
+  for (const dot of options.dots ?? []) {
+    const dx = dot.x < left ? left - dot.x : dot.x > right ? dot.x - right : 0;
+    if (dx > dot.r + CAPTION_FREE) continue;
+    clearance = Math.min(clearance, Math.max(0, distance(dot.y) - dot.r));
+  }
+  return clearance;
+}

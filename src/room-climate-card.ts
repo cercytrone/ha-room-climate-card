@@ -5,17 +5,21 @@ import {
   CARD_TAG,
   EDITOR_TAG,
 } from './const';
+import { isActionable, runAction, type CardAction } from './actions';
 import {
   chartSlotBottomMargin,
   chartSlotMargin,
   configEntityIds,
+  defaultActionEntity,
   hasChart,
+  hasReadingMeta,
   hasStatusRow,
   nameIconSize,
   nameLineHeight,
   normalizeConfig,
   preferredCardHeight,
   resolveName,
+  THEME_CARD_RADIUS,
   type ResolvedConfig,
   type RoomClimateCardConfig,
 } from './config';
@@ -30,6 +34,7 @@ import {
 } from './data/states';
 import {
   HistoryRepository,
+  historySourceFor,
   sharedHistoryRepository,
   type HistoryMap,
 } from './data/history';
@@ -44,6 +49,7 @@ import {
   withAlpha,
 } from './utils/format';
 import { icons } from './ui/icons';
+import { dewPointCelsius, humidityLevel } from './utils/climate';
 import './chart/climate-chart';
 import type { ChartSample } from './chart/geometry';
 import './editor/room-climate-editor';
@@ -83,6 +89,11 @@ function isValidTimeZone(zone: string): boolean {
 const WINDOW_OPEN_COLOR = '#fbbf24';
 const MOTION_ACTIVE_COLOR = '#34d399';
 const NEUTRAL_COLOR = 'var(--rcc-neutral)';
+
+/** Long press that counts as "hold", and the window for a second tap. */
+const HOLD_MS = 500;
+const HOLD_MOVE_TOLERANCE = 10;
+const DOUBLE_TAP_MS = 250;
 
 /** Backoff bounds for retrying a failed history request. */
 const RETRY_MIN_MS = 15 * 1000;
@@ -193,6 +204,9 @@ export class RoomClimateCard extends LitElement {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     if (this.tickTimer) clearInterval(this.tickTimer);
     if (this.pendingLoad) clearTimeout(this.pendingLoad);
+    this.clearHold();
+    if (this.tapTimer) clearTimeout(this.tapTimer);
+    this.tapTimer = undefined;
     this.refreshTimer = undefined;
     this.tickTimer = undefined;
     this.pendingLoad = undefined;
@@ -366,7 +380,10 @@ export class RoomClimateCard extends LitElement {
         ids,
         config.chart.hours,
         end,
-        fresh ? { maxAgeMs: 0 } : {}
+        {
+          ...(fresh ? { maxAgeMs: 0 } : {}),
+          source: historySourceFor(config.chart.hours),
+        }
       );
       if (this.historyKey !== key) return;
       this._history = data;
@@ -492,7 +509,8 @@ export class RoomClimateCard extends LitElement {
     const themeClass = config.theme === 'auto' ? 'theme-auto' : `theme-${config.theme}`;
     const { temperature: tempType, humidity: humType } = config.typography;
     const style = [
-      `--rcc-radius:${config.borderRadius}px`,
+      // Without an own radius the card keeps the theme's (`--ha-card-border-radius`).
+      config.borderRadius !== null ? `--rcc-radius:${config.borderRadius}px` : '',
       `--rcc-inset:${config.padding}px`,
       config.height ? `--rcc-height:${config.height}px` : '',
       `--rcc-chart-height:${config.chart.height}px`,
@@ -514,29 +532,40 @@ export class RoomClimateCard extends LitElement {
       .filter(Boolean)
       .join(';');
 
-    const tapTarget = this.tapTarget;
+    const tapEnabled = this.tapEnabled;
+    const interactive = tapEnabled || this.hasGesture('hold') || this.hasGesture('doubleTap');
     const climateRow = this.renderClimateRow(config, t);
     /*
      * Without a rendered status row the card has to carry the keyboard path
      * itself, otherwise the tap would be reachable with a pointer only.
      */
-    const cardIsButton = Boolean(tapTarget) && climateRow === nothing;
+    const cardIsButton = tapEnabled && climateRow === nothing;
 
-    return html`<div
-      class="card ${themeClass} density-${this._density} ${config.height ? 'fixed-height' : 'auto-height'} ${tapTarget ? 'is-tappable' : ''}"
+    /*
+     * `ha-card` is the frame every Home Assistant card shares: theme radius,
+     * border, shadow and background (`--ha-card-*`) apply, and card-mod finds
+     * the element it styles. The class keeps the card's own layout on it.
+     */
+    return html`<ha-card
+      class="card ${themeClass} density-${this._density} ${config.height ? 'fixed-height' : 'auto-height'} ${interactive ? 'is-tappable' : ''}"
       style="${style}"
       role=${cardIsButton ? 'button' : 'group'}
       tabindex=${cardIsButton ? '0' : nothing}
       aria-label=${cardIsButton
-        ? `${this.cellAriaLabel(config, t)} – ${t.t('openThermostat')}`
+        ? `${this.cellAriaLabel(config, t)} – ${this.tapLabel(t)}`
         : this.cellAriaLabel(config, t)}
       @click=${this.handleCardClick}
       @keydown=${cardIsButton ? this.handleCardKeydown : nothing}
+      @pointerdown=${this.onPressStart}
+      @pointermove=${this.onPressMove}
+      @pointerup=${this.onPressEnd}
+      @pointercancel=${this.onPressEnd}
+      @pointerleave=${this.onPressEnd}
     >
       ${this.renderHeader(config, t)} ${this.renderReadings(config, t)}
-      ${climateRow} ${this.renderChart(config, t)}
+      ${climateRow} ${this.renderWindowWarning(config, t)} ${this.renderChart(config, t)}
       ${!this.hasAnyEntity(config) ? this.renderEmpty(t) : nothing}
-    </div>`;
+    </ha-card>`;
   }
 
   private hasAnyEntity(config: ResolvedConfig): boolean {
@@ -661,6 +690,9 @@ export class RoomClimateCard extends LitElement {
     const humidity = readSensor(this.hass, config.humidityEntity, 'humidity');
     const showTemperature = Boolean(config.temperatureEntity);
     const showHumidity = Boolean(config.humidityEntity);
+    // Without a temperature the humidity is the only value: it takes the hero
+    // slot (size, left edge) instead of sitting small on the right.
+    const humidityIsHero = showHumidity && !showTemperature;
 
     const showLabels = config.showSeriesLabels;
     return html`<div class="readings ${showLabels ? '' : 'no-labels'}">
@@ -699,7 +731,7 @@ export class RoomClimateCard extends LitElement {
           : nothing}
         ${showHumidity
           ? this.renderReading({
-              className: 'humidity',
+              className: humidityIsHero ? 'humidity hero' : 'humidity',
               value: humidity.value,
               unit: humidity.unit,
               decimals: config.humidityDecimals,
@@ -714,6 +746,53 @@ export class RoomClimateCard extends LitElement {
             })
           : nothing}
       </div>
+      ${this.renderReadingMeta(config, t, temperature, humidity, humidityIsHero)}
+    </div>`;
+  }
+
+  /**
+   * Quiet line under the values: the dew point below the temperature and the
+   * humidity rating below the humidity. The line keeps its height while a
+   * sensor is unavailable, so the card does not jump.
+   */
+  private renderReadingMeta(
+    config: ResolvedConfig,
+    t: Translator,
+    temperature: SensorReading,
+    humidity: SensorReading,
+    humidityIsHero: boolean
+  ): TemplateResult | typeof nothing {
+    if (!hasReadingMeta(config)) return nothing;
+    const language = this.language();
+    let dewPoint: TemplateResult | typeof nothing = nothing;
+    if (config.humidity.showDewPoint && temperature.value !== null && humidity.value !== null) {
+      // The formula works in °C; the result is shown in the sensor's own unit.
+      const fahrenheit = temperatureScale(temperature.unit) === 'F';
+      const celsius = fahrenheit ? (temperature.value - 32) / 1.8 : temperature.value;
+      const dew = dewPointCelsius(celsius, humidity.value);
+      if (dew !== null) {
+        const shown = fahrenheit ? dew * 1.8 + 32 : dew;
+        dewPoint = html`<span class="meta-dew"
+          >${t.t('dewPoint')}
+          ${formatNumber(shown, language, config.temperatureDecimals)} ${temperature.unit}</span
+        >`;
+      }
+    }
+    let rating: TemplateResult | typeof nothing = nothing;
+    if (config.humidity.comfort && humidity.value !== null) {
+      const level = humidityLevel(humidity.value, config.humidity.comfort);
+      const label =
+        level === 'dry'
+          ? t.t('humidityDry')
+          : level === 'humid'
+            ? t.t('humidityHumid')
+            : t.t('humidityComfortable');
+      rating = html`<span class="meta-humidity level-${level}"
+        ><span class="meta-dot" aria-hidden="true"></span>${label}</span
+      >`;
+    }
+    return html`<div class="reading-meta ${humidityIsHero ? 'humidity-first' : ''}">
+      ${dewPoint}${rating}
     </div>`;
   }
 
@@ -755,52 +834,121 @@ export class RoomClimateCard extends LitElement {
   }
 
   /**
-   * Entity a tap on the card opens. Offered whenever a thermostat row is
-   * configured – independently of whether that row is displayed, because
-   * hiding the row is a visual choice and must not silently kill the tap. The
-   * keyboard path is the row while it is visible and the card itself while it
-   * is not (see `render()`), so the action is never pointer-only.
+   * Entity a more-info or toggle action works on when it names none: the
+   * thermostat, else the temperature sensor, else the humidity sensor. Without
+   * a thermostat a tap therefore opens the sensor's history instead of doing
+   * nothing.
    */
-  private get tapTarget(): string | undefined {
-    const config = this._config;
-    if (!config || config.tapAction === 'none') return undefined;
-    if (!config.thermostat.enabled) return undefined;
-    return config.thermostat.entity;
+  private get mainEntity(): string | undefined {
+    return this._config ? defaultActionEntity(this._config) : undefined;
   }
 
-  /**
-   * Opens Home Assistant's more-info dialog. `hass-more-info` is the event the
-   * frontend's own tiles dispatch; the dialog (with the climate controls)
-   * belongs to Home Assistant, so there is nothing to rebuild or navigate to.
-   */
-  private openMoreInfo(entityId: string): void {
-    this.dispatchEvent(
-      new CustomEvent('hass-more-info', {
-        detail: { entityId },
-        bubbles: true,
-        composed: true,
-      })
-    );
+  /** Whether a tap does something – the card is then a button. */
+  private get tapEnabled(): boolean {
+    return Boolean(this._config) && isActionable(this._config!.actions.tap, this.mainEntity);
   }
 
+  private hasGesture(kind: 'hold' | 'doubleTap'): boolean {
+    const action = this._config?.actions[kind] ?? null;
+    return isActionable(action, this.mainEntity);
+  }
+
+  /** Words for the accessible name of the tap ("Thermostat öffnen", …). */
+  private tapLabel(t: Translator): string {
+    const action = this._config?.actions.tap;
+    if (action?.action === 'more-info') {
+      const entityId = action.entity ?? this.mainEntity;
+      return entityId?.startsWith('climate.') ? t.t('openThermostat') : t.t('openDetails');
+    }
+    return t.t('runAction');
+  }
+
+  private run(action: CardAction | null): void {
+    runAction(this, this.hass, action, this.mainEntity, {
+      confirmText: this.translator().t('confirmAction'),
+    });
+  }
+
+  private holdTimer?: ReturnType<typeof setTimeout>;
+  private holdFired = false;
+  private pressOrigin?: { x: number; y: number };
+  private tapTimer?: ReturnType<typeof setTimeout>;
+
+  /** Taps inside the chart belong to the chart while it shows its readout. */
+  private chartOwns(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | null;
+    return Boolean(element?.closest?.('.chart-slot, room-climate-chart')) && Boolean(this._config?.chart.showTooltip);
+  }
+
+  private clearHold(): void {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = undefined;
+  }
+
+  /** A press of HOLD_MS without moving runs `hold_action`. */
+  private onPressStart = (event: PointerEvent): void => {
+    this.holdFired = false;
+    if (!this.hasGesture('hold') || this.chartOwns(event.target)) return;
+    if (event.button !== undefined && event.button > 0) return;
+    this.pressOrigin = { x: event.clientX, y: event.clientY };
+    this.clearHold();
+    this.holdTimer = setTimeout(() => {
+      this.holdTimer = undefined;
+      this.holdFired = true;
+      this.run(this._config?.actions.hold ?? null);
+    }, HOLD_MS);
+  };
+
+  private onPressMove = (event: PointerEvent): void => {
+    if (!this.holdTimer || !this.pressOrigin) return;
+    const dx = event.clientX - this.pressOrigin.x;
+    const dy = event.clientY - this.pressOrigin.y;
+    // Scrolling the dashboard is not a long press.
+    if (dx * dx + dy * dy > HOLD_MOVE_TOLERANCE * HOLD_MOVE_TOLERANCE) this.clearHold();
+  };
+
+  private onPressEnd = (): void => {
+    this.clearHold();
+  };
+
   /**
-   * A tap anywhere on the card opens the thermostat – except on the elements
-   * that do something themselves (the status row and links handle their own
-   * action). The readings deliberately have no handler of their own any more,
-   * and the chart only keeps its taps while it shows the value readout; with
-   * the readout switched off the chart area opens the dialog as well.
+   * One tap: runs `tap_action`, unless the press just ran `hold_action`. With a
+   * `double_tap_action` the first tap waits DOUBLE_TAP_MS for a second one;
+   * without it nothing waits.
    */
-  private handleCardClick = (event: MouseEvent): void => {
-    const entityId = this.tapTarget;
-    if (!entityId) return;
-    const target = event.target as HTMLElement | null;
-    const insideChart = Boolean(target?.closest('.chart-slot, room-climate-chart'));
-    if (insideChart) {
-      if (this._config?.chart.showTooltip) return;
-    } else if (target?.closest('button, a, input, select, textarea')) {
+  private handleTap(): void {
+    if (this.holdFired) {
+      this.holdFired = false;
       return;
     }
-    this.openMoreInfo(entityId);
+    const actions = this._config?.actions;
+    if (!actions) return;
+    if (this.hasGesture('doubleTap')) {
+      if (this.tapTimer) {
+        clearTimeout(this.tapTimer);
+        this.tapTimer = undefined;
+        this.run(actions.doubleTap);
+        return;
+      }
+      this.tapTimer = setTimeout(() => {
+        this.tapTimer = undefined;
+        this.run(actions.tap);
+      }, DOUBLE_TAP_MS);
+      return;
+    }
+    this.run(actions.tap);
+  }
+
+  /**
+   * A tap anywhere on the card – except on elements that act themselves (the
+   * status row handles its own click, links and inputs stay theirs) and on the
+   * chart while it shows the value readout.
+   */
+  private handleCardClick = (event: MouseEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (this.chartOwns(target)) return;
+    if (target?.closest('button, a, input, select, textarea')) return;
+    this.handleTap();
   };
 
   /**
@@ -811,10 +959,9 @@ export class RoomClimateCard extends LitElement {
   private handleCardKeydown = (event: KeyboardEvent): void => {
     if (event.target !== event.currentTarget) return;
     if (event.key !== 'Enter' && event.key !== ' ') return;
-    const entityId = this.tapTarget;
-    if (!entityId) return;
+    if (!this.tapEnabled) return;
     event.preventDefault();
-    this.openMoreInfo(entityId);
+    this.run(this._config?.actions.tap ?? null);
   };
 
   /**
@@ -831,6 +978,20 @@ export class RoomClimateCard extends LitElement {
     const showSetpoint = config.thermostat.showSetpoint && thermostat.setpoint !== null;
     const showStatus = config.thermostat.showStatus;
     const showMode = config.thermostat.showMode && Boolean(thermostat.modeLabel);
+    /*
+     * Mode and action together ("Automatik · Heizt"): the mode alone hid whether
+     * the heating actually runs. Said once when both are the same thing ("Aus")
+     * or when there is no action to add (the label already is the mode).
+     */
+    const stateText =
+      showMode &&
+      thermostat.modeLabel &&
+      thermostat.status !== 'unknown' &&
+      thermostat.modeLabel !== thermostat.label
+        ? `${thermostat.modeLabel} · ${thermostat.label}`
+        : showMode && thermostat.status === 'unknown'
+          ? (thermostat.modeLabel ?? thermostat.label)
+          : thermostat.label;
     if (!showSetpoint && !showStatus && !showMode) return nothing;
 
     const color = thermostatStatusColor(thermostat, config);
@@ -842,14 +1003,14 @@ export class RoomClimateCard extends LitElement {
           }`
         : '';
 
-    const entityId = this.tapTarget;
+    const tappable = this.tapEnabled;
     const content = html`${showStatus
         ? html`<span class="flame status-${thermostat.status}" style="color:${color}" aria-hidden="true"
             >${this.heatingIcon(thermostat)}</span
           >`
         : nothing}
-      <span class="climate-state" role=${entityId ? 'status' : nothing}
-        >${showMode ? thermostat.modeLabel : thermostat.label}</span
+      <span class="climate-state" role=${tappable ? 'status' : nothing}
+        >${stateText}</span
       >
       ${showSetpoint
         ? html`<span class="climate-sep" aria-hidden="true">·</span>
@@ -860,7 +1021,7 @@ export class RoomClimateCard extends LitElement {
 
     // Without a target the row stays a plain live region; with one it becomes a
     // real button, so keyboard users have the same path as a finger.
-    if (!entityId) {
+    if (!tappable) {
       return html`<div
         class="climate-row"
         role="status"
@@ -872,12 +1033,34 @@ export class RoomClimateCard extends LitElement {
     return html`<button
       type="button"
       class="climate-row is-tappable"
-      aria-label="${this.thermostatAria(thermostat)} – ${t.t('openThermostat')}"
-      title="${t.t('openThermostat')}"
-      @click=${() => this.openMoreInfo(entityId)}
+      aria-label="${this.thermostatAria(thermostat)} – ${this.tapLabel(t)}"
+      title="${this.tapLabel(t)}"
+      @click=${(event: MouseEvent) => {
+        event.stopPropagation();
+        this.handleTap();
+      }}
     >
       ${content}
     </button>`;
+  }
+
+  /**
+   * "Fenster offen – Heizung läuft": both facts are on the card already, but
+   * only together are they worth acting on. Shown while the window counts as
+   * open and the thermostat reports `hvac_action: heating`.
+   */
+  private renderWindowWarning(
+    config: ResolvedConfig,
+    t: Translator
+  ): TemplateResult | typeof nothing {
+    if (!config.window.enabled || !config.window.warnWhileHeating) return nothing;
+    if (!config.thermostat.enabled) return nothing;
+    if (readWindow(this.hass, config).status !== 'open') return nothing;
+    if (readThermostat(this.hass, config, t).status !== 'heating') return nothing;
+    return html`<div class="climate-warning" role="alert">
+      <span class="climate-warning-icon" aria-hidden="true">${icons.windowOpen()}</span>
+      <span>${t.t('windowHeatingWarning')}</span>
+    </div>`;
   }
 
   /** Icon for the current HVAC action; the colour carries the state. */
@@ -969,7 +1152,7 @@ export class RoomClimateCard extends LitElement {
     };
 
     // With the readout switched off the chart area belongs to the card tap.
-    const chartTappable = Boolean(this.tapTarget) && !config.chart.showTooltip;
+    const chartTappable = this.tapEnabled && !config.chart.showTooltip;
     /*
      * The chart's horizontal extent is a number, not a CSS trick: full bleed
      * cancels the inset, otherwise the chart shares the text edge. Written as an
@@ -1018,7 +1201,7 @@ export class RoomClimateCard extends LitElement {
         .bandHot=${bandValue(config.chart.bandLimits.hotAbove, temperatureUnitOfSensor)}
         .bandTransition=${Math.round(config.chart.bandTransition * 100)}
         .temperatureScale=${temperatureScale(temperatureUnitOfSensor) ?? 'C'}
-        .cornerRadius=${config.borderRadius}
+        .cornerRadius=${config.borderRadius ?? THEME_CARD_RADIUS}
         .language=${language}
         .timeZone=${clock.timeZone}
         .hour12=${clock.hour12}
@@ -1044,6 +1227,8 @@ export class RoomClimateCard extends LitElement {
      */
     :host {
       display: block;
+      /* Fills its cell in the sections grid; auto everywhere else. */
+      height: 100%;
       --rcc-space-1: 4px;
       --rcc-space-2: 8px;
       --rcc-space-3: 12px;
@@ -1061,9 +1246,10 @@ export class RoomClimateCard extends LitElement {
       --rcc-tertiary: rgba(255, 255, 255, 0.32);
       --rcc-tertiary: color-mix(in srgb, var(--primary-text-color, #ffffff) 32%, transparent);
       --rcc-neutral: #94a3b8;
+      /* Amber of the open-window badge; darker on light cards for contrast. */
+      --rcc-warning: var(--warning-color, #f59e0b);
       --rcc-accent: #4fd1a5;
       --rcc-secondary: #8b86d6;
-      --rcc-radius: 26px;
 
       --rcc-temp-size: 42px;
       --rcc-hum-size: 20px;
@@ -1075,25 +1261,34 @@ export class RoomClimateCard extends LitElement {
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
+    /*
+     * The frame belongs to ha-card and the theme (background, border, shadow,
+     * radius). Only an explicit dark or light theme, or an own radius, paints
+     * over it.
+     */
     .card {
       position: relative;
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
-      height: var(--rcc-height, auto);
+      height: var(--rcc-height, 100%);
       min-height: 0;
       /* One inset for everything: title, values and chart share the same edge. */
       padding: var(--rcc-inset, 10px);
       overflow: hidden;
-      background-color: var(--rcc-bg);
-      background-image: var(--rcc-surface);
-      border: 1px solid var(--rcc-hairline);
-      border-radius: var(--rcc-radius);
-      box-shadow: 0 8px 24px -22px rgba(0, 0, 0, 0.9);
+      color: var(--rcc-text);
+      border-radius: var(--rcc-radius, var(--ha-card-border-radius, 12px));
       transition:
         background-color 0.2s ease,
         border-color 0.2s ease,
         color 0.2s ease;
+    }
+    .card.theme-dark,
+    .card.theme-light {
+      background-color: var(--rcc-bg);
+      background-image: var(--rcc-surface);
+      border: 1px solid var(--rcc-hairline);
+      box-shadow: 0 8px 24px -22px rgba(0, 0, 0, 0.9);
     }
     /* Depth instead of a frame: a hairline plus a barely visible light gradient. */
     .card.theme-dark {
@@ -1107,6 +1302,7 @@ export class RoomClimateCard extends LitElement {
       --rcc-text: rgba(255, 255, 255, 0.92);
       --rcc-muted: rgba(255, 255, 255, 0.5);
       --rcc-tertiary: rgba(255, 255, 255, 0.32);
+      --rcc-warning: #fbbf24;
     }
     .card.theme-light {
       --rcc-bg: #ffffff;
@@ -1115,6 +1311,7 @@ export class RoomClimateCard extends LitElement {
       --rcc-text: rgba(15, 23, 42, 0.92);
       --rcc-muted: rgba(15, 23, 42, 0.52);
       --rcc-tertiary: rgba(15, 23, 42, 0.34);
+      --rcc-warning: #b45309;
     }
 
     /* ------------------------------------------------------------- header */
@@ -1321,6 +1518,58 @@ export class RoomClimateCard extends LitElement {
     .reading.humidity .reading-unit {
       font-size: 0.5em;
     }
+    /* Dew point (left) and humidity rating (right) under the values. */
+    .reading-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--rcc-space-2);
+      min-height: 16px;
+      font-size: 11px;
+      line-height: 16px;
+      color: var(--rcc-muted);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum' 1;
+      white-space: nowrap;
+    }
+    .meta-dew {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .meta-humidity {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--rcc-space-1);
+      margin-left: auto;
+    }
+    .reading-meta.humidity-first .meta-humidity {
+      margin-left: 0;
+    }
+    .meta-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--rcc-accent);
+    }
+    .meta-humidity.level-dry .meta-dot {
+      background: var(--info-color, #60a5fa);
+    }
+    .meta-humidity.level-humid {
+      color: var(--rcc-warning);
+    }
+    .meta-humidity.level-humid .meta-dot {
+      background: var(--rcc-warning);
+    }
+    /* Humidity-only card: the value is the hero, on the left, at hero size. */
+    .reading.humidity.hero {
+      margin-left: 0;
+      font-size: var(--rcc-temp-size);
+    }
+    .reading.humidity.hero .reading-number {
+      letter-spacing: -0.035em;
+    }
+    .reading.humidity.hero .reading-unit {
+      font-size: 0.34em;
+    }
 
     /* --------------------------------------------------------- heating row */
     .climate-row {
@@ -1418,6 +1667,29 @@ export class RoomClimateCard extends LitElement {
     .climate-setpoint-label {
       color: var(--rcc-tertiary);
     }
+    /* Window open while heating: the one line on the card that asks for action. */
+    .climate-warning {
+      display: flex;
+      align-items: center;
+      gap: var(--rcc-space-1);
+      margin-top: var(--rcc-space-1);
+      min-height: 16px;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 500;
+      color: var(--rcc-warning);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .climate-warning-icon {
+      display: inline-flex;
+      flex: none;
+    }
+    .climate-warning-icon .icon {
+      width: 14px;
+      height: 14px;
+    }
 
     /* -------------------------------------------------------------- chart */
     .chart-slot {
@@ -1431,8 +1703,12 @@ export class RoomClimateCard extends LitElement {
       flex: 1 1 auto;
       min-height: 0;
     }
+    /*
+     * Configured chart height is the minimum; inside a taller sections-grid cell
+     * the chart takes the remaining space instead of leaving a gap below.
+     */
     .auto-height .chart-slot {
-      flex: none;
+      flex: 1 0 auto;
       height: var(--rcc-chart-height, 112px);
     }
     .fixed-height .chart-slot {
@@ -1506,6 +1782,14 @@ export class RoomClimateCard extends LitElement {
     }
     .density-sm .reading.humidity {
       font-size: calc(var(--rcc-hum-size, 20px) * 0.95);
+    }
+
+    /* The humidity hero shrinks like the temperature it stands in for. */
+    .density-xs .reading.humidity.hero {
+      font-size: calc(var(--rcc-temp-size, 42px) * 0.6);
+    }
+    .density-sm .reading.humidity.hero {
+      font-size: calc(var(--rcc-temp-size, 42px) * 0.82);
     }
 
     @media (prefers-reduced-motion: reduce) {

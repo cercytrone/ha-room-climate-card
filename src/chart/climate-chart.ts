@@ -19,9 +19,9 @@ import {
   smoothingGuard,
   smoothingWindow,
   type SmoothingLevel,
+  placeSetpointCaption,
+  roundTimeTicks,
   splitAtBridges,
-  tickCountForWidth,
-  timeTicks,
   type ChartSample,
   type GapMode,
   type Point,
@@ -73,6 +73,18 @@ const END_DOT_RADIUS = 2.8;
 
 /** Minimum distance of a min/max number to the chart edge, in CSS pixel. */
 const EXTREME_EDGE_GAP = 6;
+const DAY_MS = 24 * 3600 * 1000;
+/** Room kept free left of "now" on the axis, in px. */
+const AXIS_NOW_CLEARANCE = 70;
+/** Smallest distance between two axis labels, in px ("Fr 03:00" ≈ 50 px). */
+const AXIS_LABEL_SPACING = 72;
+/** Half the width of an axis label; decides when a label leans on the left edge. */
+const AXIS_LABEL_HALF_WIDTH = 26;
+/** Approximate advance of one letter of the 9 px "SOLL" caption (versals, tracked). */
+const CAPTION_CHAR_WIDTH = 6.6;
+/** Height of the caption box and its gap to the dashed line, in px. */
+const CAPTION_HEIGHT = 9;
+const CAPTION_LINE_GAP = 3;
 
 /**
  * Why a min/max mark is missing, reported once per reason.
@@ -157,6 +169,8 @@ export interface ChartLabels {
   bandNormalText?: string;
   bandWarmText?: string;
   bandHotText?: string;
+  /** Accessible name of the focusable plot: how to explore it by keyboard. */
+  explore?: string;
 }
 
 export class RoomClimateChart extends LitElement {
@@ -338,6 +352,25 @@ export class RoomClimateChart extends LitElement {
       right: 0;
       touch-action: pan-y;
       cursor: crosshair;
+    }
+    .overlay:focus {
+      outline: none;
+    }
+    .overlay:focus-visible {
+      outline: 2px solid var(--rcc-focus, currentColor);
+      outline-offset: -2px;
+      border-radius: 4px;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
     .hover {
       position: absolute;
@@ -530,6 +563,9 @@ export class RoomClimateChart extends LitElement {
   private readonly tooltipHumidityRef = createRef<HTMLElement>();
   private readonly tooltipTemperatureRowRef = createRef<HTMLElement>();
   private readonly tooltipHumidityRowRef = createRef<HTMLElement>();
+  private readonly liveRef = createRef<HTMLElement>();
+  /** Instant the readout currently shows; the arrow keys move from here. */
+  private hoverTime?: number;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -880,17 +916,38 @@ export class RoomClimateChart extends LitElement {
       }
     }
 
-    // Three ticks only: start, middle, now. Times stay readable ("Sa 05:40"),
-    // the newest point is labelled by meaning instead of by number.
-    const tickCount = showAxis ? Math.min(3, tickCountForWidth(width)) : 0;
-    const ticks = tickCount >= 2 ? timeTicks(this.start, this.end, Math.max(2, tickCount)) : [];
-    const axisLabels = ticks.map((tick, index) => {
-      const isLast = index === ticks.length - 1;
-      const anchor = index === 0 ? 'start' : isLast ? 'end' : 'middle';
-      return svg`<text class="axis-label" x=${labelX(tick)} y=${labelBaseline} text-anchor=${anchor}>
-        ${this.formatAxisLabel(tick, isLast)}
-      </text>`;
-    });
+    /*
+     * Round local times ("Fr 03:00", "Fr 06:00") plus "now" at the right end.
+     * A label costs about 50 px; the step is the finest one whose labels keep
+     * that apart and stay clear of "now".
+     */
+    const labelSpan = Math.max(1, edgeRight - left - 2 * cornerInset);
+    const msPerPx = rangeMs / labelSpan;
+    const maxTicks = width < 200 ? 1 : width < 300 ? 2 : 3;
+    const ticks = showAxis
+      ? roundTimeTicks(this.start, this.end, {
+          maxTicks,
+          endClearanceMs: AXIS_NOW_CLEARANCE * msPerPx,
+          minSpacingMs: AXIS_LABEL_SPACING * msPerPx,
+          offsetAt: (time) => this.zoneOffset(time),
+        })
+      : [];
+    const leftBound = left + cornerInset;
+    const axisLabels = showAxis
+      ? [
+          ...ticks.map((tick) => {
+            const tickX = labelX(tick);
+            // A centred label near the left edge would run into the corner.
+            const anchor = tickX - AXIS_LABEL_HALF_WIDTH < leftBound ? 'start' : 'middle';
+            return svg`<text class="axis-label" x=${Math.max(tickX, leftBound)} y=${labelBaseline} text-anchor=${anchor}>
+              ${this.formatAxisLabel(tick, false, rangeMs > DAY_MS)}
+            </text>`;
+          }),
+          svg`<text class="axis-label" x=${labelX(this.end)} y=${labelBaseline} text-anchor="end">
+            ${this.formatAxisLabel(this.end, true)}
+          </text>`,
+        ]
+      : [];
 
     const holdToEdge = (points: Point[]): Point[] => {
       if (points.length < 2) return points;
@@ -1059,13 +1116,14 @@ export class RoomClimateChart extends LitElement {
       setpointY >= temperatureTop - 0.5 &&
       setpointY <= temperatureBottom + 0.5;
 
-    // The caption goes to the end of the line where the curve keeps the most
-    // distance from the reference, so it never sits on top of the series.
+    // First guess for the caption: the end of the line where the measured
+    // values keep the most distance from the reference.
     const firstTempValue = tempSeries.find((sample) => sample.v !== null)?.v ?? null;
     const lastTempValue = [...tempSeries].reverse().find((sample) => sample.v !== null)?.v ?? null;
     const distance = (value: number | null) =>
       value === null || setpointValue === null ? 0 : Math.abs(value - setpointValue);
-    const captionOnRight = distance(lastTempValue) >= distance(firstTempValue);
+    const preferredCaptionSide: 'left' | 'right' =
+      distance(lastTempValue) >= distance(firstTempValue) ? 'right' : 'left';
 
     /*
      * The end dot has to sit *on* the curve, so it is taken from the drawn
@@ -1086,6 +1144,54 @@ export class RoomClimateChart extends LitElement {
     };
     const lastTemp = lastPlotted(tempSegments);
     const lastHumidity = lastPlotted(humiditySegments);
+
+    /*
+     * The caption checks the *drawn* curves and the "now" dots: guessing from
+     * the values alone put it on the end dot whenever the room sat close to
+     * its target. It tries both ends, above and below the line.
+     */
+    const captionText = this.labels.setpoint;
+    const captionWidth = captionText.length * CAPTION_CHAR_WIDTH + 2;
+    const captionPlacement =
+      showSetpoint && setpointY !== null
+        ? placeSetpointCaption({
+            lineY: setpointY,
+            left: left + captionInset,
+            right: edgeRight - captionInset,
+            width: captionWidth,
+            height: CAPTION_HEIGHT,
+            top,
+            bottom,
+            curves: [
+              ...(tempY
+                ? tempSegments
+                    .filter((segment) => segment.samples.length > 1)
+                    .map((segment) => projectPoints(segment.samples, tempY))
+                : []),
+              ...(humidityY
+                ? humiditySegments
+                    .filter((segment) => segment.samples.length > 1)
+                    .map((segment) => projectPoints(segment.samples, humidityY))
+                : []),
+            ],
+            dots: [
+              ...(lastTemp && tempY
+                ? [{ x: x(lastTemp.t), y: tempY(lastTemp.v as number), r: 2.8 }]
+                : []),
+              ...(lastHumidity && humidityY
+                ? [{ x: x(lastHumidity.t), y: humidityY(lastHumidity.v as number), r: 2.6 }]
+                : []),
+            ],
+            preferredSide: preferredCaptionSide,
+          })
+        : null;
+    const captionOnRight = captionPlacement ? captionPlacement.side === 'right' : true;
+    const captionBaseline =
+      setpointY === null
+        ? 0
+        : captionPlacement && !captionPlacement.above
+          ? setpointY + CAPTION_LINE_GAP + CAPTION_HEIGHT - 1
+          : setpointY - CAPTION_LINE_GAP - 1;
 
     // The dashed reference is invisible to screen readers, so its value and unit
     // are part of the accessible name.
@@ -1253,7 +1359,7 @@ export class RoomClimateChart extends LitElement {
         const captionClash = (x: number): boolean =>
           showSetpoint &&
           setpointY !== null &&
-          Math.abs(entry.labelY - (setpointY - 5)) < 9 &&
+          Math.abs(entry.labelY - captionBaseline) < 9 &&
           Math.abs(x - captionX) < 40;
         if (captionClash(labelX)) {
           const flipped = anchor === 'start' ? entry.cx - 6 : entry.cx + 6;
@@ -1370,7 +1476,7 @@ export class RoomClimateChart extends LitElement {
           <text
             class="setpoint-caption"
             x=${captionOnRight ? edgeRight - captionInset : left + captionInset}
-            y=${setpointY - 5}
+            y=${captionBaseline}
             text-anchor=${captionOnRight ? 'end' : 'start'}
           >
             ${this.labels.setpoint}
@@ -1426,15 +1532,27 @@ export class RoomClimateChart extends LitElement {
     if (!geometry.temperature && !geometry.humidity) return nothing;
     const top = Math.round(geometry.plotTop);
     const height = Math.max(1, Math.round(geometry.plotBottom - geometry.plotTop));
+    /*
+     * The plot is a keyboard stop as well: arrow keys walk through the measured
+     * values, Home/End jump to the ends, Escape closes the readout. A polite live
+     * region speaks what the tooltip shows.
+     */
     return html`<div
         class="overlay"
-        style=${`top:${top}px;height:${height}px`}
+        style=${`top:${top}px;height:${height}px;--rcc-focus:${this.accentColor}`}
+        tabindex="0"
+        role="group"
+        aria-label=${this.labels.explore ?? this.labels.aria}
         @pointerdown=${this.onPointerDown}
         @pointermove=${this.onPointerMove}
         @pointerup=${this.onPointerUp}
         @pointercancel=${this.onPointerUp}
         @pointerleave=${this.onPointerLeave}
+        @keydown=${this.onKeyDown}
+        @focus=${this.onFocus}
+        @blur=${this.onBlur}
       ></div>
+      <span class="sr-only" aria-live="polite" ${ref(this.liveRef)}></span>
       <div class="hover" ${ref(this.hoverRef)} hidden aria-hidden="true">
         <div
           class="crosshair"
@@ -1466,6 +1584,77 @@ export class RoomClimateChart extends LitElement {
         </div>
       </div>`;
   }
+
+  /** Measured instants of both series, ascending – the stops of the arrow keys. */
+  private keyboardTimes(): number[] {
+    const geometry = this.hoverGeometry;
+    if (!geometry) return [];
+    const times = new Set<number>();
+    for (const series of [geometry.temperature, geometry.humidity]) {
+      for (const sample of series?.samples ?? []) {
+        if (sample.v !== null && sample.t >= geometry.start && sample.t <= geometry.end) {
+          times.add(sample.t);
+        }
+      }
+    }
+    return [...times].sort((a, b) => a - b);
+  }
+
+  private onFocus = (): void => {
+    // Keyboard focus starts at "now", the value the reading above shows too. A
+    // click focuses as well – its readout is already showing and stays.
+    if (this.hoverTime !== undefined) return;
+    const times = this.keyboardTimes();
+    if (times.length) this.showHoverAt(times[times.length - 1], true);
+  };
+
+  private onBlur = (): void => {
+    this.hideHover();
+  };
+
+  private onKeyDown = (event: KeyboardEvent): void => {
+    if (!this.showTooltip) return;
+    const times = this.keyboardTimes();
+    if (!times.length) return;
+    const current = this.hoverTime ?? times[times.length - 1];
+    // Index of the stop at or right after the current instant.
+    let index = times.findIndex((time) => time >= current);
+    if (index < 0) index = times.length - 1;
+    const onStop = times[index] === current;
+    let next: number | undefined;
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        next = times[Math.max(0, index - 1)];
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        next = times[Math.min(times.length - 1, onStop ? index + 1 : index)];
+        break;
+      case 'PageDown':
+        next = times[Math.max(0, index - 10)];
+        break;
+      case 'PageUp':
+        next = times[Math.min(times.length - 1, index + 10)];
+        break;
+      case 'Home':
+        next = times[0];
+        break;
+      case 'End':
+        next = times[times.length - 1];
+        break;
+      case 'Escape':
+        this.hideHover();
+        event.preventDefault();
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    this.lastPointerType = 'keyboard';
+    this.clearHoverTimer();
+    if (next !== undefined) this.showHoverAt(next, true);
+  };
 
   private onPointerDown = (event: PointerEvent | MouseEvent): void => {
     if (!this.showTooltip) return;
@@ -1531,7 +1720,7 @@ export class RoomClimateChart extends LitElement {
    * curve is smoothed, decimated and may contain interpolated bridge points –
    * none of those are measurements, so none of them may be shown here.
    */
-  private showHoverAt(time: number): void {
+  private showHoverAt(time: number, announce = false): void {
     const geometry = this.hoverGeometry;
     const hover = this.hoverRef.value;
     if (!geometry || !hover) return;
@@ -1615,6 +1804,20 @@ export class RoomClimateChart extends LitElement {
     }
 
     hover.hidden = false;
+    this.hoverTime = anchorTime;
+    // Spoken only for keyboard moves: a pointer sweep would flood the reader.
+    const live = this.liveRef.value;
+    if (live && announce) {
+      live.textContent = [
+        timeNode?.textContent ?? '',
+        temperatureSample && temperatureValue
+          ? `${this.labels.temperature} ${temperatureValue.textContent}`
+          : '',
+        humiditySample && humidityValue ? `${this.labels.humidity} ${humidityValue.textContent}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+    }
   }
 
   private placeDot(
@@ -1635,6 +1838,7 @@ export class RoomClimateChart extends LitElement {
 
   private hideHover(): void {
     this.clearHoverTimer();
+    this.hoverTime = undefined;
     const hover = this.hoverRef.value;
     if (hover) hover.hidden = true;
   }
@@ -1644,13 +1848,76 @@ export class RoomClimateChart extends LitElement {
     this.hoverHideTimer = undefined;
   }
 
+  private offsetFormatter?: { zone: string; format: Intl.DateTimeFormat };
+
+  /**
+   * Offset of the displayed zone at `time` in ms (local = utc + offset), so the
+   * axis can put its ticks on full local hours. Browser zone without a zone set;
+   * an invalid zone falls back to it as well, like the labels do.
+   */
+  private zoneOffset(time: number): number {
+    const browser = -new Date(time).getTimezoneOffset() * 60_000;
+    const zone = this.timeZone;
+    if (!zone) return browser;
+    try {
+      if (this.offsetFormatter?.zone !== zone) {
+        this.offsetFormatter = {
+          zone,
+          format: new Intl.DateTimeFormat('en-US', {
+            timeZone: zone,
+            hourCycle: 'h23',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+        };
+      }
+      const parts: Record<string, number> = {};
+      for (const part of this.offsetFormatter.format.formatToParts(new Date(time))) {
+        if (part.type !== 'literal') parts[part.type] = Number(part.value);
+      }
+      const asUtc = Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day,
+        parts.hour % 24,
+        parts.minute,
+        parts.second
+      );
+      return asUtc - Math.floor(time / 1000) * 1000;
+    } catch {
+      return browser;
+    }
+  }
+
   /**
    * Axis caption: weekday plus time for the first ticks, plain "now" for the
    * right-most one. "Sa 05:40" is readable at a glance; "05:40" alone is not.
    */
-  private formatAxisLabel(timestamp: number, isLast: boolean): string {
+  private formatAxisLabel(timestamp: number, isLast: boolean, multiDay = false): string {
     if (isLast) return this.labels.now;
+    // On a multi-day axis the ticks sit on midnight: the weekday says it all.
+    if (multiDay && Math.round((timestamp + this.zoneOffset(timestamp)) % DAY_MS) === 0) {
+      return this.formatWeekday(timestamp);
+    }
     return this.formatDayTime(timestamp);
+  }
+
+  private formatWeekday(timestamp: number): string {
+    try {
+      return new Intl.DateTimeFormat(this.language || 'en', {
+        weekday: 'short',
+        ...(this.timeZone ? { timeZone: this.timeZone } : {}),
+      })
+        .format(new Date(timestamp))
+        .replace(/[.,]/g, '')
+        .trim();
+    } catch {
+      return this.formatDayTime(timestamp);
+    }
   }
 
   private formatDayTime(timestamp: number): string {

@@ -171,8 +171,14 @@ export function readThermostat(
     // cooling / fan / drying / preheating / defrosting
     return { ...base, status: 'action', label: t.action(action), colorKey: 'idle' };
   }
-  // No hvac_action: never invent "heating".
-  return { ...base, status: 'unknown', label: t.t('statusUnknown'), colorKey: 'unknown' };
+  // No hvac_action: never invent "heating". The mode the user set ("Heizen",
+  // "Automatik") is the honest statement instead of "Status unbekannt".
+  return {
+    ...base,
+    status: 'unknown',
+    label: base.modeLabel ?? t.t('statusUnknown'),
+    colorKey: 'unknown',
+  };
 }
 
 /**

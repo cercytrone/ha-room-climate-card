@@ -180,7 +180,8 @@ describe('readThermostat', () => {
   it('does not invent heating when hvac_action is missing', () => {
     const result = reading('heat', { temperature: 21 });
     expect(result.status).toBe('unknown');
-    expect(result.label).toBe('Status unbekannt');
+    // The mode stands in for the missing action.
+    expect(result.label).toBe('Heizen');
     expect(result.colorKey).toBe('unknown');
   });
 

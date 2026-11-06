@@ -387,7 +387,8 @@ describe('room climate card', () => {
       })
     );
     await modeCard.updateComplete;
-    expect(text(modeCard, '.climate-state')).toBe('Automatik');
+    // Mode and action together: the mode alone hid whether it heats.
+    expect(text(modeCard, '.climate-state')).toBe('Automatik · Bereit');
     expect(text(modeCard, '.climate-setpoint')).toBe('Soll 21,0 °C');
     expect(stylesOf(modeCard)).toMatch(/\.climate-state\s*\{[^}]*color:\s*var\(--rcc-muted\)/);
   });
@@ -405,7 +406,8 @@ describe('room climate card', () => {
     await card.updateComplete;
     const flame = q(card, '.flame') as HTMLElement;
     expect(flame.classList.contains('status-unknown')).toBe(true);
-    expect(text(card, '.climate-state')).toBe('Status unbekannt');
+    // The mode the user chose is the honest statement, not "Status unbekannt".
+    expect(text(card, '.climate-state')).toBe('Heizen');
     // The setpoint is still known and stays visible.
     expect(text(card, '.climate-setpoint')).toBe('Soll 21,0 °C');
   });
@@ -581,7 +583,8 @@ describe('room climate card', () => {
       .join('\n');
     expect(styleText).toContain('#0e1013');
     expect(styleText).toContain('rgba(255, 255, 255, 0.07)');
-    expect(styleText).toMatch(/--rcc-radius:\s*26px/);
+    // The corner radius follows the theme unless the card sets its own.
+    expect(styleText).toMatch(/border-radius:\s*var\(--rcc-radius,\s*var\(--ha-card-border-radius,\s*12px\)\)/);
   });
 
   it('writes the inset into the card style and forwards custom values', async () => {
@@ -1044,9 +1047,12 @@ describe('room climate card', () => {
 
       chart.setSize(420, 140);
       await chart.updateComplete;
-      const firstLabel = chart.shadowRoot.querySelector('.axis-label')?.textContent?.trim();
-      // 06:00 UTC is 08:00 in Berlin – not the browser's zone.
-      expect(firstLabel).toContain('08:00');
+      const labels = Array.from(chart.shadowRoot.querySelectorAll('.axis-label')).map(
+        (label) => label.textContent?.trim()
+      );
+      // 06:00–12:00 UTC is 08:00–14:00 in Berlin: the ticks fall on full Berlin
+      // hours. In the browser's (UTC) zone 12:00 would already be "Jetzt".
+      expect(labels).toEqual(['Sa 10:00', 'Sa 12:00', 'Jetzt']);
     } finally {
       vi.useRealTimers();
     }
@@ -1174,14 +1180,21 @@ describe('room climate card', () => {
     expect(events).toEqual(['climate.thermostat']);
   });
 
-  it('offers no tap target when there is nothing to open', async () => {
+  it('opens the temperature sensor without a thermostat, and nothing with tap_action none', async () => {
     const withoutClimate = mount(
       { ...fullConfig, climate_entity: undefined, show_thermostat: false },
       createHass({ states: baseStates() })
     );
     await withoutClimate.updateComplete;
-    expect(q(withoutClimate, '.card')?.classList.contains('is-tappable')).toBe(false);
+    const opened: string[] = [];
+    withoutClimate.addEventListener('hass-more-info', (event) =>
+      opened.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+    );
+    expect(q(withoutClimate, '.card')?.classList.contains('is-tappable')).toBe(true);
     expect(q(withoutClimate, '.climate-row')).toBeNull();
+    (q(withoutClimate, '.card') as HTMLElement).click();
+    expect(opened).toEqual(['sensor.temp']);
+    expect(q(withoutClimate, '.card')?.getAttribute('aria-label')).toContain('Details öffnen');
 
     // Switching the tap off keeps the row, but as a plain live region.
     const off = mount(
@@ -1738,6 +1751,183 @@ describe('room climate card', () => {
       const card = document.createElement('room-climate-card') as RoomClimateCard;
       const css = stylesOf(card);
       expect(css).toMatch(/button\.climate-row:hover[^{]*\{[^}]*color-mix\(in srgb, var\(--rcc-text\)/);
+    });
+  });
+
+  describe('design and usability', () => {
+    it('renders inside ha-card so theme variables and card-mod apply', async () => {
+      const card = mount(fullConfig, createHass({ states: baseStates() }));
+      await card.updateComplete;
+      const shell = q(card, '.card') as HTMLElement;
+      expect(shell.tagName).toBe('HA-CARD');
+      // No own radius: nothing is written, the theme's value applies.
+      expect(shell.getAttribute('style')).not.toContain('--rcc-radius');
+      const own = mount({ ...fullConfig, border_radius: 20 }, createHass({ states: baseStates() }));
+      await own.updateComplete;
+      expect((q(own, '.card') as HTMLElement).getAttribute('style')).toContain('--rcc-radius:20px');
+      // Only explicit themes paint their own surface over the theme's card.
+      expect(stylesOf(card)).toMatch(/\.card\.theme-dark,\s*\.card\.theme-light\s*\{[^}]*background-color/);
+      // Fills its cell in the sections grid.
+      expect(stylesOf(card)).toMatch(/:host\s*\{[^}]*height:\s*100%/);
+    });
+
+    it('makes humidity the hero when there is no temperature sensor', async () => {
+      const card = mount(
+        {
+          type: 'custom:room-climate-card',
+          humidity_entity: 'sensor.humidity',
+        },
+        createHass({ states: baseStates() })
+      );
+      await card.updateComplete;
+      expect(q(card, '.reading.humidity.hero')).not.toBeNull();
+      expect(q(card, '.reading.temperature')).toBeNull();
+      // The humidity sensor names the room instead of "Raumklima".
+      expect(text(card, '.name')).toBe('Wohnzimmer Feuchte');
+      expect(stylesOf(card)).toMatch(/\.reading\.humidity\.hero\s*\{[^}]*font-size:\s*var\(--rcc-temp-size\)/);
+    });
+
+    it('rates the humidity and shows the dew point', async () => {
+      const card = mount(
+        { ...fullConfig, humidity_comfort: true, show_dew_point: true },
+        createHass({ states: baseStates() })
+      );
+      await card.updateComplete;
+      // 21,78 °C at 50,4 % → dew point about 10,9 °C.
+      expect(text(card, '.meta-dew')).toMatch(/^Taupunkt 1[01],\d °C$/);
+      expect(text(card, '.meta-humidity')).toBe('angenehm');
+
+      const humid = mount(
+        { ...fullConfig, humidity_comfort: true },
+        createHass({
+          states: baseStates().map((state) =>
+            state.entity_id === 'sensor.humidity'
+              ? entity('sensor.humidity', { state: '71', attributes: { unit_of_measurement: '%' } })
+              : state
+          ),
+        })
+      );
+      await humid.updateComplete;
+      expect(q(humid, '.meta-humidity.level-humid')).not.toBeNull();
+      expect(text(humid, '.meta-humidity')).toBe('feucht – lüften');
+      expect(q(humid, '.meta-dew')).toBeNull();
+
+      // Off by default: no extra line.
+      const plain = mount(fullConfig, createHass({ states: baseStates() }));
+      await plain.updateComplete;
+      expect(q(plain, '.reading-meta')).toBeNull();
+    });
+
+    it('warns while the window is open and the heating runs', async () => {
+      const openWindow = () =>
+        baseStates().map((state) =>
+          state.entity_id === 'binary_sensor.window'
+            ? entity('binary_sensor.window', { state: 'on', attributes: { device_class: 'window' } })
+            : state
+        );
+      const card = mount(fullConfig, createHass({ states: openWindow() }));
+      await card.updateComplete;
+      expect(text(card, '.climate-warning')).toBe('Fenster offen – Heizung läuft');
+      expect(q(card, '.climate-warning')?.getAttribute('role')).toBe('alert');
+
+      const closed = mount(fullConfig, createHass({ states: baseStates() }));
+      await closed.updateComplete;
+      expect(q(closed, '.climate-warning')).toBeNull();
+
+      const off = mount(
+        { ...fullConfig, show_window_warning: false },
+        createHass({ states: openWindow() })
+      );
+      await off.updateComplete;
+      expect(q(off, '.climate-warning')).toBeNull();
+    });
+
+    it('runs hold_action on a long press and swallows the tap that follows', async () => {
+      vi.useFakeTimers();
+      try {
+        const card = mount(
+          { ...fullConfig, hold_action: { action: 'more-info', entity: 'sensor.humidity' } },
+          createHass({ states: baseStates() })
+        );
+        await card.updateComplete;
+        const opened: string[] = [];
+        card.addEventListener('hass-more-info', (event) =>
+          opened.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+        );
+        const reading = q(card, '.reading.temperature') as HTMLElement;
+        reading.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
+        await vi.advanceTimersByTimeAsync(600);
+        expect(opened).toEqual(['sensor.humidity']);
+        reading.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, composed: true }));
+        reading.click();
+        expect(opened).toEqual(['sensor.humidity']);
+
+        // A short press is an ordinary tap.
+        reading.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
+        await vi.advanceTimersByTimeAsync(100);
+        reading.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, composed: true }));
+        reading.click();
+        expect(opened).toEqual(['sensor.humidity', 'climate.thermostat']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('tells a double tap from a single one', async () => {
+      vi.useFakeTimers();
+      const pushState = vi.spyOn(window.history, 'pushState');
+      try {
+        const card = mount(
+          { ...fullConfig, double_tap_action: { action: 'navigate', navigation_path: '/lovelace/heizung' } },
+          createHass({ states: baseStates() })
+        );
+        await card.updateComplete;
+        const opened: string[] = [];
+        card.addEventListener('hass-more-info', (event) =>
+          opened.push((event as CustomEvent<{ entityId: string }>).detail.entityId)
+        );
+        const shell = q(card, '.card') as HTMLElement;
+        shell.click();
+        shell.click();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(pushState).toHaveBeenCalledWith(null, '', '/lovelace/heizung');
+        expect(opened).toEqual([]);
+
+        shell.click();
+        expect(opened).toEqual([]);
+        await vi.advanceTimersByTimeAsync(400);
+        expect(opened).toEqual(['climate.thermostat']);
+      } finally {
+        pushState.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it('performs a service call as tap action', async () => {
+      const hass = createHass({ states: baseStates() });
+      const callService = vi.fn(async () => undefined);
+      hass.callService = callService;
+      const card = mount(
+        {
+          ...fullConfig,
+          tap_action: {
+            action: 'perform-action',
+            perform_action: 'climate.set_temperature',
+            data: { temperature: 21 },
+            target: { entity_id: 'climate.thermostat' },
+          },
+        },
+        hass
+      );
+      await card.updateComplete;
+      (q(card, '.climate-row') as HTMLElement).click();
+      expect(callService).toHaveBeenCalledWith(
+        'climate',
+        'set_temperature',
+        { temperature: 21 },
+        { entity_id: 'climate.thermostat' }
+      );
+      expect(q(card, '.climate-row')?.getAttribute('aria-label')).toContain('Aktion ausführen');
     });
   });
 });
