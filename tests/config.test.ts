@@ -3,7 +3,9 @@ import {
   DEFAULT_OPEN_STATES,
   DEFAULT_READING_FONT_SIZE,
   READING_FONT_SIZE_RANGE,
+  asColor,
   asFontFamily,
+  asTapAction,
   configEntityIds,
   hasChart,
   normalizeConfig,
@@ -521,6 +523,51 @@ describe('area fill strength', () => {
     try {
       resetUnknownKeyWarnings();
       normalizeConfig({ chart_temperature_area_opacity: 150, chart_humidity_area_opacity: 80 });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe('review fixes', () => {
+  it('reads tap_action in the string and in the Home Assistant object form', () => {
+    expect(normalizeConfig({ tap_action: 'none' }).tapAction).toBe('none');
+    expect(normalizeConfig({ tap_action: { action: 'none' } }).tapAction).toBe('none');
+    expect(normalizeConfig({ tap_action: { action: 'more-info' } }).tapAction).toBe('more-info');
+    expect(normalizeConfig({}).tapAction).toBe('more-info');
+    // Actions the card does not offer keep the built-in dialog.
+    expect(asTapAction({ action: 'navigate' })).toBe('more-info');
+    expect(asTapAction(42)).toBe('more-info');
+  });
+
+  it('rejects colour values that would break out of the inline style', () => {
+    expect(asColor('#ff8000', '#000')).toBe('#ff8000');
+    expect(asColor('rgb(255, 128, 0)', '#000')).toBe('rgb(255, 128, 0)');
+    expect(asColor('var(--state-climate-heat-color, #ff8000)', '#000')).toBe(
+      'var(--state-climate-heat-color, #ff8000)'
+    );
+    expect(asColor('color-mix(in srgb, red 40%, blue)', '#000')).toBe(
+      'color-mix(in srgb, red 40%, blue)'
+    );
+    expect(asColor('red;background:url(x)', '#000')).toBe('#000');
+    expect(asColor('red}', '#000')).toBe('#000');
+    expect(asColor('"red"', '#000')).toBe('#000');
+    expect(asColor('<b>', '#000')).toBe('#000');
+    expect(normalizeConfig({ accent_color: 'red;color:blue' }).accentColor).toBe('#4FD1A5');
+    expect(normalizeConfig({ heating_color: 'red;x:y' }).thermostat.heatingColor).not.toContain(';');
+  });
+
+  it('does not warn about keys Home Assistant writes itself', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      resetUnknownKeyWarnings();
+      normalizeConfig({
+        grid_options: { columns: 6, rows: 4 },
+        layout_options: { grid_columns: 2 },
+        visibility: [{ condition: 'screen', media_query: '(min-width: 0px)' }],
+        view_layout: { position: 'main' },
+      });
       expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();

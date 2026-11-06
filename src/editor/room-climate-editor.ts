@@ -7,6 +7,7 @@ import {
   asBoolean,
   asEntityId,
   asString,
+  asTapAction,
   type RoomClimateCardConfig,
 } from '../config';
 import { baseLanguage } from '../localize';
@@ -1064,7 +1065,8 @@ export class RoomClimateCardEditor extends LitElement {
             ],
           },
         },
-        value: this.stringValue('tap_action', 'more-info'),
+        // Reads `{ action: none }` as well, so a hand-written YAML shows its real value.
+        value: asTapAction(this._config.tap_action),
         disabled: !enabled || !this.rowVisible,
         helper: t.tapHelper,
       })}

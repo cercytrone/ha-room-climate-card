@@ -20,9 +20,13 @@ export const icons = {
     base(
       svg`<circle cx="13" cy="4.4" r="1.9" /><path d="M10 21l2.6-5.6 3 1.9 2.2-4.6" /><path d="M7.4 13.4l3.4-2.7.9-3.4-3-1-2.8 3.6" />`
     ),
+  /**
+   * Standing figure: "nobody is moving" must not depend on colour alone, so
+   * the idle badge gets its own shape next to the running figure above.
+   */
   motionOff: () =>
     base(
-      svg`<circle cx="13" cy="4.4" r="1.9" /><path d="M10 21l2.6-5.6 3 1.9 2.2-4.6" /><path d="M7.4 13.4l3.4-2.7.9-3.4-3-1-2.8 3.6" />`
+      svg`<circle cx="12" cy="4.4" r="1.9" /><path d="M12 8.2v6.3M12 14.5 9.8 21M12 14.5l2.2 6.5M8.4 10.6h7.2" />`
     ),
   flame: () =>
     base(

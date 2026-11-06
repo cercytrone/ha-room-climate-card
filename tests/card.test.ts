@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../src/main';
-import type { RoomClimateCard } from '../src/room-climate-card';
+import { resolveChartClock, type RoomClimateCard } from '../src/room-climate-card';
 import {
   chartSlotBottomMargin,
   chartSlotMargin,
@@ -1601,4 +1601,143 @@ describe('room climate card', () => {
     expect(chart.temperatureBands).toBe(false);
   });
 
+
+  describe('review fixes', () => {
+    it('resolves the axis clock from the real Home Assistant settings', () => {
+      const hass = createHass();
+      hass.config = { unit_system: { temperature: '°C' }, time_zone: 'Europe/Berlin' };
+
+      // "server" = the instance zone, "local" = the browser's own zone.
+      hass.locale = { language: 'en', time_zone: 'server', time_format: '24' };
+      expect(resolveChartClock(hass)).toEqual({ timeZone: 'Europe/Berlin', hour12: false });
+
+      hass.locale = { language: 'en', time_zone: 'local', time_format: '12' };
+      expect(resolveChartClock(hass)).toEqual({ timeZone: undefined, hour12: true });
+
+      // "language" / "system" leave the clock to the locale.
+      hass.locale = { language: 'en', time_zone: 'server', time_format: 'language' };
+      expect(resolveChartClock(hass).hour12).toBeUndefined();
+
+      // An unknown value never reaches Intl as a time zone.
+      hass.locale = { language: 'en', time_zone: 'Not/AZone' };
+      expect(resolveChartClock(hass).timeZone).toBe('Europe/Berlin');
+    });
+
+    it('keeps full-size type with automatic height, even on a short card', async () => {
+      const card = mount(
+        { ...fullConfig, show_temperature_chart: false, show_humidity_chart: false },
+        createHass({ states: baseStates() })
+      );
+      await card.updateComplete;
+      resizeTo(card, 320, 140);
+      await card.updateComplete;
+      const container = q(card, '.card') as HTMLElement;
+      expect(container.classList.contains('density-md')).toBe(true);
+      expect(container.classList.contains('density-xs')).toBe(false);
+    });
+
+    it('draws a different motion icon while nobody moves', async () => {
+      const idle = mount(fullConfig, createHass({ states: baseStates() }));
+      const active = mount(
+        fullConfig,
+        createHass({
+          states: baseStates().map((state) =>
+            state.entity_id === 'binary_sensor.motion'
+              ? entity('binary_sensor.motion', { state: 'on' })
+              : state
+          ),
+        })
+      );
+      await idle.updateComplete;
+      await active.updateComplete;
+      const idleIcon = q(idle, '.badge.motion svg')?.innerHTML;
+      const activeIcon = q(active, '.badge.motion svg')?.innerHTML;
+      expect(idleIcon).toBeTruthy();
+      expect(activeIcon).toBeTruthy();
+      expect(idleIcon).not.toBe(activeIcon);
+    });
+
+    it('shares one history request between cards on the same connection', async () => {
+      vi.useFakeTimers();
+      try {
+        const history = historyFor(['sensor.temp', 'sensor.humidity']);
+        const send = vi.fn(async () => history);
+        const hass = createHass({ states: baseStates(), history });
+        hass.connection!.sendMessagePromise = send;
+
+        mount(fullConfig, hass);
+        mount({ ...fullConfig, name: 'Zweite Karte' }, hass);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(send).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('fetches fresh history after a reconnect instead of serving the cache', async () => {
+      vi.useFakeTimers();
+      try {
+        const history = historyFor(['sensor.temp', 'sensor.humidity']);
+        const send = vi.fn(async () => history);
+        const hass = createHass({ states: baseStates(), history });
+        hass.connection!.sendMessagePromise = send;
+
+        const card = mount(fullConfig, hass);
+        await vi.advanceTimersByTimeAsync(300);
+        expect(send).toHaveBeenCalledTimes(1);
+
+        // Well inside the two-minute cache: the connection drops and returns.
+        card.hass = { ...hass, connected: false };
+        await vi.advanceTimersByTimeAsync(1000);
+        card.hass = { ...hass, connected: true };
+        await vi.advanceTimersByTimeAsync(300);
+        expect(send).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('marks the last good curve as stale while a refresh fails', async () => {
+      vi.useFakeTimers();
+      try {
+        const history = historyFor(['sensor.temp', 'sensor.humidity']);
+        const send = vi.fn(async () => history);
+        const hass = createHass({ states: baseStates(), history });
+        hass.connection!.sendMessagePromise = send;
+        hass.callApi = async () => {
+          throw new Error('boom');
+        };
+
+        const card = mount(fullConfig, hass);
+        await vi.advanceTimersByTimeAsync(300);
+        const chart = q(card, 'room-climate-chart') as HTMLElement & {
+          setSize: (w: number, h: number) => void;
+          updateComplete: Promise<unknown>;
+          shadowRoot: ShadowRoot;
+        };
+        chart.setSize(320, 112);
+        await chart.updateComplete;
+        expect(chart.shadowRoot.querySelector('.stale')).toBeNull();
+
+        send.mockImplementation(async () => {
+          throw new Error('recorder offline');
+        });
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1000);
+        await card.updateComplete;
+        await chart.updateComplete;
+        expect(chart.shadowRoot.querySelector('.series-line')).not.toBeNull();
+        const mark = chart.shadowRoot.querySelector('.stale');
+        expect(mark).not.toBeNull();
+        expect(mark?.getAttribute('aria-label')).toBe('Verlauf konnte nicht geladen werden');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the hover tint of the status row theme-aware', () => {
+      const card = document.createElement('room-climate-card') as RoomClimateCard;
+      const css = stylesOf(card);
+      expect(css).toMatch(/button\.climate-row:hover[^{]*\{[^}]*color-mix\(in srgb, var\(--rcc-text\)/);
+    });
+  });
 });

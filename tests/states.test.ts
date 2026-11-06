@@ -141,8 +141,13 @@ describe('readThermostat', () => {
     const hass = createHass({
       states: [entity('climate.living', { state: 'heat', attributes: { temperature: 22 } })],
     });
-    hass.config = { unit_system: { temperature: 'us_customary' } };
+    // Home Assistant stores the symbol in the unit system, not "us_customary".
+    hass.config = { unit_system: { temperature: '°F' } };
     expect(readThermostat(hass, config, de).unit).toBe('°F');
+
+    // A unit system the card cannot read falls back to Celsius.
+    hass.config = { unit_system: { temperature: 'us_customary' } };
+    expect(readThermostat(hass, config, de).unit).toBe('°C');
 
     const metric = createHass({
       states: [entity('climate.living', { state: 'heat', attributes: { temperature: 22 } })],

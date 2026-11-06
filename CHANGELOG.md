@@ -4,6 +4,34 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Behoben
+
+- **Zeitachse folgt jetzt den Home-Assistant-Einstellungen.** `locale.time_zone` ist in Home
+  Assistant `local` oder `server`, keine Zeitzone; die Karte reichte den Wert direkt an `Intl`
+  weiter, landete im Fallback und zeigte immer deutsche Wochentage, Browserzeit und 24 h.
+  `server` nutzt jetzt die Zone der Instanz, `local` die des Browsers. Das 12-Stunden-Format
+  (`time_format: "12"`) wird erkannt.
+- **Sollwert bei Fahrenheit.** Die Systemeinheit wurde als `us_customary` erwartet, Home Assistant
+  speichert dort aber `°F`. Ein 72-°F-Thermostat erschien als „72 °C“, die Soll-Linie im Verlauf
+  lag weit daneben.
+- **`tap_action` in Objektform.** `tap_action: { action: none }` schaltet das Antippen jetzt ab,
+  wie bei anderen Karten. Der Editor zeigt den Wert korrekt an.
+- **Keine Schriftverkleinerung bei automatischer Höhe.** Die Dichtestufen greifen nur noch bei
+  fester `height`. Vorher rutschte eine Karte ohne Verlauf in die kleinste Stufe und blieb dort.
+- **Keine Warnungen für `grid_options`, `layout_options`, `visibility` und `view_layout`.** Diese
+  Schlüssel schreibt Home Assistant selbst.
+- **Verlauf nach Reconnect wird neu geladen** statt aus dem Zwei-Minuten-Cache bedient.
+- **Ein Verlaufs-Cache pro Verbindung.** Mehrere Karten mit denselben Sensoren stellen eine
+  gemeinsame Anfrage statt einer pro Karte.
+- **Veraltete Kurve wird markiert.** Schlägt eine Aktualisierung fehl, zeigt ein kleines Symbol in
+  der Ecke des Verlaufs, dass die Daten nicht aktuell sind (Text bei Hover und für Screenreader).
+- **Eigenes Icon für „keine Bewegung“.** Der Zustand hängt nicht mehr nur an der Farbe.
+- **Hover der Heizzeile im hellen Theme sichtbar.** Die Tönung folgt jetzt der Textfarbe.
+- **Farbwerte werden geprüft.** Werte mit `;`, Klammern `{}`, Anführungszeichen oder `<>` fallen auf
+  den Standard zurück, damit sie keine weiteren CSS-Angaben ins `style`-Attribut schreiben können.
+
 ## [2.17.0] – 2026-11-06
 
 ### Hinzugefügt

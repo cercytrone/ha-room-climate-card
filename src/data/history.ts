@@ -176,6 +176,15 @@ export function historyCacheKey(entityIds: string[], hours: number): string {
   return `${[...entityIds].sort().join('|')}@${hours}`;
 }
 
+export interface LoadOptions {
+  /**
+   * Oldest cached answer that may still be served, in milliseconds. Defaults to
+   * the cache TTL; `0` forces a new request (after a reconnect the cached curve
+   * may predate the outage).
+   */
+  maxAgeMs?: number;
+}
+
 /**
  * Small in-memory cache. History is only requested again when the cached entry
  * is older than two minutes, which keeps re-renders (resize, theme change,
@@ -189,13 +198,16 @@ export class HistoryRepository {
     hass: HomeAssistant,
     entityIds: string[],
     hours: number,
-    now = Date.now()
+    now = Date.now(),
+    options: LoadOptions = {}
   ): Promise<HistoryMap> {
     const key = historyCacheKey(entityIds, hours);
+    const maxAge = Math.max(0, options.maxAgeMs ?? HISTORY_CACHE_TTL_MS);
     const cached = this.cache.get(key);
-    if (cached && now - cached.fetchedAt < HISTORY_CACHE_TTL_MS) {
+    if (cached && maxAge > 0 && now - cached.fetchedAt < maxAge) {
       return cached.data;
     }
+    // A request already on its way is at least as fresh as a new one would be.
     const pending = this.inflight.get(key);
     if (pending) return pending;
 
@@ -223,4 +235,22 @@ export class HistoryRepository {
     this.cache.clear();
     this.inflight.clear();
   }
+}
+
+/**
+ * One repository per Home Assistant connection, shared by every card on it.
+ * Several cards showing the same sensors then make a single request instead of
+ * one each. Keyed weakly, so a closed connection takes its cache with it.
+ */
+const sharedRepositories = new WeakMap<object, HistoryRepository>();
+
+export function sharedHistoryRepository(hass: HomeAssistant): HistoryRepository | undefined {
+  const connection = hass.connection;
+  if (!connection || typeof connection !== 'object') return undefined;
+  let repository = sharedRepositories.get(connection);
+  if (!repository) {
+    repository = new HistoryRepository();
+    sharedRepositories.set(connection, repository);
+  }
+  return repository;
 }
