@@ -43,7 +43,10 @@ describe('release metadata', () => {
 
   it('lists the newest version first in the changelog', () => {
     expect(changelogVersions.length).toBeGreaterThan(0);
-    expect(changelogVersions[0]).toBe(packageVersion);
+    // Between releases the changelog may already name the next version; the
+    // release workflow then sets package.json to it. It may never trail behind.
+    expect(compare(changelogVersions[0], packageVersion)).toBeGreaterThanOrEqual(0);
+    expect(changelogVersions).toContain(packageVersion);
   });
 
   it('never goes backwards in the changelog', () => {

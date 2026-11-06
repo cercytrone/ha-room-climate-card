@@ -1,27 +1,67 @@
 name: Release
 
+# Ein Release braucht nur noch einen Tag (oder einen Klick unter Actions):
+#
+#   git tag v2.18.1 && git push origin v2.18.1
+#
+# Der Workflow setzt die Version in package.json, package-lock.json und README,
+# benennt "## [Unreleased]" im CHANGELOG in die neue Version um, baut dist/,
+# prüft alles, committet das Ergebnis auf main, setzt den Tag auf diesen Commit
+# und veröffentlicht das Release mit dem Bundle. dist/ muss also nie mehr von
+# Hand gebaut werden.
+
 on:
   push:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to release (e.g. v1.0.0)'
+      version:
+        description: 'Version ohne "v", z. B. 2.18.1'
         required: true
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Build and publish release
+    name: Build, commit and publish release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Resolve version
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then RAW="$INPUT_VERSION"; else RAW="$REF_NAME"; fi
+          VERSION="${RAW#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::\"$RAW\" ist keine Version der Form 1.2.3"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Gebaut wird immer main: dorthin wird das Ergebnis auch committet.
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
+
+      - name: Tag must point into main
+        if: github.event_name == 'push'
+        run: |
+          if ! git merge-base --is-ancestor "${{ github.sha }}" HEAD; then
+            echo "::error::Der Tag zeigt auf einen Commit, der nicht auf main liegt."
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -32,41 +72,81 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify
+      - name: Set version in package.json, README and CHANGELOG
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          npm run typecheck
-          npm test
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          sed -i -E "s/ROOM-CLIMATE-CARD v[0-9]+\.[0-9]+\.[0-9]+/ROOM-CLIMATE-CARD v$VERSION/" README.md
+          DATE="$(TZ=Europe/Berlin date +%F)"
+          if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
+            sed -i "0,/^## \[Unreleased\].*/s//## [$VERSION] – $DATE/" CHANGELOG.md
+          fi
+          HEAD_VERSION="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ')"
+          if [ "$HEAD_VERSION" != "$VERSION" ]; then
+            echo "::error::CHANGELOG beginnt mit $HEAD_VERSION statt $VERSION – bitte einen Abschnitt \"## [Unreleased]\" oder \"## [$VERSION]\" anlegen."
+            exit 1
+          fi
 
       - name: Build
         run: npm run build
 
-      - name: Resolve version
-        id: version
+      # Nach dem Build: version.test.ts prüft, dass das Bundle die neue Version trägt.
+      - name: Typecheck and tests
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          npm run typecheck
+          npm test
 
-      - name: Check version matches package.json
+      - name: Commit release files to main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$PKG_VERSION" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::package.json version ($PKG_VERSION) does not match tag (${{ steps.version.outputs.version }})"
-            exit 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json README.md CHANGELOG.md dist
+          if git diff --cached --quiet; then
+            echo "Nichts zu committen – main ist bereits auf dem Stand von $TAG."
+          else
+            git commit -m "Release $TAG"
+            git push origin HEAD:main
           fi
+
+      # Der Tag muss auf den Commit mit dem gebauten Bundle zeigen: HACS lädt den
+      # Stand des Tags, falls es das Release-Asset nicht nimmt.
+      - name: Point tag at the release commit
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+
+      - name: Release notes from CHANGELOG
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          cat >> release-notes.md <<'NOTES'
+
+          ---
+
+          Einzelne JavaScript-Datei für HACS. HACS lädt `ha-room-climate-card.js`,
+          wenn das Release als *Dashboard*-Repository installiert ist.
+
+          Installation über HACS: Repository `cercytrone/ha-room-climate-card`
+          als benutzerdefiniertes Repository (Kategorie *Dashboard*) hinzufügen.
+          NOTES
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
+          body_path: release-notes.md
+          make_latest: true
           files: |
             dist/ha-room-climate-card.js
             dist/ha-room-climate-card.js.map
-          body: |
-            Einzelne JavaScript-Datei für HACS. HACS lädt `ha-room-climate-card.js`,
-            wenn das Release als *Dashboard*-Repository installiert ist.
-
-            Installation über HACS: Repository `cercytrone/ha-room-climate-card`
-            als benutzerdefiniertes Repository (Kategorie *Dashboard*) hinzufügen.

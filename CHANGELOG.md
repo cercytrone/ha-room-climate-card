@@ -4,6 +4,23 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Behoben
+
+- **Das Bundle enthält jetzt die Korrekturen aus 2.18.0.** Das Release v2.18.0 wurde ohne
+  JavaScript-Datei veröffentlicht, und `dist/` stand noch auf 2.17.0 – installiert wurde also der
+  alte Code. 2.18.1 liefert die Änderungen aus 2.18.0 erstmals aus.
+
+### Geändert
+
+- **Releases bauen `dist/` selbst.** Ein Tag `vX.Y.Z` genügt: Der Release-Workflow setzt die
+  Version in `package.json`, `package-lock.json` und README, benennt `## [Unreleased]` im
+  CHANGELOG um, baut, testet, committet das Ergebnis auf `main`, setzt den Tag auf diesen Commit
+  und hängt das Bundle an das Release. Neue Einträge kommen bis dahin unter `## [Unreleased]`.
+- **Build & Test verlangt kein frisch gebautes `dist/` mehr** in Pull Requests; das Bundle
+  entsteht beim Release.
+
 ## [2.18.0] – 2026-11-06
 
 ### Behoben
