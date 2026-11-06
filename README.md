@@ -761,22 +761,17 @@ npm run showcase   # rendert showcase.{svg,png} (dunkel), showcase-light.* und e
 
 ### Release
 
-Änderungen kommen im CHANGELOG unter `## [Unreleased]`. Für ein Release genügt ein Tag:
+Änderungen kommen im CHANGELOG unter `## [Unreleased]`. Ein Release entsteht durch einen Merge:
 
-```bash
-git tag v2.18.1 && git push origin v2.18.1
-```
+1. Ein Pull Request benennt `## [Unreleased]` in `## [X.Y.Z] – JJJJ-MM-TT` um.
+2. Nach dem Merge auf `main` erkennt der Release-Workflow die neue Version (sie hat noch keinen
+   Tag), setzt sie in `package.json`, `package-lock.json` und README, baut `dist/`, prüft alles,
+   committet das Ergebnis auf `main`, legt den Tag `vX.Y.Z` an und veröffentlicht das Release
+   mit dem Bundle.
 
-Der Release-Workflow setzt die Version (`package.json`, `package-lock.json`, README), benennt
-`## [Unreleased]` in die neue Version um, baut `dist/`, prüft alles, committet das Ergebnis auf
-`main`, setzt den Tag auf diesen Commit und hängt das Bundle an das Release. `dist/` wird also
-nicht von Hand gebaut. Alternativ lässt sich der Workflow unter *Actions → Release → Run
-workflow* mit einer Versionsnummer starten.
-
-Die Entwicklungsumgebung in `dev/` ist ein reiner Mock: `dev/mock-hass.ts` erzeugt
-Entitäten und Historien, `dev/mock-elements.ts` ersetzt `ha-icon`/`ha-selector`. Diese Dateien
-landen **nicht** im Bundle. Die Demo-Seite trägt einen sichtbaren Hinweis „DEMO – simulierte
-Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
+Jeder andere Push auf `main` endet ohne Release. Eine ältere Version als die letzte wird
+abgelehnt. `dist/` wird nie von Hand gebaut. Manuell lässt sich der Workflow unter *Actions →
+Release → Run workflow* starten.
 
 ---
 
