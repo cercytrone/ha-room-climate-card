@@ -171,6 +171,34 @@ describe('room climate card editor', () => {
     ).toBe(true);
   });
 
+  it('offers the room name size but no entity picker for the name', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+
+    // The name is plain text plus a size – the old "name from entity" field is gone.
+    expect(selectorByLabel(editor, 'Raumname').selector).toEqual({ text: {} });
+    expect(() => selectorByLabel(editor, 'Name aus Entität übernehmen')).toThrow();
+    expect(selectorByLabel(editor, 'Schriftgröße Raumname').value).toBe(15);
+
+    selectorByLabel(editor, 'Schriftgröße Raumname').emit(24);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.name_font_size).toBe(24);
+    // Nothing else moves with it.
+    expect(editor.config.name).toBe('Wohnzimmer');
+    expect(editor.config.temperature_font_size).toBeUndefined();
+    // A value outside the range is kept visible but never committed.
+    selectorByLabel(editor, 'Schriftgröße Raumname').emit(80);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(editor.config.name_font_size).toBe(24);
+    expect(selectorByLabel(editor, 'Schriftgröße Raumname').value).toBe(80);
+    // Emptying the field leaves the stored value alone.
+    selectorByLabel(editor, 'Schriftgröße Raumname').emit('');
+    await editor.updateComplete;
+    expect(editor.config.name_font_size).toBe(24);
+  });
+
   it('offers independent font size and family for temperature and humidity', async () => {
     const editor = await mountEditor(baseConfig);
     openAll(editor);

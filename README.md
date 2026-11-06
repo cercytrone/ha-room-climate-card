@@ -48,7 +48,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 
 | Bereich | Details |
 | --- | --- |
-| **Raumname** | Frei konfigurierbar, optional aus einer Entität (`name_entity`) oder dem Friendly Name des Temperatursensors, optionales Icon. Lange Namen werden zweizeilig gekürzt. |
+| **Raumname** | Frei konfigurierbares Textfeld (ohne Eintrag gilt der Friendly Name des Temperatursensors), **Schriftgröße 11–32 px** im Editor einstellbar, optionales Icon, das mit der Schriftgröße wächst. Lange Namen werden zweizeilig gekürzt. |
 | **Temperatur** | Der Held der Karte: 42 px, neutrales Weiß, enges Tracking (−0,035 em), Tabellenziffern. Einheit als eigene, kleinere Sekundärschrift. Schriftgröße und Schriftart im Editor frei einstellbar. |
 | **Luftfeuchte** | Folgt rechtsbündig auf **derselben Grundlinie**, halb so groß (20 px). Eigene Schriftgröße und -art im Editor. Über der Zeile steht die Deklaration mit farbigem Punkt. Der Wert ist reiner Text – ein Tippen darauf gehört der Karte. |
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
@@ -101,7 +101,7 @@ letzten Release). Updates laufen danach ganz normal über HACS → **Dashboard �
 - Alternativ in der Ressourcen-URL eine Versionsangabe ergänzen:
   `/hacsfiles/ha-room-climate-card/ha-room-climate-card.js?v=1.0.0`
 - In der Browser-Konsole sollte beim Laden stehen:
-  `ROOM-CLIMATE-CARD v2.16.3`.
+  `ROOM-CLIMATE-CARD v2.17.0`.
 
 ---
 
@@ -136,7 +136,7 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | Option | Typ | Standard | Beschreibung |
 | --- | --- | --- | --- |
 | `name` | string | – | Raumname. Ohne Angabe wird der Friendly Name des Temperatursensors verwendet. |
-| `name_entity` | entity | – | Entität, deren Friendly Name als Raumname dient (hat Vorrang vor dem Sensor-Namen). |
+| `name_font_size` | number (px) | `15` | Schriftgröße des Raumnamens (11–32). Die Zeilenhöhe wächst im Verhältnis 4/3 mit, das Raumicon auf das 16/15-fache – bei 24 px also 32 px Zeile und ein 26-px-Icon. |
 | `icon` | string | `mdi:home-thermometer-outline` | Raum-Icon (MDI). |
 | `height` | number \| `auto` | `auto` | Feste Kartenhöhe in px (140–900) oder automatische Höhe. |
 | `border_radius` | number | `26` | Eckenradius in px (0–40). |
@@ -305,7 +305,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 
 | Abschnitt | Felder |
 | --- | --- |
-| **Allgemein** | Raumname, Name aus Entität, Icon, automatische Höhe, Kartenhöhe, Eckenradius, **Innenabstand**, Darstellung |
+| **Allgemein** | Raumname, **Schriftgröße Raumname**, Icon, automatische Höhe, Kartenhöhe, Eckenradius, **Innenabstand**, Darstellung |
 | **Sensoren** | Temperatursensor, Luftfeuchtesensor, Dezimalstellen |
 | **Messwerte (Schrift)** | Schriftgröße und Schriftart für Temperatur und Luftfeuchte – jeweils getrennt; Beschriftungszeile („TEMPERATUR“ / „LUFTFEUCHTE“) ein-/ausschaltbar |
 | **Farben** | Akzentfarbe (Temperaturkurve, Soll-Linie, Ruhezustand der Flamme) und Sekundärfarbe der Luftfeuchte – mehr Farben gibt es bewusst nicht |
@@ -313,6 +313,11 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, **Tippen auf die Karte** (Thermostat-Dialog öffnen / nichts), Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
 | **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, **Verlauf bündig zur Kartenkante**, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Soll-Linie im Verlauf**, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
+
+Das Bild zeigt bewusst den Abschnitt **Allgemein** – dort steht neben dem Namensfeld auch die
+neue **Schriftgröße Raumname**. Das frühere Feld „Name aus Entität übernehmen“ gibt es nicht
+mehr: der Raumname ist reiner Text, und ohne Eintrag gilt der Friendly Name des
+Temperatursensors.
 
 Zahlen- und Textfelder arbeiten mit einem lokalen Entwurf: Ein Feld darf leer sein, ohne dass
 die Konfiguration verändert wird. Erst ein vollständiger, gültiger Wert wird übernommen –
@@ -763,7 +768,7 @@ Testdaten“, und der Mock wirft bei echten API-Aufrufen einen Fehler.
 
 ## Tests
 
-`npm test` führt 399 Tests in 13 Dateien aus (Stand 2.16.3):
+`npm test` führt 402 Tests in 13 Dateien aus (Stand 2.17.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |

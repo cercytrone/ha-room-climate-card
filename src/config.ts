@@ -23,7 +23,7 @@ export type { SmoothingLevel } from './chart/geometry';
 export interface RoomClimateCardConfig extends LovelaceCardConfig {
   // General
   name?: string;
-  name_entity?: string;
+  name_font_size?: number;
   icon?: string;
   /** Card height in pixels. `0` / `"auto"` (default) lets the content decide. */
   height?: number | 'auto';
@@ -226,7 +226,8 @@ export interface HumidityConfig {
 export interface ResolvedConfig {
   raw: RoomClimateCardConfig;
   name?: string;
-  nameEntity?: string;
+  /** Font size of the room name in pixels. */
+  nameFontSize: number;
   icon: string;
   /** `null` means "automatic / content driven". */
   height: number | null;
@@ -289,6 +290,13 @@ export const DEFAULT_READING_FONT_SIZE = {
 
 /** Range accepted for `*_font_size` (pixels). */
 export const READING_FONT_SIZE_RANGE = { min: 14, max: 96 } as const;
+
+/**
+ * The room name is a caption, not a headline – but a card on a wall tablet may
+ * want it bigger, and a dense dashboard smaller. 15 px is the design token.
+ */
+export const DEFAULT_NAME_FONT_SIZE = 15;
+export const NAME_FONT_SIZE_RANGE = { min: 11, max: 32 } as const;
 
 const ENTITY_ID_RE = /^[a-z0-9_]+\.[a-z0-9_]+$/;
 const FONT_FAMILY_RE = /^[-a-zA-Z0-9 ,'"_.()]+$/;
@@ -373,7 +381,7 @@ function asStringList(value: unknown): string[] {
 export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'type',
   'name',
-  'name_entity',
+  'name_font_size',
   'icon',
   'height',
   'border_radius',
@@ -439,16 +447,28 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
 /** Keys already reported, so a re-render does not flood the console. */
 const reportedKeys = new Set<string>();
 
+/**
+ * Keys that used to work and are gone now, with the sentence that replaces them.
+ * They are reported like a typo, but with a way out instead of "ignored".
+ */
+const REMOVED_KEYS: Record<string, string> = {
+  name_entity:
+    'Der Raumname kommt nur noch aus `name` (Editor: Allgemein → Raumname); ' +
+    'ohne Eintrag gilt der Name des Temperatursensors.',
+};
+
 /** Warns about unknown configuration keys (once per key). */
 function reportUnknownKeys(config: Record<string, unknown>): void {
   for (const key of Object.keys(config)) {
     if (KNOWN_CONFIG_KEYS.includes(key) || reportedKeys.has(key)) continue;
     reportedKeys.add(key);
+    const removed = REMOVED_KEYS[key];
+    const message = removed
+      ? `"${key}" wird nicht mehr unterstützt. ${removed}`
+      : `Unbekannter Konfigurationsschlüssel "${key}" – wird ignoriert. ` +
+        'Bekannte Schlüssel stehen in der README.';
     // eslint-disable-next-line no-console -- a visible hint beats a silent typo
-    console.warn(
-      `[room-climate-card] Unbekannter Konfigurationsschlüssel "${key}" – wird ignoriert. ` +
-        'Bekannte Schlüssel stehen in der README.'
-    );
+    console.warn(`[room-climate-card] ${message}`);
   }
 }
 
@@ -466,7 +486,6 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
   const windowEntity = asEntityId(config.window_entity);
   const motionEntity = asEntityId(config.motion_entity);
   const climateEntity = asEntityId(config.climate_entity);
-  const nameEntity = asEntityId(config.name_entity);
 
   const openStates = asStringList(config.window_open_states);
 
@@ -505,7 +524,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
   return {
     raw: config,
     name: asString(config.name),
-    nameEntity,
+    nameFontSize: clampNameSize(config.name_font_size),
     icon: asString(config.icon) ?? 'mdi:home-thermometer-outline',
     height,
     borderRadius: asNumber(config.border_radius, 0, 40, 26),
@@ -638,7 +657,6 @@ export function configEntityIds(config: ResolvedConfig): string[] {
     config.window.entity,
     config.motion.entity,
     config.thermostat.entity,
-    config.nameEntity,
   ];
   return ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
 }
@@ -655,6 +673,37 @@ export function hasStatusRow(config: ResolvedConfig): boolean {
 }
 
 /**
+ * Line height of the room name, in pixels.
+ *
+ * 4/3 of the font size is the ratio of the design token (15 px type on a 20 px
+ * line), so the title keeps its proportions at every size. Two lines are clamped
+ * by the stylesheet; the header grows with this value instead of clipping.
+ */
+export function nameLineHeight(size: number): number {
+  const safe = clampNameSize(size);
+  return Math.round((safe * 4) / 3);
+}
+
+/**
+ * Box size of the room icon, in pixels.
+ *
+ * The icon is meant to match the capital height of the title: 16 px for the
+ * 15 px token (the paths of a 24 px viewBox do not fill their box completely).
+ * It follows a changed name size instead of looking lost next to a big title.
+ */
+export function nameIconSize(size: number): number {
+  const safe = clampNameSize(size);
+  return Math.min(36, Math.round((safe * 16) / DEFAULT_NAME_FONT_SIZE));
+}
+
+/** Keeps a name size inside the documented range; junk falls back to the token. */
+function clampNameSize(size: unknown): number {
+  return Math.round(
+    asNumber(size, NAME_FONT_SIZE_RANGE.min, NAME_FONT_SIZE_RANGE.max, DEFAULT_NAME_FONT_SIZE)
+  );
+}
+
+/**
  * Default card height used for `getCardSize()` / grid options.
  *
  * Mirrors the 4 px rhythm of the stylesheet: 20 px inset top and bottom, title
@@ -665,7 +714,8 @@ export function preferredCardHeight(config: ResolvedConfig): number {
   const readings = config.typography.temperature.fontSize;
   const chartHeight = hasChart(config) ? config.chart.height : 0;
   const statusRow = hasStatusRow(config) ? 20 : 0;
-  const header = 28;
+  // A bigger room name needs a taller title row – the icon grows with it.
+  const header = Math.max(28, nameLineHeight(config.nameFontSize) + 8);
   // Caption row plus its 4 px gap disappears completely when switched off.
   const labels = config.showSeriesLabels ? 20 : 0;
   const inset = config.padding * 2;
@@ -674,11 +724,6 @@ export function preferredCardHeight(config: ResolvedConfig): number {
 
 export function resolveName(config: ResolvedConfig, hass?: HomeAssistant): string {
   if (config.name) return config.name;
-  if (config.nameEntity) {
-    const entity = hass?.states[config.nameEntity];
-    const friendly = entity?.attributes?.friendly_name;
-    if (typeof friendly === 'string' && friendly.trim().length) return friendly;
-  }
   if (config.temperatureEntity) {
     const entity = hass?.states[config.temperatureEntity];
     const friendly = entity?.attributes?.friendly_name;

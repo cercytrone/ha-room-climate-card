@@ -1211,7 +1211,35 @@ export function renderEditor(palette: Palette): string {
   const PREVIEW_W = WIDTH - PREVIEW_X - 24;
 
   const sections: EditorSection[] = [
-    { title: 'Allgemein', open: false },
+    {
+      // The section this release is about: the room name and its size.
+      title: 'Allgemein',
+      open: true,
+      fields: [
+        { label: 'Raumname', value: 'Wohnzimmer', kind: 'text' },
+        {
+          label: 'Schriftgröße Raumname',
+          value: '15',
+          unit: 'px',
+          kind: 'number',
+          helper:
+            '11–32 px (Standard 15). Das Raumicon wächst mit, die Zeilenhöhe bleibt im Verhältnis.',
+        },
+        { label: 'Raumicon', value: 'mdi:sofa', kind: 'text' },
+        { label: 'Höhe automatisch (Inhalt)', kind: 'switch', on: true },
+        { label: 'Kartenhöhe', value: '240', unit: 'px', kind: 'number', disabled: true },
+        { label: 'Eckenradius', value: '26', unit: 'px', kind: 'number' },
+        {
+          label: 'Innenabstand',
+          value: '10',
+          unit: 'px',
+          kind: 'number',
+          helper:
+            'Abstand zwischen Inhalt und Außenkante in Pixeln (0–32). Gilt für Titel, Messwerte und Heizzeile.',
+        },
+        { label: 'Darstellung', value: 'Automatisch (Home-Assistant-Theme)', kind: 'select' },
+      ],
+    },
     { title: 'Sensoren', open: false },
     { title: 'Messwerte (Schrift)', open: false },
     { title: 'Farben', open: false },
@@ -1219,9 +1247,8 @@ export function renderEditor(palette: Palette): string {
     { title: 'Bewegung', open: false },
     { title: 'Thermostat', open: false },
     {
-      // The section this release is about: opacity and the colour bands.
       title: 'Verlauf',
-      open: true,
+      open: false,
       fields: [
         { label: 'Temperaturverlauf anzeigen', kind: 'switch', on: true },
         { label: 'Luftfeuchteverlauf anzeigen', kind: 'switch', on: true },
@@ -1318,7 +1345,7 @@ export function renderEditor(palette: Palette): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${H}" viewBox="0 0 ${WIDTH} ${H}" role="img" aria-label="Room Climate Card – visueller Editor, Nachbau mit Demo-Werten">
   <rect width="${WIDTH}" height="${H}" fill="${EDITOR.page}" />
   <text x="${PANEL_X}" y="46" ${font(22, 700)} fill="${EDITOR.text}">Visueller Editor</text>
-  <text x="${PANEL_X}" y="68" ${font(11)} fill="${EDITOR.muted}">Acht Abschnitte, native Home-Assistant-Selektoren, Live-Vorschau – hier der Abschnitt „Verlauf“</text>
+  <text x="${PANEL_X}" y="68" ${font(11)} fill="${EDITOR.muted}">Acht Abschnitte, native Home-Assistant-Selektoren, Live-Vorschau – hier der Abschnitt „Allgemein“</text>
   <g transform="translate(${PANEL_X},0)">${panelSvg}</g>
 
   <text x="${PREVIEW_X}" y="108" ${font(9.5, 700)} ${TRACKING(0.09, 9.5)} fill="${

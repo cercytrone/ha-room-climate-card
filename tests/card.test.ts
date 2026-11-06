@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../src/main';
 import type { RoomClimateCard } from '../src/room-climate-card';
-import { chartSlotBottomMargin, chartSlotMargin, normalizeConfig } from '../src/config';
+import {
+  chartSlotBottomMargin,
+  chartSlotMargin,
+  normalizeConfig,
+  preferredCardHeight,
+} from '../src/config';
 import type { RoomClimateCardConfig } from '../src/config';
 import type { HomeAssistant } from '../src/types';
 import { createHass, entity, flush, resizeTo, setVisible, type EntityInit } from './helpers';
@@ -1427,13 +1432,56 @@ describe('room climate card', () => {
     const card = mount(fullConfig, createHass({ states: baseStates() }));
     await card.updateComplete;
     expect(q(card, '.room-icon')).not.toBeNull();
-    // 16 px box next to a 15 px title: the glyph ends up at the cap height,
-    // a pixel above and below it – two steps up from the old 14 px.
+    /*
+     * 16 px box next to a 15 px title: the glyph ends up at the cap height.
+     * Both numbers are tokens now, because the title size is configurable – the
+     * 16/20 are the defaults the stylesheet falls back to.
+     */
     const css = String((card.constructor as unknown as { styles: { cssText: string } }).styles.cssText);
-    expect(css).toMatch(/\.room-icon ha-icon \{[^}]*--mdc-icon-size: 16px/);
-    expect(css).toMatch(/\.room-icon \.icon \{[^}]*width: 16px[^}]*height: 16px/);
-    // It still fits the 20 px title line, so the header does not move.
-    expect(css).toMatch(/\.name \{[^}]*line-height: 20px/);
+    expect(css).toMatch(/\.room-icon ha-icon \{[^}]*--mdc-icon-size: var\(--rcc-name-icon, 16px\)/);
+    expect(css).toMatch(/\.room-icon \.icon \{[^}]*width: var\(--rcc-name-icon, 16px\)/);
+    expect(css).toMatch(/\.name \{[^}]*line-height: var\(--rcc-name-line, 20px\)/);
+    // The card writes the tokens for the default size, so nothing changes visually.
+    const style = (q(card, '.card') as HTMLElement).getAttribute('style') ?? '';
+    expect(style).toContain('--rcc-name-size:15px');
+    expect(style).toContain('--rcc-name-line:20px');
+    expect(style).toContain('--rcc-name-icon:16px');
+  });
+
+  it('grows the title, its line box and the icon with the configured name size', async () => {
+    const big = mount({ ...fullConfig, name_font_size: 24 }, createHass({ states: baseStates() }));
+    await big.updateComplete;
+    const style = (q(big, '.card') as HTMLElement).getAttribute('style') ?? '';
+    // 24 px type on a 32 px line, icon 26 px – the ratio of the 15/20/16 token.
+    expect(style).toContain('--rcc-name-size:24px');
+    expect(style).toContain('--rcc-name-line:32px');
+    expect(style).toContain('--rcc-name-icon:26px');
+
+    // A tiny name shrinks the icon with it instead of leaving a 16 px glyph.
+    const small = mount({ ...fullConfig, name_font_size: 11 }, createHass({ states: baseStates() }));
+    await small.updateComplete;
+    const smallStyle = (q(small, '.card') as HTMLElement).getAttribute('style') ?? '';
+    expect(smallStyle).toContain('--rcc-name-size:11px');
+    expect(smallStyle).toContain('--rcc-name-icon:12px');
+
+    // A value far outside the range is clamped, not passed through.
+    const huge = mount({ ...fullConfig, name_font_size: 400 }, createHass({ states: baseStates() }));
+    await huge.updateComplete;
+    expect((q(huge, '.card') as HTMLElement).getAttribute('style')).toContain('--rcc-name-size:32px');
+  });
+
+  it('lets the header grow with a large room name instead of clipping it', async () => {
+    /*
+     * The title row is 28 px tall for the default 15 px name. A 32 px name needs
+     * a 43 px line, so the row grows to 51 px – and the card reports that height
+     * to the dashboard instead of overlapping the readings.
+     */
+    const base = preferredCardHeight(normalizeConfig(fullConfig));
+    const big = preferredCardHeight(normalizeConfig({ ...fullConfig, name_font_size: 32 }));
+    const small = preferredCardHeight(normalizeConfig({ ...fullConfig, name_font_size: 11 }));
+    expect(big - base).toBe(23);
+    // Small names stay inside the 28 px row – no gap appears under the title.
+    expect(small).toBe(base);
   });
 
   it('draws the room name in the tone of the series captions', async () => {
