@@ -6,8 +6,45 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- **Standard-Actions.** `tap_action`, `hold_action` und `double_tap_action` verstehen das Format
+  aller Home-Assistant-Karten: `more-info`, `navigate`, `url`, `perform-action` (auch das alte
+  `call-service`), `toggle`, `none`, jeweils mit `confirmation`. Im Editor stehen sie im neuen
+  Abschnitt *Aktionen* mit den Auswahlfeldern von Home Assistant.
+- **Warnung „Fenster offen – Heizung läuft“** (`show_window_warning`, Standard an), sobald das
+  Fenster offen ist und das Thermostat heizt.
+- **Feuchte-Bewertung und Taupunkt** (`humidity_comfort`, `humidity_dry_below`,
+  `humidity_humid_above`, `show_dew_point`): „trocken / angenehm / feucht – lüften“ unter dem
+  Feuchtewert, der Taupunkt nach der Magnus-Formel unter der Temperatur. Beides ist standardmäßig aus.
+- **Lange Zeiträume über die Recorder-Statistik.** Über 48 h lädt der Verlauf Fünf-Minuten-Mittel
+  statt jeder Messung; der Editor bietet zusätzlich 72 h und 7 Tage.
+- **Tastatur im Verlauf.** Der Chart ist ein Tab-Stopp: Pfeiltasten gehen von Messwert zu
+  Messwert, Bild auf/ab springen zehn, Pos1/Ende an die Ränder, Escape schließt die Anzeige. Ein
+  Screenreader hört Zeit und Werte.
+- **Vorlagen und Zurücksetzen im Editor.** *Standard*, *Kompakt*, *Wandtablet* und *Minimal* setzen
+  Schriftgrößen, Abstände und Verlauf auf einmal; Sensoren, Farben und Aktionen bleiben. Jeder
+  Abschnitt hat einen Knopf „Abschnitt auf Standard zurücksetzen“.
+
 ### Geändert
 
+- **`ha-card` als Rahmen.** Hintergrund, Rand, Schatten und Radius kommen jetzt vom Theme
+  (`--ha-card-*`), und card-mod findet sein `ha-card`. Nur `theme: dark` / `theme: light` malen
+  weiter ihre eigene Fläche.
+- **Eckenradius vom Theme.** `border_radius` hat keinen eigenen Standard (26 px) mehr; ohne Eintrag
+  gilt der Radius des Themes wie bei allen anderen Karten.
+- **Füllt die Zelle im Sections-Raster.** Die Karte nimmt die Höhe ihrer Rasterzelle an; der
+  Verlauf wächst in den freien Platz, statt eine Lücke zu lassen.
+- **Ohne Thermostat öffnet ein Tipp den Temperatursensor** (sonst den Feuchtesensor), statt nichts
+  zu tun.
+- **Achse auf vollen Stunden** in der Zeitzone von Home Assistant („Fr 03:00“ statt „Fr 02:55“),
+  bei mehrtägigen Fenstern nur der Wochentag um Mitternacht.
+- **„Soll“ weicht der Kurve aus.** Die Beschriftung prüft die gezeichneten Kurven und den
+  Endpunkt und wechselt die Seite oder geht unter die Linie, statt den Endpunkt zu überdecken.
+- **Heizzeile:** Ohne `hvac_action` steht der Modus („Heizen“) statt „Status unbekannt“; mit
+  `show_hvac_mode` erscheinen Modus und Zustand zusammen („Automatik · Heizt“).
+- **Nur Luftfeuchte:** Ohne Temperatursensor wird die Feuchte zum großen Wert links, und der Name
+  kommt vom Feuchtesensor.
 - **Release durch Merge.** Ein Release braucht keinen Tag mehr: Nennt der CHANGELOG auf `main`
   oben eine Version ohne Tag, baut, testet, taggt und veröffentlicht der Release-Workflow sie
   selbst. Eine Version, die älter ist als die letzte, wird abgelehnt.

@@ -172,8 +172,99 @@ export async function fetchHistory(
   return parseHistoryResponse(response, entityIds);
 }
 
-export function historyCacheKey(entityIds: string[], hours: number): string {
-  return `${[...entityIds].sort().join('|')}@${hours}`;
+export function historyCacheKey(
+  entityIds: string[],
+  hours: number,
+  source: HistorySource = 'history'
+): string {
+  const key = `${[...entityIds].sort().join('|')}@${hours}`;
+  return source === 'statistics' ? `${key}#stats` : key;
+}
+
+/**
+ * `history` = every recorded state change; `statistics` = the recorder's
+ * five-minute means. A week of a chatty sensor is tens of thousands of raw
+ * states but only about 2 000 means – the long-term view loads the latter.
+ */
+export type HistorySource = 'history' | 'statistics';
+
+/** From this window length on the chart reads five-minute statistics. */
+export const STATISTICS_FROM_HOURS = 48;
+
+export function historySourceFor(hours: number): HistorySource {
+  return hours > STATISTICS_FROM_HOURS ? 'statistics' : 'history';
+}
+
+function statisticTime(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value > 1e12 ? value : value * 1000;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Normalises a `recorder/statistics_during_period` answer. Each mean is placed
+ * in the middle of its five-minute bucket.
+ */
+export function parseStatisticsResponse(response: unknown, entityIds: string[]): HistoryMap {
+  const result: HistoryMap = {};
+  for (const entityId of entityIds) result[entityId] = [];
+  if (!isRecord(response)) return result;
+  for (const entityId of entityIds) {
+    const rows = response[entityId];
+    if (!Array.isArray(rows)) continue;
+    const samples: ChartSample[] = [];
+    for (const row of rows) {
+      if (!isRecord(row)) continue;
+      const start = statisticTime(row.start);
+      if (start === undefined) continue;
+      const end = statisticTime(row.end) ?? start + 5 * 60 * 1000;
+      const mean = typeof row.mean === 'number' && Number.isFinite(row.mean) ? row.mean : null;
+      samples.push({ t: Math.round((start + end) / 2), v: mean });
+    }
+    samples.sort((a, b) => a.t - b.t);
+    result[entityId] = samples;
+  }
+  return result;
+}
+
+/**
+ * Five-minute means from the recorder's statistics. Entities without
+ * statistics (no `state_class: measurement`) come back empty and are filled
+ * from the regular history; a failing request falls back to it entirely.
+ */
+export async function fetchStatistics(
+  hass: HomeAssistant,
+  entityIds: string[],
+  options: FetchOptions
+): Promise<HistoryMap> {
+  if (!entityIds.length) return {};
+  const connection = hass.connection;
+  if (!connection || typeof connection.sendMessagePromise !== 'function') {
+    return fetchHistory(hass, entityIds, options);
+  }
+  let parsed: HistoryMap;
+  try {
+    const response = await connection.sendMessagePromise({
+      type: 'recorder/statistics_during_period',
+      start_time: new Date(options.start).toISOString(),
+      end_time: new Date(options.end).toISOString(),
+      statistic_ids: entityIds,
+      period: '5minute',
+      types: ['mean'],
+    });
+    parsed = parseStatisticsResponse(response, entityIds);
+  } catch {
+    return fetchHistory(hass, entityIds, options);
+  }
+  const missing = entityIds.filter((id) => !parsed[id]?.some((sample) => sample.v !== null));
+  if (missing.length) {
+    const raw = await fetchHistory(hass, missing, options);
+    for (const id of missing) parsed[id] = raw[id] ?? [];
+  }
+  return parsed;
 }
 
 export interface LoadOptions {
@@ -183,6 +274,8 @@ export interface LoadOptions {
    * may predate the outage).
    */
   maxAgeMs?: number;
+  /** Raw history (default) or five-minute statistics for long windows. */
+  source?: HistorySource;
 }
 
 /**
@@ -201,7 +294,8 @@ export class HistoryRepository {
     now = Date.now(),
     options: LoadOptions = {}
   ): Promise<HistoryMap> {
-    const key = historyCacheKey(entityIds, hours);
+    const source = options.source ?? 'history';
+    const key = historyCacheKey(entityIds, hours, source);
     const maxAge = Math.max(0, options.maxAgeMs ?? HISTORY_CACHE_TTL_MS);
     const cached = this.cache.get(key);
     if (cached && maxAge > 0 && now - cached.fetchedAt < maxAge) {
@@ -211,10 +305,12 @@ export class HistoryRepository {
     const pending = this.inflight.get(key);
     if (pending) return pending;
 
-    const promise = fetchHistory(hass, entityIds, {
-      start: now - hours * 60 * 60 * 1000,
-      end: now,
-    })
+    const window = { start: now - hours * 60 * 60 * 1000, end: now };
+    const promise = (
+      source === 'statistics'
+        ? fetchStatistics(hass, entityIds, window)
+        : fetchHistory(hass, entityIds, window)
+    )
       .then((data) => {
         this.cache.set(key, { fetchedAt: Date.now(), data });
         if (this.cache.size > 24) {

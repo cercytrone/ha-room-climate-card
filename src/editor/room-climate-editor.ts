@@ -4,10 +4,10 @@ import {
   DEFAULT_COLORS,
   DEFAULT_NAME_FONT_SIZE,
   NAME_FONT_SIZE_RANGE,
+  THEME_CARD_RADIUS,
   asBoolean,
   asEntityId,
   asString,
-  asTapAction,
   type RoomClimateCardConfig,
 } from '../config';
 import { baseLanguage } from '../localize';
@@ -32,6 +32,7 @@ interface EditorText {
   height: string;
   heightHelper: string;
   radius: string;
+  radiusHelper: string;
   padding: string;
   paddingHelper: string;
   paddingWarning: string;
@@ -45,6 +46,12 @@ interface EditorText {
   humidityEntity: string;
   temperatureDecimals: string;
   humidityDecimals: string;
+  humidityComfort: string;
+  humidityComfortHelper: string;
+  humidityDryBelow: string;
+  humidityHumidAbove: string;
+  dewPoint: string;
+  dewPointHelper: string;
   temperatureSize: string;
   temperatureFont: string;
   humiditySize: string;
@@ -66,9 +73,10 @@ interface EditorText {
   climateEntity: string;
   showClimateRow: string;
   showSetpoint: string;
+  actions: string;
   tapAction: string;
-  tapMoreInfo: string;
-  tapNone: string;
+  holdAction: string;
+  doubleTapAction: string;
   tapHelper: string;
   showHvacStatus: string;
   showHvacMode: string;
@@ -128,6 +136,15 @@ interface EditorText {
   missingEntity: string;
   loading: string;
   generalHelper: string;
+  windowWarning: string;
+  windowWarningHelper: string;
+  presets: string;
+  presetsHelper: string;
+  presetStandard: string;
+  presetCompact: string;
+  presetWall: string;
+  presetMinimal: string;
+  resetSection: string;
 }
 
 /**
@@ -163,6 +180,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     height: 'Kartenhöhe',
     heightHelper: 'Feste Höhe in Pixeln. Die Karte komprimiert ihren Inhalt automatisch.',
     radius: 'Eckenradius',
+    radiusHelper: 'Ohne Eintrag gilt der Radius des Home-Assistant-Themes (wie bei allen anderen Karten). „Abschnitt zurücksetzen“ kehrt dorthin zurück.',
     padding: 'Innenabstand',
     paddingHelper:
       'Abstand zwischen Inhalt und Außenkante in Pixeln (0–32). Gilt für Titel, Messwerte und Heizzeile; der Verlauf kann bündig laufen.',
@@ -179,6 +197,14 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityEntity: 'Luftfeuchtesensor',
     temperatureDecimals: 'Dezimalstellen Temperatur',
     humidityDecimals: 'Dezimalstellen Luftfeuchte',
+    humidityComfort: 'Luftfeuchte bewerten',
+    humidityComfortHelper:
+      'Zeigt unter dem Wert „trocken“, „angenehm“ oder „feucht – lüften“. Über der oberen Grenze steigt das Schimmelrisiko.',
+    humidityDryBelow: 'Trocken unter',
+    humidityHumidAbove: 'Feucht über',
+    dewPoint: 'Taupunkt anzeigen',
+    dewPointHelper:
+      'Berechnet aus Temperatur und Luftfeuchte (Magnus-Formel). Kühlt eine Wand oder ein Fenster unter diesen Wert, schlägt sich dort Feuchtigkeit nieder.',
     temperatureSize: 'Schriftgröße Temperatur',
     temperatureFont: 'Schriftart Temperatur',
     humiditySize: 'Schriftgröße Luftfeuchte',
@@ -203,11 +229,12 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     climateEntity: 'Thermostat-Entität',
     showClimateRow: 'Statuszeile unter dem Messwert (Heizstatus & Solltemperatur) anzeigen',
     showSetpoint: 'Solltemperatur in der Statuszeile anzeigen',
-    tapAction: 'Tippen auf die Karte',
-    tapMoreInfo: 'Thermostat öffnen',
-    tapNone: 'Nichts',
+    actions: 'Aktionen',
+    tapAction: 'Tippen',
+    holdAction: 'Gedrückt halten',
+    doubleTapAction: 'Doppelt tippen',
     tapHelper:
-      'Öffnet den Dialog der Climate-Entität von Home Assistant – dort lassen sich Solltemperatur und Modus einstellen. Die Statuszeile ist derselbe Knopf für die Tastatur; Messwerte und Chart behalten ihre eigene Funktion.',
+      'Standard: Tippen öffnet den Dialog des Thermostats (Solltemperatur, Modus), ohne Thermostat den des Temperatursensors. Halten und doppelt Tippen tun nichts, bis hier eine Aktion gewählt ist. Der Verlauf behält seine Tipps, solange er die Werte anzeigt.',
     showHvacStatus: 'Heizstatus (Flamme + Statuswort) anzeigen',
     showHvacMode: 'Betriebsmodus anzeigen',
     heatingColor: 'Icon-Farbe Heizen (nur bei aktiver Heizanforderung)',
@@ -278,6 +305,17 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     missingEntity: 'Bitte eine Entität auswählen.',
     loading: 'Editor wird geladen …',
     generalHelper: 'Alle Werte sind optional – die Karte funktioniert auch mit Teilkonfiguration.',
+    windowWarning: 'Warnen, wenn das Fenster offen ist und geheizt wird',
+    windowWarningHelper:
+      'Zeigt „Fenster offen – Heizung läuft“, solange beides zutrifft. Braucht Fenstersensor und Thermostat.',
+    presets: 'Vorlage',
+    presetsHelper:
+      'Setzt Schriftgrößen, Abstände und Verlauf auf eine passende Kombination. Sensoren, Farben und Aktionen bleiben, wie sie sind.',
+    presetStandard: 'Standard',
+    presetCompact: 'Kompakt',
+    presetWall: 'Wandtablet',
+    presetMinimal: 'Minimal',
+    resetSection: 'Abschnitt auf Standard zurücksetzen',
   },
   en: {
     general: 'General',
@@ -298,6 +336,7 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     height: 'Card height',
     heightHelper: 'Fixed height in pixels. The card compresses itself automatically.',
     radius: 'Corner radius',
+    radiusHelper: 'Without a value the card uses the Home Assistant theme radius, like every other card. “Reset this section” returns to it.',
     padding: 'Card padding',
     paddingHelper:
       'Space between the content and the card edge in pixels (0–32). Applies to title, readings and status row; the chart may run flush.',
@@ -314,6 +353,14 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     humidityEntity: 'Humidity sensor',
     temperatureDecimals: 'Temperature decimals',
     humidityDecimals: 'Humidity decimals',
+    humidityComfort: 'Rate the humidity',
+    humidityComfortHelper:
+      'Shows “dry”, “comfortable” or “humid – ventilate” below the value. Above the upper limit the risk of mould rises.',
+    humidityDryBelow: 'Dry below',
+    humidityHumidAbove: 'Humid above',
+    dewPoint: 'Show dew point',
+    dewPointHelper:
+      'Computed from temperature and humidity (Magnus formula). Where a wall or window is colder than this, moisture condenses.',
     temperatureSize: 'Temperature font size',
     temperatureFont: 'Temperature font family',
     humiditySize: 'Humidity font size',
@@ -338,11 +385,12 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     climateEntity: 'Climate entity',
     showClimateRow: 'Show the status row (heating state & target temperature)',
     showSetpoint: 'Show target temperature in the status row',
-    tapAction: 'Tap on the card',
-    tapMoreInfo: 'Open thermostat',
-    tapNone: 'Nothing',
+    actions: 'Actions',
+    tapAction: 'Tap',
+    holdAction: 'Hold',
+    doubleTapAction: 'Double tap',
     tapHelper:
-      "Opens Home Assistant's dialog for the climate entity, where target temperature and mode are set. The status row is the same button for keyboards; readings and chart keep their own behaviour.",
+      'Default: a tap opens the thermostat dialog (target temperature, mode), without a thermostat the temperature sensor’s. Hold and double tap do nothing until an action is chosen here. The chart keeps its taps while it shows the values.',
     showHvacStatus: 'Show heating state (flame + wording)',
     showHvacMode: 'Show HVAC mode',
     heatingColor: 'Heating icon colour (active heating demand only)',
@@ -413,6 +461,17 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     missingEntity: 'Please select an entity.',
     loading: 'Loading editor …',
     generalHelper: 'Everything is optional – the card also works with a partial configuration.',
+    windowWarning: 'Warn while the window is open and the heating runs',
+    windowWarningHelper:
+      'Shows “Window open – heating is on” while both are true. Needs a window sensor and a thermostat.',
+    presets: 'Preset',
+    presetsHelper:
+      'Sets font sizes, spacing and the chart to a matching combination. Sensors, colours and actions stay as they are.',
+    presetStandard: 'Default',
+    presetCompact: 'Compact',
+    presetWall: 'Wall tablet',
+    presetMinimal: 'Minimal',
+    resetSection: 'Reset this section to defaults',
   },
 };
 
@@ -424,7 +483,122 @@ type SectionId =
   | 'window'
   | 'motion'
   | 'thermostat'
-  | 'chart';
+  | 'chart'
+  | 'actions';
+
+/**
+ * Keys a reset of a section returns to their defaults. Entities are left out on
+ * purpose: "reset" means "default look", not "forget my sensors".
+ */
+export const SECTION_RESET_KEYS: Record<SectionId, readonly string[]> = {
+  general: ['name', 'name_font_size', 'icon', 'height', 'border_radius', 'card_padding', 'theme'],
+  sensors: [
+    'temperature_decimals',
+    'humidity_decimals',
+    'humidity_comfort',
+    'humidity_dry_below',
+    'humidity_humid_above',
+    'show_dew_point',
+  ],
+  typography: [
+    'temperature_font_size',
+    'temperature_font_family',
+    'humidity_font_size',
+    'humidity_font_family',
+    'show_series_labels',
+  ],
+  colors: ['accent_color', 'humidity_color', 'temperature_comfort_color'],
+  window: ['show_window', 'window_open_states', 'show_window_warning'],
+  motion: ['show_motion', 'motion_show_last_changed'],
+  thermostat: [
+    'show_thermostat',
+    'show_climate_row',
+    'show_setpoint',
+    'show_hvac_status',
+    'show_hvac_mode',
+    'heating_color',
+    'heating_idle_color',
+    'heating_off_color',
+  ],
+  chart: [
+    'show_temperature_chart',
+    'show_humidity_chart',
+    'chart_hours',
+    'chart_height',
+    'chart_curve',
+    'chart_smoothing',
+    'chart_gap_mode',
+    'chart_max_gap_minutes',
+    'chart_gap_style',
+    'chart_humidity_line_style',
+    'chart_show_points',
+    'chart_show_grid',
+    'chart_show_axis',
+    'chart_full_bleed',
+    'chart_show_setpoint',
+    'chart_show_tooltip',
+    'chart_show_extremes',
+    'chart_temperature_gradient',
+    'chart_humidity_gradient',
+    'chart_temperature_area_opacity',
+    'chart_humidity_area_opacity',
+    'chart_opacity',
+    'chart_temperature_bands',
+    'chart_band_cold_below',
+    'chart_band_warm_above',
+    'chart_band_hot_above',
+    'chart_band_transition',
+  ],
+  actions: ['tap_action', 'hold_action', 'double_tap_action'],
+};
+
+export type PresetId = 'standard' | 'compact' | 'wall' | 'minimal';
+
+/** Every key a preset may set; applying a preset clears the ones it leaves out. */
+export const PRESET_KEYS: readonly string[] = [
+  'height',
+  'card_padding',
+  'name_font_size',
+  'temperature_font_size',
+  'humidity_font_size',
+  'show_series_labels',
+  'show_temperature_chart',
+  'show_humidity_chart',
+  'chart_hours',
+  'chart_height',
+  'chart_show_axis',
+  'chart_show_extremes',
+];
+
+export const PRESETS: Record<PresetId, Record<string, unknown>> = {
+  /** The card's own defaults. */
+  standard: {},
+  /** Dense dashboards: smaller values, a slim chart without labels. */
+  compact: {
+    card_padding: 8,
+    temperature_font_size: 32,
+    humidity_font_size: 18,
+    show_series_labels: false,
+    chart_height: 72,
+    chart_show_axis: false,
+    chart_show_extremes: false,
+  },
+  /** Read from across the room: big values, a day of history. */
+  wall: {
+    card_padding: 16,
+    name_font_size: 20,
+    temperature_font_size: 64,
+    humidity_font_size: 28,
+    chart_height: 160,
+    chart_hours: 24,
+  },
+  /** Just the values and the badges. */
+  minimal: {
+    show_series_labels: false,
+    show_temperature_chart: false,
+    show_humidity_chart: false,
+  },
+};
 
 interface FieldOptions {
   key: string;
@@ -758,8 +932,47 @@ export class RoomClimateCardEditor extends LitElement {
         <span class="section-title">${title}</span>
         <span class="chevron" aria-hidden="true"></span>
       </summary>
-      <div class="fields">${content}</div>
+      <div class="fields">
+        ${content}
+        <button type="button" class="reset" @click=${() => this.resetSection(id)}>
+          ${this.text.resetSection}
+        </button>
+      </div>
     </details>`;
+  }
+
+  /** Clears every key of a section, so the card's defaults apply again. */
+  private resetSection(id: SectionId): void {
+    this._drafts = {};
+    this.patch(Object.fromEntries(SECTION_RESET_KEYS[id].map((key) => [key, undefined])));
+  }
+
+  /** Applies a preset: its own values, and defaults for the other preset keys. */
+  applyPreset(id: PresetId): void {
+    const preset = PRESETS[id];
+    this._drafts = {};
+    this.patch(Object.fromEntries(PRESET_KEYS.map((key) => [key, preset[key]])));
+  }
+
+  private renderPresets(t: EditorText): TemplateResult {
+    const presets: Array<[PresetId, string]> = [
+      ['standard', t.presetStandard],
+      ['compact', t.presetCompact],
+      ['wall', t.presetWall],
+      ['minimal', t.presetMinimal],
+    ];
+    return html`<div class="presets" role="group" aria-label=${t.presets}>
+      <span class="presets-title">${t.presets}</span>
+      <div class="preset-buttons">
+        ${presets.map(
+          ([id, label]) =>
+            html`<button type="button" class="preset" data-preset=${id} @click=${() => this.applyPreset(id)}>
+              ${label}
+            </button>`
+        )}
+      </div>
+      <span class="helper">${t.presetsHelper}</span>
+    </div>`;
   }
 
   private onToggle(id: SectionId, event: Event): void {
@@ -774,6 +987,7 @@ export class RoomClimateCardEditor extends LitElement {
     }
     const t = this.text;
     return html`<div class="editor">
+      ${this.renderPresets(t)}
       ${this.renderSection('general', t.general, this.renderGeneral(t))}
       ${this.renderSection('sensors', t.sensors, this.renderSensors(t))}
       ${this.renderSection('typography', t.typography, this.renderTypography(t))}
@@ -782,6 +996,7 @@ export class RoomClimateCardEditor extends LitElement {
       ${this.renderSection('motion', t.motion, this.renderMotion(t))}
       ${this.renderSection('thermostat', t.thermostat, this.renderThermostat(t))}
       ${this.renderSection('chart', t.chart, this.renderChart(t))}
+      ${this.renderSection('actions', t.actions, this.renderActions(t))}
     </div>`;
   }
 
@@ -834,11 +1049,12 @@ export class RoomClimateCardEditor extends LitElement {
       ${this.renderNumber({
         key: 'border_radius',
         label: t.radius,
+        helper: t.radiusHelper,
         min: 0,
         max: 40,
         step: 1,
         unit: 'px',
-        fallback: 26,
+        fallback: THEME_CARD_RADIUS,
       })}
       ${this.renderNumber({
         key: 'card_padding',
@@ -897,6 +1113,48 @@ export class RoomClimateCardEditor extends LitElement {
         max: 3,
         step: 1,
         fallback: 0,
+      })}
+      ${this.renderHumidityRating(t)}`;
+  }
+
+  /** Humidity rating and dew point: both read the sensors chosen above. */
+  private renderHumidityRating(t: EditorText): TemplateResult {
+    const hasHumidity = Boolean(asEntityId(this._config.humidity_entity));
+    const hasBoth = hasHumidity && Boolean(asEntityId(this._config.temperature_entity));
+    const ratingOn = hasHumidity && (this.rawBoolean('humidity_comfort') ?? false);
+    return html`${this.renderSwitch({
+        key: 'humidity_comfort',
+        label: t.humidityComfort,
+        value: this.rawBoolean('humidity_comfort') ?? false,
+        disabled: !hasHumidity,
+        helper: t.humidityComfortHelper,
+      })}
+      ${this.renderNumber({
+        key: 'humidity_dry_below',
+        label: t.humidityDryBelow,
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: '%',
+        fallback: 40,
+        disabled: !ratingOn,
+      })}
+      ${this.renderNumber({
+        key: 'humidity_humid_above',
+        label: t.humidityHumidAbove,
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: '%',
+        fallback: 60,
+        disabled: !ratingOn,
+      })}
+      ${this.renderSwitch({
+        key: 'show_dew_point',
+        label: t.dewPoint,
+        value: this.rawBoolean('show_dew_point') ?? false,
+        disabled: !hasBoth,
+        helper: t.dewPointHelper,
       })}`;
   }
 
@@ -1002,7 +1260,14 @@ export class RoomClimateCardEditor extends LitElement {
                 .filter(Boolean);
               this.patch({ window_open_states: list.length ? list : undefined });
             },
-          })}`;
+          })}
+      ${this.renderSwitch({
+        key: 'show_window_warning',
+        label: t.windowWarning,
+        value: this.rawBoolean('show_window_warning') ?? true,
+        disabled: !enabled,
+        helper: t.windowWarningHelper,
+      })}`;
   }
 
   private renderMotion(t: EditorText): TemplateResult {
@@ -1053,23 +1318,6 @@ export class RoomClimateCardEditor extends LitElement {
         value: this.rawBoolean('show_climate_row') ?? true,
         disabled: !enabled,
       })}
-      ${this.renderField({
-        key: 'tap_action',
-        label: t.tapAction,
-        selector: {
-          select: {
-            mode: 'dropdown',
-            options: [
-              { value: 'more-info', label: t.tapMoreInfo },
-              { value: 'none', label: t.tapNone },
-            ],
-          },
-        },
-        // Reads `{ action: none }` as well, so a hand-written YAML shows its real value.
-        value: asTapAction(this._config.tap_action),
-        disabled: !enabled || !this.rowVisible,
-        helper: t.tapHelper,
-      })}
       ${this.renderSwitch({
         key: 'show_setpoint',
         label: t.showSetpoint,
@@ -1108,6 +1356,34 @@ export class RoomClimateCardEditor extends LitElement {
       })}`;
   }
 
+  /**
+   * Home Assistant's own action picker (`ui_action`): more-info, navigate, URL,
+   * perform action, toggle, none – the same fields every built-in card offers.
+   * The old short form `tap_action: none` is shown as `{ action: none }`.
+   */
+  private actionValue(key: string): unknown {
+    const raw = this._config[key];
+    return typeof raw === 'string' ? { action: raw } : raw;
+  }
+
+  private renderActions(t: EditorText): TemplateResult {
+    const field = (key: string, label: string, defaultAction: string): TemplateResult =>
+      this.renderField({
+        key,
+        label,
+        selector: { ui_action: { default_action: defaultAction } },
+        value: this.actionValue(key),
+        onChange: (value) =>
+          this.patch({
+            [key]: value && typeof value === 'object' && Object.keys(value).length ? value : undefined,
+          }),
+      });
+    return html`${field('tap_action', t.tapAction, 'more-info')}
+      ${field('hold_action', t.holdAction, 'none')}
+      ${field('double_tap_action', t.doubleTapAction, 'none')}
+      <p class="helper">${t.tapHelper}</p>`;
+  }
+
   private renderChart(t: EditorText): TemplateResult {
     const showTemperature = this.showFlag('show_temperature_chart', 'temperature_entity');
     const showHumidity = this.showFlag('show_humidity_chart', 'humidity_entity');
@@ -1115,7 +1391,11 @@ export class RoomClimateCardEditor extends LitElement {
     // The band thresholds only mean something while the bands are switched on.
     const bandsOn =
       showTemperature && (this.rawBoolean('chart_temperature_bands') ?? false);
-    const hourOptions = [3, 6, 12, 24, 48].map((hours) => ({ value: String(hours), label: `${hours} h` }));
+    // Beyond 48 h the card reads five-minute means from the recorder statistics.
+    const hourOptions = [3, 6, 12, 24, 48, 72, 168].map((hours) => ({
+      value: String(hours),
+      label: hours === 168 ? '7 d' : `${hours} h`,
+    }));
     return html`${this.renderSwitch({
         key: 'show_temperature_chart',
         label: t.showTemperatureChart,
@@ -1464,6 +1744,48 @@ export class RoomClimateCardEditor extends LitElement {
     .hint {
       font-size: 11.5px;
       line-height: 1.4;
+      color: var(--secondary-text-color);
+    }
+    .presets {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 2px 2px 6px;
+    }
+    .presets-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .preset-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .preset,
+    .reset {
+      appearance: none;
+      font: inherit;
+      font-size: 12.5px;
+      line-height: 1;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color, rgba(148, 163, 184, 0.4));
+      background: transparent;
+      color: var(--primary-text-color);
+      cursor: pointer;
+    }
+    .preset:hover,
+    .reset:hover {
+      background: color-mix(in srgb, var(--primary-color, #38bdf8) 10%, transparent);
+    }
+    .preset:focus-visible,
+    .reset:focus-visible {
+      outline: 2px solid var(--primary-color, #38bdf8);
+      outline-offset: 2px;
+    }
+    .reset {
+      align-self: flex-start;
+      margin-top: 2px;
       color: var(--secondary-text-color);
     }
     .loading {

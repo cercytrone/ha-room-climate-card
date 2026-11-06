@@ -23,6 +23,9 @@ import {
   SMOOTHING_LEVELS,
   smoothingGuard,
   smoothingWindow,
+  placeSetpointCaption,
+  polylineYAt,
+  roundTimeTicks,
   tickCountForWidth,
   timeTicks,
   type ChartSample,
@@ -820,5 +823,101 @@ describe('series pieces', () => {
 
   it('returns nothing for a single point', () => {
     expect(seriesPieces([{ x: 3, y: 4 }], true)).toEqual([]);
+  });
+});
+
+describe('roundTimeTicks', () => {
+  const H = 3600_000;
+  const options = (width: number, start: number, end: number) => {
+    const msPerPx = (end - start) / width;
+    return { maxTicks: 3, endClearanceMs: 70 * msPerPx, minSpacingMs: 72 * msPerPx };
+  };
+
+  it('puts ticks on full hours inside the window', () => {
+    const start = Date.UTC(2026, 9, 24, 6, 13);
+    const end = Date.UTC(2026, 9, 24, 12, 13);
+    expect(roundTimeTicks(start, end, options(400, start, end))).toEqual([
+      Date.UTC(2026, 9, 24, 8),
+      Date.UTC(2026, 9, 24, 10),
+    ]);
+  });
+
+  it('follows the offset of the displayed zone', () => {
+    const start = Date.UTC(2026, 9, 24, 6, 13);
+    const end = Date.UTC(2026, 9, 24, 12, 13);
+    // UTC+2: 08:13 – 14:13 local → 10:00 and 12:00 local = 08:00 and 10:00 UTC.
+    const ticks = roundTimeTicks(start, end, { ...options(400, start, end), offsetAt: () => 2 * H });
+    expect(ticks).toEqual([Date.UTC(2026, 9, 24, 8), Date.UTC(2026, 9, 24, 10)]);
+  });
+
+  it('keeps the area next to "now" free and never exceeds the label budget', () => {
+    for (let minute = 0; minute < 24 * 60; minute += 37) {
+      const end = Date.UTC(2026, 0, 1) + minute * 60_000;
+      const start = end - 6 * H;
+      const opts = options(360, start, end);
+      const ticks = roundTimeTicks(start, end, opts);
+      expect(ticks.length).toBeGreaterThanOrEqual(1);
+      expect(ticks.length).toBeLessThanOrEqual(3);
+      for (const tick of ticks) {
+        expect(tick).toBeGreaterThanOrEqual(start);
+        expect(tick).toBeLessThanOrEqual(end - opts.endClearanceMs);
+        expect(tick % (30 * 60_000)).toBe(0);
+      }
+    }
+  });
+
+  it('uses whole days for a week', () => {
+    const end = Date.UTC(2026, 9, 24, 12, 13);
+    const start = end - 7 * 24 * H;
+    const ticks = roundTimeTicks(start, end, options(400, start, end));
+    expect(ticks.length).toBeGreaterThanOrEqual(2);
+    for (const tick of ticks) expect(tick % (24 * H)).toBe(0);
+  });
+
+  it('returns nothing for an empty window', () => {
+    expect(roundTimeTicks(10, 10, { maxTicks: 3, endClearanceMs: 0, minSpacingMs: 0 })).toEqual([]);
+  });
+});
+
+describe('placeSetpointCaption', () => {
+  const flat = (y: number) => Array.from({ length: 51 }, (_, index) => ({ x: index * 8, y }));
+  const base = { lineY: 70, left: 3, right: 397, width: 30, height: 9, top: 6, bottom: 110 };
+
+  it('keeps the preferred spot when the curve is far away', () => {
+    const placement = placeSetpointCaption({ ...base, curves: [flat(20)], preferredSide: 'right' });
+    expect(placement).toMatchObject({ side: 'right', above: true });
+  });
+
+  it('moves below the line when the curve runs right above it', () => {
+    const placement = placeSetpointCaption({
+      ...base,
+      curves: [flat(63)],
+      dots: [{ x: 396, y: 63, r: 2.8 }],
+      preferredSide: 'right',
+    });
+    expect(placement).toMatchObject({ side: 'right', above: false });
+    expect(placement.clearance).toBeGreaterThanOrEqual(4);
+  });
+
+  it('switches sides when only the other end is free', () => {
+    // Curve hugs the line on the right only.
+    const curve = Array.from({ length: 51 }, (_, index) => ({ x: index * 8, y: index > 40 ? 66 : 20 }));
+    const placement = placeSetpointCaption({ ...base, curves: [curve], preferredSide: 'right' });
+    expect(placement).toMatchObject({ side: 'left', above: true });
+  });
+
+  it('stays inside the plot', () => {
+    const placement = placeSetpointCaption({
+      ...base,
+      lineY: 10,
+      curves: [flat(100)],
+      preferredSide: 'left',
+    });
+    expect(placement.above).toBe(false);
+  });
+
+  it('interpolates polylines', () => {
+    expect(polylineYAt([{ x: 0, y: 0 }, { x: 10, y: 20 }], 5)).toBe(10);
+    expect(polylineYAt([{ x: 0, y: 0 }, { x: 10, y: 20 }], 11)).toBeNull();
   });
 });

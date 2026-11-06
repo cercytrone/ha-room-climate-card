@@ -56,7 +56,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
 | **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, Übergang stufenlos von hart bis durchgehend) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel (allein gezeichnet: volle Höhe), gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
-| **Optik** | Ruhige Kachel mit 26 px Radius und Haarlinie, Lichtverlauf von oben links, ein Akzent pro Aussage – vollständig in Hell und Dunkel. |
+| **Optik** | Ruhige Kachel im Rahmen des Themes (`ha-card`, Radius und Rand wie die übrigen Karten), ein Akzent pro Aussage – mit `theme: dark` / `light` eigene Fläche mit Haarlinie und Lichtverlauf. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
 | **Robustheit** | `unavailable`/`unknown`/fehlende Entitäten, fehlende Attribute, kaputtes YAML – die Karte stürzt nicht ab. |
 
@@ -139,7 +139,7 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `name_font_size` | number (px) | `15` | Schriftgröße des Raumnamens (11–32). Die Zeilenhöhe wächst im Verhältnis 4/3 mit, das Raumicon auf das 16/15-fache – bei 24 px also 32 px Zeile und ein 26-px-Icon. |
 | `icon` | string | `mdi:home-thermometer-outline` | Raum-Icon (MDI). |
 | `height` | number \| `auto` | `auto` | Feste Kartenhöhe in px (140–900) oder automatische Höhe. |
-| `border_radius` | number | `26` | Eckenradius in px (0–40). |
+| `border_radius` | number | Theme | Eckenradius in px (0–40). Ohne Eintrag gilt `--ha-card-border-radius` des Themes, wie bei allen anderen Karten. |
 | `card_padding` | number | `10` | Innenabstand zwischen Inhalt und Außenkante in px (0–32). Gilt für Titel, Messwerte und Heizzeile auf allen vier Seiten; der Verlauf hebt ihn links und rechts auf – und ohne Zeitangabe auch unten – und schließt bündig mit der Kante ab. Unter 8 px warnt der Editor, dass der Text an der Kante klebt. |
 | `theme` | `auto` \| `dark` \| `light` | `auto` | `auto` folgt dem Home-Assistant-Theme, `dark`/`light` erzwingen eine Optik. |
 
@@ -151,6 +151,10 @@ Optionale Bereiche sind aktiv, sobald eine Entität gesetzt ist – oder explizi
 | `humidity_entity` | entity | – | Luftfeuchtesensor. |
 | `temperature_decimals` | number | `1` | Dezimalstellen Temperatur (0–3). |
 | `humidity_decimals` | number | `0` | Dezimalstellen Luftfeuchte (0–3). |
+| `humidity_comfort` | boolean | `false` | Bewertung unter dem Feuchtewert: „trocken“, „angenehm“ oder „feucht – lüften“ (über der oberen Grenze steigt das Schimmelrisiko). |
+| `humidity_dry_below` | number | `40` | Darunter gilt die Luft als trocken (%). |
+| `humidity_humid_above` | number | `60` | Darüber gilt die Luft als feucht (%). Vertauschte Grenzen werden sortiert. |
+| `show_dew_point` | boolean | `false` | Taupunkt unter der Temperatur, berechnet nach der Magnus-Formel. Braucht Temperatur- und Feuchtesensor. |
 
 ### Messwerte (Schrift)
 
@@ -194,6 +198,7 @@ mehr.
 | `show_window` | boolean | automatisch | Fensterstatus anzeigen. Ohne `window_entity` ist der Bereich aus. |
 | `window_entity` | entity | – | Kontaktsensor. |
 | `window_open_states` | list \| string | `on, open, opening, tilted, gekippt` | Zustände, die als „offen“ gelten. |
+| `show_window_warning` | boolean | `true` | Zeigt „Fenster offen – Heizung läuft“, solange das Fenster offen ist und das Thermostat `hvac_action: heating` meldet. |
 
 Ein Hinweis zur Aussagekraft: Die Karte zeigt genau den Zustand, den die Entität meldet. Bei
 Tado ist `binary_sensor.*_window` **keine** Magnetkontakt-Meldung, sondern die Erkennung des
@@ -219,7 +224,9 @@ das genau wissen will, nutzt einen echten Kontaktsensor; die Karte behandelt bei
 | `show_setpoint` | boolean | `true` | Solltemperatur in der Statuszeile anzeigen. |
 | `show_hvac_status` | boolean | `true` | Flamme samt Statuswort anzeigen (Farbe = Zustand). |
 | `show_hvac_mode` | boolean | `false` | Statt des Statusworts den HVAC-Modus („Automatik“) in derselben Zeile anzeigen. |
-| `tap_action` | `more-info` \| `none` | `more-info` | Tippen/Klicken auf die Karte öffnet den Home-Assistant-Dialog der Climate-Entität (Solltemperatur, Modus, alles, was die Integration anbietet). `none` schaltet das ab. Die Objektform anderer Karten (`tap_action: { action: none }`) wird ebenfalls verstanden. |
+| `tap_action` | Action | `more-info` | Tippen/Klicken auf die Karte. Standard: Dialog des Thermostats, ohne Thermostat der des Temperatursensors (sonst Feuchtesensor). Versteht alle Standard-Actions: `more-info`, `navigate`, `url`, `perform-action` (auch altes `call-service`), `toggle`, `none`, jeweils mit `confirmation`. Die Kurzform `tap_action: none` gilt weiter. |
+| `hold_action` | Action | – | Langes Drücken (500 ms). Ohne Eintrag ist langes Drücken ein normaler Tipp. |
+| `double_tap_action` | Action | – | Doppelt tippen. Nur wenn gesetzt, wartet ein einzelner Tipp kurz (250 ms) auf den zweiten. |
 | `heating_color` | color | `#d16a62` (gedämpftes Rot) | Flammenfarbe – **nur** solange tatsächlich geheizt wird (`hvac_action: heating`). |
 | `heating_idle_color` | color | Akzentfarbe (`#4FD1A5`) | Flammenfarbe beim Warten/Bereitstehen – standardmäßig exakt das Grün des Verlaufs. |
 | `heating_off_color` | color | Farbe des Soll-Werts (`--rcc-muted`) | Flammenfarbe bei ausgeschaltetem oder nicht verfügbarem Thermostat. |
@@ -268,7 +275,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 | --- | --- | --- | --- |
 | `show_temperature_chart` | boolean | automatisch | Temperaturkurve anzeigen. |
 | `show_humidity_chart` | boolean | automatisch | Feuchtekurve anzeigen. |
-| `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48). |
+| `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48/72 h und 7 Tage). Über 48 h lädt die Karte die Fünf-Minuten-Mittel der Recorder-Statistik statt jeder einzelnen Messung; Sensoren ohne Statistik (`state_class: measurement` fehlt) kommen weiter aus dem Verlauf. |
 | `chart_height` | number | `112` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
 | `chart_curve` | `smooth` \| `linear` | `smooth` | Geglättete (überschwingungsfreie) oder direkt verbundene Linien. |
 | `chart_smoothing` | `none` \| `light` \| `medium` \| `strong` | `light` | Stufe der Kurvenglättung, als Zeitfenster: `light` ±10, `medium` ±30, `strong` ±60 Minuten, `none` zeichnet jeden Messwert. Wirkt nur bei `chart_curve: smooth`. |
@@ -335,8 +342,9 @@ YAML bleiben unangetastet.
 
 Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 
-- **Tiefe statt Rahmen:** 26 px Radius, 1 px Haarlinie bei 7 % Weiß und ein kaum sichtbarer
-  Lichtverlauf von oben links. Die Fläche ist `#0E1013` – OLED-freundlich, aber kein
+- **Rahmen vom Theme:** Die Karte sitzt in `ha-card`; Radius, Rand, Schatten und Hintergrund
+  kommen vom Home-Assistant-Theme. Mit `theme: dark` bekommt sie ihre eigene Fläche: 1 px
+  Haarlinie bei 7 % Weiß und ein kaum sichtbarer Lichtverlauf von oben links. Die Fläche ist `#0E1013` – OLED-freundlich, aber kein
   Reinschwarz.
 - **Nur ein großer Wert:** Temperatur 42 px in neutralem Weiß mit −0,035 em Tracking wird der
   Held; die Luftfeuchte steht rechtsbündig auf derselben Grundlinie bei 20 px.
@@ -679,10 +687,11 @@ Soll-Werts. Nur der Zustand färbt, alles andere bleibt in der ruhigen Palette:
 | Flamme | **Bereit** (aktiv, keine Heizanforderung) | `hvac_action == idle` | Grün des Verlaufs (Akzent) |
 | Flamme | Aus | HVAC-Modus `off` oder `hvac_action == off` | Farbe des Soll-Werts (`--rcc-muted`) |
 | Schneeflocke / Ventilator / Tropfen | Kühlt / Lüftet / Trocknet | entsprechender `hvac_action` | Grün des Verlaufs – **nie** Rot |
-| Flamme | Status unbekannt | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` | Farbe des Soll-Werts (`--rcc-muted`) |
+| Flamme | Modus („Heizen“, „Automatik“) | Modus ist aktiv, aber die Entität liefert **kein** `hvac_action` | Farbe des Soll-Werts (`--rcc-muted`) |
 
 Ein eingeschaltetes Thermostat gilt bewusst **nicht** als „Heizt“. Fehlt `hvac_action`, bleibt
-die Flamme neutral und es steht „Status unbekannt“ da, statt einen Zustand zu erfinden.
+die Flamme neutral und es steht der eingestellte Modus da („Heizen“), statt einen Zustand zu
+erfinden.
 Kühlen, Lüften und Trocknen sind ebenfalls kein Heizen und tragen deshalb nie Rot.
 
 Beispiel:
@@ -704,9 +713,12 @@ heating_off_color: '#94a3b8'    # Farbe des Soll-Werts, wenn ausgeschaltet ist
 - Messwerte melden sich als „Temperatur: 21,8 °C“ bzw. „Luftfeuchte: 50 %“ – als Text, nicht als
   Schalter; es gibt keinen Bedienschritt am Wert, der eine Kurve verbirgt.
 - Die Heizzeile ist eine Live-Region (`role="status"`) und benennt den Zustand im `aria-label`
-  („Heizt“, „Bereit“, „Aus“, „Status unbekannt“); die Flamme selbst ist `aria-hidden`. Ist ein
-  Thermostat verknüpft, wird daraus ein `<button>` (der Tastaturweg zum More-Info-Dialog neben
-  dem Tippen auf die Karte): Fokusring, `title` und der Zusatz „Thermostat öffnen“ im Namen.
+  („Heizt“, „Bereit“, „Aus“ oder der Modus); die Flamme selbst ist `aria-hidden`. Hat der Tipp
+  eine Aktion, wird daraus ein `<button>` (der Tastaturweg neben dem Tippen auf die Karte):
+  Fokusring, `title` und der Zusatz „Thermostat öffnen“ (bzw. „Details öffnen“, „Aktion
+  ausführen“) im Namen.
+- Der Verlauf ist ein Tab-Stopp: Pfeiltasten wählen den vorigen/nächsten Messwert, Pos1/Ende die
+  Ränder, Escape schließt die Anzeige; eine Live-Region spricht Zeit und Werte.
 - Ohne gerenderte Statuszeile übernimmt die Karte diesen Tastaturweg selbst (`role="button"`,
   `tabindex="0"`, Enter/Leertaste) – die Maus-Bedienung bleibt in beiden Fällen gleich.
 - Fenster- und Bewegungs-Badges haben `role="img"` plus sprechende `aria-label`

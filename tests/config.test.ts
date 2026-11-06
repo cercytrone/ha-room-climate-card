@@ -5,8 +5,8 @@ import {
   READING_FONT_SIZE_RANGE,
   asColor,
   asFontFamily,
-  asTapAction,
   configEntityIds,
+  defaultActionEntity,
   hasChart,
   normalizeConfig,
   preferredCardHeight,
@@ -21,7 +21,9 @@ describe('normalizeConfig', () => {
     expect(config.name).toBeUndefined();
     expect(config.icon).toBe('mdi:home-thermometer-outline');
     expect(config.height).toBeNull();
-    expect(config.borderRadius).toBe(26);
+    // No own radius: the card follows the theme (`--ha-card-border-radius`).
+    expect(config.borderRadius).toBeNull();
+    expect(normalizeConfig({ border_radius: 18 }).borderRadius).toBe(18);
     // The inset is a single value for all four sides.
     expect(config.padding).toBe(10);
     expect(config.theme).toBe('auto');
@@ -532,13 +534,48 @@ describe('area fill strength', () => {
 
 describe('review fixes', () => {
   it('reads tap_action in the string and in the Home Assistant object form', () => {
-    expect(normalizeConfig({ tap_action: 'none' }).tapAction).toBe('none');
-    expect(normalizeConfig({ tap_action: { action: 'none' } }).tapAction).toBe('none');
-    expect(normalizeConfig({ tap_action: { action: 'more-info' } }).tapAction).toBe('more-info');
-    expect(normalizeConfig({}).tapAction).toBe('more-info');
-    // Actions the card does not offer keep the built-in dialog.
-    expect(asTapAction({ action: 'navigate' })).toBe('more-info');
-    expect(asTapAction(42)).toBe('more-info');
+    expect(normalizeConfig({ tap_action: 'none' }).actions.tap).toEqual({ action: 'none' });
+    expect(normalizeConfig({ tap_action: { action: 'none' } }).actions.tap).toEqual({ action: 'none' });
+    expect(normalizeConfig({}).actions.tap).toEqual({ action: 'more-info' });
+    expect(normalizeConfig({}).actions.hold).toBeNull();
+    expect(normalizeConfig({}).actions.doubleTap).toBeNull();
+    // Garbage keeps the default instead of silently killing the tap.
+    expect(normalizeConfig({ tap_action: 42 }).actions.tap).toEqual({ action: 'more-info' });
+  });
+
+  it('opens the thermostat, else the temperature, else the humidity sensor', () => {
+    const full = normalizeConfig({
+      climate_entity: 'climate.a',
+      temperature_entity: 'sensor.t',
+      humidity_entity: 'sensor.h',
+    });
+    expect(defaultActionEntity(full)).toBe('climate.a');
+    expect(defaultActionEntity(normalizeConfig({ temperature_entity: 'sensor.t' }))).toBe('sensor.t');
+    expect(defaultActionEntity(normalizeConfig({ humidity_entity: 'sensor.h' }))).toBe('sensor.h');
+    expect(defaultActionEntity(normalizeConfig({}))).toBeUndefined();
+  });
+
+  it('rates humidity and shows the dew point only when asked and possible', () => {
+    const off = normalizeConfig({ temperature_entity: 'sensor.t', humidity_entity: 'sensor.h' });
+    expect(off.humidity.comfort).toBeNull();
+    expect(off.humidity.showDewPoint).toBe(false);
+
+    const on = normalizeConfig({
+      temperature_entity: 'sensor.t',
+      humidity_entity: 'sensor.h',
+      humidity_comfort: true,
+      humidity_dry_below: 65,
+      humidity_humid_above: 35,
+      show_dew_point: true,
+    });
+    // Limits typed the wrong way round are sorted.
+    expect(on.humidity.comfort).toEqual({ dryBelow: 35, humidAbove: 65 });
+    expect(on.humidity.showDewPoint).toBe(true);
+
+    // The dew point needs both sensors.
+    expect(
+      normalizeConfig({ humidity_entity: 'sensor.h', show_dew_point: true }).humidity.showDewPoint
+    ).toBe(false);
   });
 
   it('rejects colour values that would break out of the inline style', () => {

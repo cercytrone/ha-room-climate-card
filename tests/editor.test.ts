@@ -90,6 +90,7 @@ describe('room climate card editor', () => {
       'Bewegung',
       'Thermostat',
       'Verlauf',
+      'Aktionen',
     ]);
   });
 
@@ -318,30 +319,82 @@ describe('room climate card editor', () => {
     expect(emitted?.chart_humidity_gradient).toBe(false);
   });
 
-  it('lets the tap target of the card be chosen', async () => {
-    const editor = await mountEditor(baseConfig);
+  it('offers Home Assistant action pickers for tap, hold and double tap', async () => {
+    const editor = await mountEditor({ ...baseConfig, tap_action: 'none' });
     openAll(editor);
     let emitted: RoomClimateCardConfig | undefined;
     editor.addEventListener('config-changed', (event) => {
       emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
     });
 
-    const select = selectorByLabel(editor, 'Tippen auf die Karte');
-    expect(select.type).toBe('select');
-    // Home Assistant's dialog is the default.
-    expect(select.value).toBe('more-info');
-    const options = select.selector.select.options.map((option: { value: string }) => option.value);
-    expect(options).toEqual(['more-info', 'none']);
+    const tap = selectorByLabel(editor, 'Tippen');
+    expect(tap.type).toBe('ui_action');
+    expect(tap.selector.ui_action.default_action).toBe('more-info');
+    // The old short form is shown as the action object.
+    expect(tap.value).toEqual({ action: 'none' });
+    expect(tap.disabled).toBe(false);
+    expect(selectorByLabel(editor, 'Gedrückt halten').selector.ui_action.default_action).toBe('none');
+    expect(selectorByLabel(editor, 'Doppelt tippen').type).toBe('ui_action');
 
-    select.emit('none');
+    selectorByLabel(editor, 'Gedrückt halten').emit({ action: 'navigate', navigation_path: '/x' });
     await editor.updateComplete;
-    expect(emitted?.tap_action).toBe('none');
+    expect(emitted?.hold_action).toEqual({ action: 'navigate', navigation_path: '/x' });
+
+    // Clearing the picker removes the key, so the default applies again.
+    selectorByLabel(editor, 'Gedrückt halten').emit(undefined);
+    await editor.updateComplete;
+    expect(emitted && 'hold_action' in emitted).toBe(false);
   });
 
-  it('disables the tap target without a thermostat row', async () => {
-    const editor = await mountEditor({ ...baseConfig, show_thermostat: false });
-    openAll(editor);
-    expect(selectorByLabel(editor, 'Tippen auf die Karte').disabled).toBe(true);
+  it('applies presets without touching sensors, colours or actions', async () => {
+    const editor = await mountEditor({
+      ...baseConfig,
+      accent_color: '#ff0000',
+      chart_height: 200,
+      tap_action: { action: 'none' },
+    });
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+    const button = (id: string) =>
+      editor.shadowRoot!.querySelector(`.preset[data-preset="${id}"]`) as HTMLButtonElement;
+    expect(editor.shadowRoot!.querySelectorAll('.preset')).toHaveLength(4);
+
+    button('compact').click();
+    expect(emitted?.temperature_font_size).toBe(32);
+    expect(emitted?.chart_height).toBe(72);
+    expect(emitted?.temperature_entity).toBe('sensor.temp');
+    expect(emitted?.accent_color).toBe('#ff0000');
+    expect(emitted?.tap_action).toEqual({ action: 'none' });
+
+    button('standard').click();
+    expect(emitted && 'temperature_font_size' in emitted).toBe(false);
+    expect(emitted && 'chart_height' in emitted).toBe(false);
+    expect(emitted?.temperature_entity).toBe('sensor.temp');
+  });
+
+  it('resets one section to its defaults and keeps the entities', async () => {
+    const editor = await mountEditor({
+      ...baseConfig,
+      temperature_font_size: 60,
+      humidity_font_family: 'Inter',
+      temperature_decimals: 2,
+    });
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+    const sections = Array.from(editor.shadowRoot!.querySelectorAll('details.section'));
+    const typography = sections.find(
+      (section) => section.querySelector('.section-title')?.textContent?.trim() === 'Messwerte (Schrift)'
+    )!;
+    (typography.querySelector('.reset') as HTMLButtonElement).click();
+    expect(emitted && 'temperature_font_size' in emitted).toBe(false);
+    expect(emitted && 'humidity_font_family' in emitted).toBe(false);
+    // Other sections and the sensors stay as they were.
+    expect(emitted?.temperature_decimals).toBe(2);
+    expect(emitted?.temperature_entity).toBe('sensor.temp');
   });
 
   it('offers switches for the readout and the min/max marks', async () => {
@@ -721,7 +774,7 @@ describe('room climate card editor', () => {
 
   it('survives an empty configuration', async () => {
     const editor = await mountEditor(undefined);
-    expect(editor.shadowRoot!.querySelectorAll('.section').length).toBe(8);
+    expect(editor.shadowRoot!.querySelectorAll('.section').length).toBe(9);
     expect(editor.config.type).toBe('custom:room-climate-card');
   });
   it('exposes the curve opacity as a percentage', async () => {
