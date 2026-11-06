@@ -4,6 +4,7 @@
  *
  *   screenshot-dark.png    – four cards, dark theme
  *   screenshot-light.png   – two cards, light theme
+ *   screenshot-bands.png   – temperature colour bands, default vs. 55 % opacity
  *   screenshot-editor.png  – visual editor with live preview
  *
  * Starts the Vite dev server in-process and drives Chromium via Playwright
@@ -64,7 +65,37 @@ try {
   await (await page.$('#cards')).screenshot({ path: resolve(outDir, 'screenshot-light.png') });
   console.log('screenshot-light.png written');
 
+  /*
+   * Colour bands: two cards with a wide-swinging demo sensor (≈17–28 °C), so the
+   * default limits 18 / 24 / 27 °C show all four bands.
+   */
   await prepare('dark', 0);
+  await page.evaluate(() => {
+    const grid = document.querySelector('#cards');
+    const hass = document.querySelector('#preview').hass;
+    const base = {
+      type: 'custom:room-climate-card',
+      icon: 'mdi:home-roof',
+      temperature_entity: 'sensor.demo_attic_temperature',
+      humidity_entity: 'sensor.demo_wc_humidity',
+      chart_temperature_bands: true,
+    };
+    for (const extra of [
+      { name: 'Dachboden' },
+      { name: 'Dachboden · 55 %', chart_opacity: 55, chart_temperature_area_opacity: 180 },
+    ]) {
+      const card = document.createElement('room-climate-card');
+      card.hass = hass;
+      card.setConfig({ ...base, ...extra });
+      card.dataset.bands = '';
+      grid.append(card);
+    }
+  });
+  await page.waitForTimeout(1200);
+  await (await page.$('#cards')).screenshot({ path: resolve(outDir, 'screenshot-bands.png') });
+  console.log('screenshot-bands.png written');
+  await page.evaluate(() => document.querySelectorAll('[data-bands]').forEach((el) => el.remove()));
+
   await page.evaluate(() => {
     document.querySelector('#yaml').style.display = 'none';
     document.querySelector('.preview-box .hint').style.display = 'none';

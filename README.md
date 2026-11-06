@@ -8,22 +8,20 @@ Eine eigenständige Lovelace-Karte für Home Assistant, die das Raumklima auf ei
 Temperatur, Luftfeuchte, Fensterstatus, Bewegung, Thermostat/Heizstatus und einen **echten
 Verlaufs-Chart** aus der Home-Assistant-Historie.
 
-![Vorschau der Karte](docs/images/showcase.png)
+![Vier Karten im dunklen Theme](docs/images/screenshot-dark.png)
 
-> Alle Bilder in dieser README sind **Design-Vorschauen**, gerendert mit
-> **simulierten Demo-Messwerten** (`scripts/showcase.ts`, `npm run showcase`) – keine
-> Screenshots einer Installation und keine Live-Daten. Die Editor-Abbildung ist ein Nachbau der
-> Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert.
-> Nach der Installation zeigt die Karte ausschließlich echte Entitäts- und Historienwerte.
-> Browser-Screenshots der echten Karte (ebenfalls mit Demo-Daten) stehen unter
-> [Screenshots](#screenshots).
+> Alle Bilder in dieser README sind **Browser-Screenshots der echten Karte** – derselbe Code,
+> der in `dist/` ausgeliefert wird –, aufgenommen in der Entwicklungsumgebung (`npm run dev`)
+> mit **simulierten Demo-Messwerten** aus `dev/mock-hass.ts` (`npm run screenshots`). Es
+> sind keine Live-Daten einer Installation. Im Editor-Bild sind die Home-Assistant-Selektoren
+> durch einfache Platzhalter ersetzt. Nach der Installation zeigt die Karte ausschließlich
+> echte Entitäts- und Historienwerte.
 
 ---
 
 ## Inhalt
 
 - [Funktionen](#funktionen)
-- [Screenshots](#screenshots)
 - [Installation](#installation)
   - [Über HACS als benutzerdefiniertes Repository](#über-hacs-als-benutzerdefiniertes-repository)
   - [Manuell](#manuell)
@@ -62,28 +60,6 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Optik** | Ruhige Kachel im Rahmen des Themes (`ha-card`, Radius und Rand wie die übrigen Karten), ein Akzent pro Aussage – mit `theme: dark` / `light` eigene Fläche mit Haarlinie und Lichtverlauf. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
 | **Robustheit** | `unavailable`/`unknown`/fehlende Entitäten, fehlende Attribute, kaputtes YAML – die Karte stürzt nicht ab. |
-
----
-
-## Screenshots
-
-Browser-Screenshots der **echten Karte** – derselbe Lit-Code, der in `dist/` ausgeliefert
-wird –, aufgenommen in der Entwicklungsumgebung (`npm run dev`) mit Chromium. Die Messwerte
-und Verläufe sind **simulierte Testdaten** aus `dev/mock-hass.ts`, keine Live-Daten einer
-Installation. Neu erzeugen mit `npm run screenshots`.
-
-**Dunkel** – Heizen mit Bewegung, Fenster offen, Thermostat aus, nur Luftfeuchte:
-
-![Screenshot: vier Karten im dunklen Theme](docs/images/screenshot-dark.png)
-
-**Hell:**
-
-![Screenshot: zwei Karten im hellen Theme](docs/images/screenshot-light.png)
-
-**Visueller Editor mit Live-Vorschau** (die Formularelemente sind in der Entwicklungsumgebung
-durch einfache Platzhalter der HA-Selektoren ersetzt):
-
-![Screenshot: visueller Editor mit Live-Vorschau](docs/images/screenshot-editor.png)
 
 ---
 
@@ -330,7 +306,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 
 ## Visueller Editor
 
-![Der visuelle Editor mit Live-Vorschau](docs/images/editor.png)
+![Der visuelle Editor mit Live-Vorschau](docs/images/screenshot-editor.png)
 
 Der Editor ist in acht Abschnitte gegliedert und nutzt ausschließlich native
 Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zustand):
@@ -408,7 +384,7 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 **Helle Darstellung (tagsüber):** weißes Blatt mit sehr weichem Verlauf statt Tiefschwarz,
 dieselbe Haarlinie, dieselben Akzente:
 
-![Helle Darstellung der Karte](docs/images/showcase-light.png)
+![Helle Darstellung der Karte](docs/images/screenshot-light.png)
 
 Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variablen
 (`--ha-card-background`, `--primary-text-color`, `--divider-color`) überschreiben.
@@ -570,7 +546,7 @@ Die Temperaturkurve trägt standardmäßig **eine** Farbe: den Akzent. Auf Wunsc
 (`chart_temperature_bands: true`, im Editor unter *Verlauf*) bekommt sie stattdessen einen
 **weichen, durchgehenden Farbverlauf nach Messwert**:
 
-![Temperaturkurve mit Farbbereichen, links volle Deckkraft, rechts 55 %](docs/images/showcase-bands.png)
+![Temperaturkurve mit Farbbereichen, links volle Deckkraft, rechts 55 %](docs/images/screenshot-bands.png)
 
 | Bereich | Farbe | Standardgrenze |
 | --- | --- | --- |
@@ -793,8 +769,7 @@ npm run dev        # Entwicklungsumgebung mit simulierten Testdaten (http://loca
 npm run typecheck  # TypeScript
 npm test           # Vitest (jsdom)
 npm run build      # erzeugt dist/ha-room-climate-card.js (+ Sourcemap)
-npm run showcase   # rendert showcase.{svg,png} (dunkel), showcase-light.* und editor.*
-npm run screenshots # Browser-Screenshots der echten Karte (Playwright/Chromium) nach docs/images/screenshot-*.png
+npm run screenshots # README-Screenshots der echten Karte (Playwright/Chromium) nach docs/images/
 ```
 
 ### Release
@@ -854,7 +829,7 @@ src/
   utils/format.ts          Zahlen-/Zeitformatierung, Farb-Helfer
 dev/                       Entwicklungsumgebung mit MOCK-Daten (nicht im Bundle)
 tests/                     Vitest-Tests
-scripts/                   Showcase-Renderer (drei SVG/PNG-Paare für die README)
+scripts/                   Screenshot-Skript für die README-Bilder (Playwright)
 dist/                      Gebautes Bundle (HACS-Download)
 ```
 
@@ -877,9 +852,9 @@ dist/                      Gebautes Bundle (HACS-Download)
   Badge, ohne ihn in den Verlauf zu zeichnen.
 - HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
   `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
-- Die README-Bilder sind gerendert (Demo-Daten), keine Screenshots einer echten Installation;
-  die Editor-Abbildung ist ein Nachbau der Oberfläche. Die Bilder unter *Screenshots* zeigen
-  die echte Karte, aber ebenfalls mit simulierten Daten in der Entwicklungsumgebung.
+- Die README-Bilder zeigen die echte Karte, aber mit simulierten Daten in der
+  Entwicklungsumgebung – keine Screenshots einer echten Installation. `npm run screenshots`
+  braucht Playwright mit Chromium; es ist bewusst keine Projektabhängigkeit.
 
 ---
 

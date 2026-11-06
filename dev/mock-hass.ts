@@ -73,6 +73,17 @@ const SPECS: EntitySpec[] = [
     periodHours: 3.5,
   },
   {
+    // Wide swing (≈17–28 °C) so the temperature colour bands show all four stages.
+    entity_id: 'sensor.demo_attic_temperature',
+    state: '22.6',
+    name: 'Dachboden Temperatur',
+    unit: '°C',
+    deviceClass: 'temperature',
+    base: 22.5,
+    amplitude: 5.5,
+    periodHours: 6,
+  },
+  {
     entity_id: 'sensor.demo_bath_humidity',
     state: '70.2',
     name: 'Bad Luftfeuchte',
