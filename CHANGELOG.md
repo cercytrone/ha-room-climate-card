@@ -4,7 +4,7 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unreleased]
+## [2.19.0] – 2026-11-06
 
 ### Hinzugefügt
 

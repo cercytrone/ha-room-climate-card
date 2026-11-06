@@ -789,7 +789,7 @@ Release → Run workflow* starten.
 
 ## Tests
 
-`npm test` führt 402 Tests in 13 Dateien aus (Stand 2.17.0):
+`npm test` führt 457 Tests in 15 Dateien aus (Stand 2.19.0):
 
 | Datei | Prüft unter anderem |
 | --- | --- |
