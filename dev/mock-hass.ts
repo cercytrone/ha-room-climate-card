@@ -19,6 +19,11 @@ interface EntitySpec {
   periodHours?: number;
   gapFrom?: number;
   gapTo?: number;
+  /**
+   * Thermostats: target schedule, oldest first – `hoursAgo` is when the value
+   * was set, `null` = no target (off). The last entry should match `extra.temperature`.
+   */
+  targets?: Array<{ hoursAgo: number; value: number | null }>;
 }
 
 const SPECS: EntitySpec[] = [
@@ -71,6 +76,17 @@ const SPECS: EntitySpec[] = [
     base: 23.2,
     amplitude: 0.5,
     periodHours: 3.5,
+  },
+  {
+    // Wide swing (≈17–28 °C) so the temperature colour bands show all four stages.
+    entity_id: 'sensor.demo_attic_temperature',
+    state: '22.6',
+    name: 'Dachboden Temperatur',
+    unit: '°C',
+    deviceClass: 'temperature',
+    base: 22.5,
+    amplitude: 5.5,
+    periodHours: 6,
   },
   {
     entity_id: 'sensor.demo_bath_humidity',
@@ -137,18 +153,34 @@ const SPECS: EntitySpec[] = [
     state: 'heat',
     name: 'Wohnzimmer Thermostat',
     extra: { temperature: 22, current_temperature: 21.8, hvac_action: 'heating', hvac_modes: ['off', 'heat'] },
+    // Night setback until the morning, then comfort.
+    targets: [
+      { hoursAgo: 12, value: 19 },
+      { hoursAgo: 3.2, value: 21 },
+      { hoursAgo: 1.4, value: 22 },
+    ],
   },
   {
     entity_id: 'climate.demo_kitchen_thermostat',
     state: 'heat',
     name: 'Küche Thermostat',
     extra: { temperature: 21.5, current_temperature: 22.3, hvac_action: 'idle', hvac_modes: ['off', 'heat'] },
+    targets: [
+      { hoursAgo: 12, value: 20 },
+      { hoursAgo: 4.5, value: 21.5 },
+    ],
   },
   {
     entity_id: 'climate.demo_bath_thermostat',
     state: 'off',
     name: 'Bad Thermostat',
     extra: { temperature: 21, hvac_action: 'off', hvac_modes: ['off', 'heat'] },
+    // Heated in the morning, off for a while, the target is kept.
+    targets: [
+      { hoursAgo: 12, value: 23 },
+      { hoursAgo: 4, value: null },
+      { hoursAgo: 2.5, value: 21 },
+    ],
   },
   {
     entity_id: 'climate.demo_office_thermostat',
@@ -210,6 +242,25 @@ function demoHistory(spec: EntitySpec, start: number, end: number): Array<{ s: s
   return samples;
 }
 
+/** Thermostat rows with attributes, as the full (non-minimal) history returns them. */
+function demoTargets(
+  spec: EntitySpec,
+  start: number,
+  end: number
+): Array<{ s: string; a: Record<string, unknown>; lu: number }> {
+  if (!spec.targets) return [];
+  const rows = spec.targets.map((target) => {
+    const t = Math.max(start, end - target.hoursAgo * 3600000);
+    return {
+      s: target.value === null ? 'off' : spec.state,
+      a: { ...spec.extra, temperature: target.value },
+      lu: Math.floor(t / 1000),
+    };
+  });
+  // Only the newest row at or before `start` counts (include_start_time_state).
+  return rows.filter((_row, index) => index === rows.length - 1 || rows[index + 1].lu * 1000 > start);
+}
+
 export function createMockHass(): HomeAssistant {
   const states = buildStates();
   const specs = new Map(SPECS.map((spec) => [spec.entity_id, spec]));
@@ -236,7 +287,11 @@ export function createMockHass(): HomeAssistant {
         const response: Record<string, Array<{ s: string; lu: number }>> = {};
         for (const entityId of entityIds) {
           const spec = specs.get(entityId);
-          response[entityId] = spec ? demoHistory(spec, start, end) : [];
+          response[entityId] = !spec
+            ? []
+            : message.no_attributes === false
+              ? demoTargets(spec, start, end)
+              : demoHistory(spec, start, end);
         }
         // Simulate network latency so loading states are visible.
         await new Promise((resolve) => setTimeout(resolve, 220));

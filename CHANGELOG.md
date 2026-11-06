@@ -4,6 +4,22 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.20.0] – 2026-11-06
+
+### Geändert
+
+- **Soll-Linie folgt dem Verlauf.** Die gestrichelte Soll-Linie zeigt nicht mehr überall den
+  aktuellen Sollwert, sondern zu jedem Zeitpunkt die damals eingestellte Solltemperatur: als
+  Stufenlinie aus dem Attribut `temperature` der Climate-Entität, mit einer Lücke, solange das
+  Thermostat keinen Sollwert hatte. Der Abruf läuft als eigene Anfrage mit Attributen, wird wie
+  die Kurven zwischengespeichert und zwischen Karten geteilt; schlägt er fehl, bleibt die
+  waagerechte Linie beim aktuellen Wert.
+
+### Dokumentation
+
+- README-Bilder sind jetzt Browser-Screenshots der echten Karte (Demo-Daten, `npm run
+  screenshots`); die SVG-Nachbauten, `npm run showcase` und `@resvg/resvg-js` entfallen.
+
 ## [2.19.0] – 2026-11-06
 
 ### Hinzugefügt

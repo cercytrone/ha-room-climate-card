@@ -8,13 +8,14 @@ Eine eigenständige Lovelace-Karte für Home Assistant, die das Raumklima auf ei
 Temperatur, Luftfeuchte, Fensterstatus, Bewegung, Thermostat/Heizstatus und einen **echten
 Verlaufs-Chart** aus der Home-Assistant-Historie.
 
-![Vorschau der Karte](docs/images/showcase.png)
+![Vier Karten im dunklen Theme](docs/images/screenshot-dark.png)
 
-> Alle Bilder in dieser README sind **Design-Vorschauen**, gerendert mit
-> **simulierten Demo-Messwerten** (`scripts/showcase.ts`, `npm run showcase`) – keine
-> Screenshots einer Installation und keine Live-Daten. Die Editor-Abbildung ist ein Nachbau der
-> Oberfläche mit den echten Beschriftungen der Karte; die Formularelemente sind stilisiert.
-> Nach der Installation zeigt die Karte ausschließlich echte Entitäts- und Historienwerte.
+> Alle Bilder in dieser README sind **Browser-Screenshots der echten Karte** – derselbe Code,
+> der in `dist/` ausgeliefert wird –, aufgenommen in der Entwicklungsumgebung (`npm run dev`)
+> mit **simulierten Demo-Messwerten** aus `dev/mock-hass.ts` (`npm run screenshots`). Es
+> sind keine Live-Daten einer Installation. Im Editor-Bild sind die Home-Assistant-Selektoren
+> durch einfache Platzhalter ersetzt. Nach der Installation zeigt die Karte ausschließlich
+> echte Entitäts- und Historienwerte.
 
 ---
 
@@ -54,7 +55,7 @@ Verlaufs-Chart** aus der Home-Assistant-Historie.
 | **Fenster** | Optional. Icon-Badge, offen = Amber-Warnung, geschlossen = neutral. Unterstützt `on/off`, `open/closed`, `tilted`, eigene Zustände. Bei Deaktivierung verschwindet das Element vollständig. |
 | **Bewegung** | Optional. Dezenter Badge, aktiv = hervorgehoben, plus „Ruhe seit 12 Min.“ aus `last_changed`. |
 | **Heizzeile** | Unter dem Messwert eine ruhige Textzeile: gedämpfte Flamme (Rot nur beim tatsächlichen Heizen, Grün des Verlaufs = bereit, Farbe des Soll-Werts = aus), der aktuelle Modus als Wort und die Solltemperatur – optional der HVAC-Modus statt des Statusworts. |
-| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, Übergang stufenlos von hart bis durchgehend) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel (allein gezeichnet: volle Höhe), gestrichelte Soll-Referenz, drei sprechende Achsenlabels. |
+| **Verlauf** | Echte HA-Historie (WebSocket `history/history_during_period`, REST-Fallback), 1–168 h. Optional **nach Temperaturbereich eingefärbt** (kalt/normal/warm/heiß, Übergang stufenlos von hart bis durchgehend) und in der **Deckkraft** einstellbar. Glättung in vier Stufen im Editor wählbar, 1,9 px Linie ohne Leuchten, je ein dezenter Flächenverlauf für Temperatur und Feuchte (einzeln abschaltbar), Feuchte als feines Band im oberen Drittel (allein gezeichnet: volle Höhe), gestrichelte Soll-Linie, die der jeweils gültigen Solltemperatur folgt, drei sprechende Achsenlabels. |
 | **Layout** | Automatische oder feste Höhe, konfigurierbarer Chart-Bereich, drei Dichte-Stufen, funktioniert auf Desktop, Tablet und Smartphone. |
 | **Optik** | Ruhige Kachel im Rahmen des Themes (`ha-card`, Radius und Rand wie die übrigen Karten), ein Akzent pro Aussage – mit `theme: dark` / `light` eigene Fläche mit Haarlinie und Lichtverlauf. |
 | **Editor** | Vollständiger visueller Editor mit nativen `ha-selector`-Feldern, abhängig deaktivierten Feldern und Live-Vorschau. |
@@ -291,7 +292,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 | `chart_show_grid` | boolean | `false` | Feine gestrichelte Hilfslinien – standardmäßig aus, die Achse bleibt eine Haarlinie. |
 | `chart_show_axis` | boolean | `true` | Zeitangaben unter dem Verlauf (Start · Mitte · Jetzt). Aus: die unterste Zeile **und** die Haarlinie darüber entfallen, die Kurven bekommen den Platz und laufen bis zur unteren Kartenkante (bei bündigem Verlauf). |
 | `chart_full_bleed` | boolean | `true` | Der Verlauf läuft bündig bis zur Außenkante (Kurven und Flächen werden von der Rundung beschnitten). `false` lässt ihn auf derselben Kante wie den Text enden – Editor: *Verlauf* → **Verlauf bündig zur Kartenkante**. |
-| `chart_show_setpoint` | boolean | `true` | Gestrichelte Soll-Linie samt „Soll“-Beschriftung im Verlauf. Aus: nur Messwerte im Chart; die Solltemperatur bleibt in der Statuszeile (eigener Schalter `show_setpoint`). |
+| `chart_show_setpoint` | boolean | `true` | Gestrichelte Soll-Linie samt „Soll“-Beschriftung im Verlauf. Sie zeigt zu jedem Zeitpunkt die damals eingestellte Solltemperatur (Stufen bei jeder Änderung, Lücke während das Thermostat aus war). Aus: nur Messwerte im Chart; die Solltemperatur bleibt in der Statuszeile (eigener Schalter `show_setpoint`). |
 | `chart_show_tooltip` | boolean | `true` | Kreuzlinie mit Uhrzeit und den **echten Messwerten** beim Zeigen bzw. Antippen. |
 | `chart_show_extremes` | boolean | `true` | Minimum und Maximum der sichtbaren Kurven als dezente Zahlen neben der Kurve. |
 | `chart_opacity` | number | `100` | Deckkraft der Kurven in Prozent (15–100). Gilt für Linien, Flächen und Datenpunkte; darunter tritt der Verlauf ruhiger hinter die Messwerte zurück. |
@@ -305,7 +306,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 
 ## Visueller Editor
 
-![Der visuelle Editor mit Live-Vorschau](docs/images/editor.png)
+![Der visuelle Editor mit Live-Vorschau](docs/images/screenshot-editor.png)
 
 Der Editor ist in acht Abschnitte gegliedert und nutzt ausschließlich native
 Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zustand):
@@ -383,7 +384,7 @@ Die Karte folgt dem modernen Layout der Wetterkarte aus dem eigenen Dashboard:
 **Helle Darstellung (tagsüber):** weißes Blatt mit sehr weichem Verlauf statt Tiefschwarz,
 dieselbe Haarlinie, dieselben Akzente:
 
-![Helle Darstellung der Karte](docs/images/showcase-light.png)
+![Helle Darstellung der Karte](docs/images/screenshot-light.png)
 
 Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variablen
 (`--ha-card-background`, `--primary-text-color`, `--divider-color`) überschreiben.
@@ -496,7 +497,16 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
   Assistant (`hass.config.time_zone`, `hass.locale`), nicht der Zone des Browsers. Auf einem
   Wandtablet mit falsch gestellter Zeitzone steht damit trotzdem die richtige Uhrzeit; bei
   `time_format: am_pm` erscheint die Achse im 12-Stunden-Format.
-- **Sollwert:** Die gestrichelte Soll-Linie (abschaltbar über `chart_show_setpoint`, Editor:
+- **Sollwert im Verlauf:** Die gestrichelte Soll-Linie zeigt nicht nur den aktuellen Wert,
+  sondern zu jedem Zeitpunkt die **Solltemperatur, die damals galt**: Die Karte liest dafür das
+  Attribut `temperature` der Climate-Entität aus der Historie. Jede Änderung (Zeitplan,
+  Nachtabsenkung, Hand am Regler) wird zur Stufe, die Linie springt dort senkrecht auf den neuen
+  Wert. Hatte das Thermostat keinen Sollwert (z. B. ausgeschaltet), bleibt dort eine Lücke. Die
+  „Soll“-Beschriftung steht an dem Rand, an dem die Linie die Kurven am wenigsten berührt. Weil
+  dieser Abruf die Attribute braucht, ist er eine eigene, kleine Anfrage (nur Zeilen, in denen
+  sich der Sollwert ändert, werden behalten). Scheitert sie, fällt die Karte auf die waagerechte
+  Linie beim aktuellen Sollwert zurück – ohne Fehlermeldung.
+- **Sollwert-Einheit:** Die Soll-Linie (abschaltbar über `chart_show_setpoint`, Editor:
   *Verlauf* → **Soll-Linie im Verlauf**) wird in die Einheit des Temperatursensors umgerechnet
   (22 °C am Thermostat, Sensor in °F → 71,6 °F), sonst läge sie weit neben der Kurve. Die Einheit
   stammt aus den Attributen der Climate-Entität, mit dem Systemstandard als Rückfall. Ist eine
@@ -545,7 +555,7 @@ Die Temperaturkurve trägt standardmäßig **eine** Farbe: den Akzent. Auf Wunsc
 (`chart_temperature_bands: true`, im Editor unter *Verlauf*) bekommt sie stattdessen einen
 **weichen, durchgehenden Farbverlauf nach Messwert**:
 
-![Temperaturkurve mit Farbbereichen, links volle Deckkraft, rechts 55 %](docs/images/showcase-bands.png)
+![Temperaturkurve mit Farbbereichen, links volle Deckkraft, rechts 55 %](docs/images/screenshot-bands.png)
 
 | Bereich | Farbe | Standardgrenze |
 | --- | --- | --- |
@@ -768,7 +778,7 @@ npm run dev        # Entwicklungsumgebung mit simulierten Testdaten (http://loca
 npm run typecheck  # TypeScript
 npm test           # Vitest (jsdom)
 npm run build      # erzeugt dist/ha-room-climate-card.js (+ Sourcemap)
-npm run showcase   # rendert showcase.{svg,png} (dunkel), showcase-light.* und editor.*
+npm run screenshots # README-Screenshots der echten Karte (Playwright/Chromium) nach docs/images/
 ```
 
 ### Release
@@ -828,7 +838,7 @@ src/
   utils/format.ts          Zahlen-/Zeitformatierung, Farb-Helfer
 dev/                       Entwicklungsumgebung mit MOCK-Daten (nicht im Bundle)
 tests/                     Vitest-Tests
-scripts/                   Showcase-Renderer (drei SVG/PNG-Paare für die README)
+scripts/                   Screenshot-Skript für die README-Bilder (Playwright)
 dist/                      Gebautes Bundle (HACS-Download)
 ```
 
@@ -851,8 +861,9 @@ dist/                      Gebautes Bundle (HACS-Download)
   Badge, ohne ihn in den Verlauf zu zeichnen.
 - HACS-Einbindung bewusst nur als *benutzerdefiniertes Repository*; eine Aufnahme in
   `hacs/default` ist nicht vorgesehen und wird nicht angestrebt.
-- Die README-Bilder sind gerendert (Demo-Daten), keine Screenshots einer echten Installation;
-  die Editor-Abbildung ist ein Nachbau der Oberfläche.
+- Die README-Bilder zeigen die echte Karte, aber mit simulierten Daten in der
+  Entwicklungsumgebung – keine Screenshots einer echten Installation. `npm run screenshots`
+  braucht Playwright mit Chromium; es ist bewusst keine Projektabhängigkeit.
 
 ---
 

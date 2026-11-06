@@ -21,6 +21,8 @@ import {
   type SmoothingLevel,
   placeSetpointCaption,
   roundTimeTicks,
+  stepPath,
+  stepRuns,
   splitAtBridges,
   type ChartSample,
   type GapMode,
@@ -181,6 +183,7 @@ export class RoomClimateChart extends LitElement {
     humidityColor: { attribute: false },
     setpoint: { attribute: false },
     setpointUnit: { attribute: false },
+    setpointHistory: { attribute: false },
     start: { attribute: false },
     end: { attribute: false },
     showPoints: { attribute: false },
@@ -472,6 +475,12 @@ export class RoomClimateChart extends LitElement {
   /** Target temperature, drawn as a dashed reference line. */
   setpoint: number | null = null;
   setpointUnit = '°C';
+  /**
+   * Target over the window as a step series (each value holds until the next
+   * sample; `null` = no target, e.g. thermostat off). When given, the reference
+   * follows the target that applied at each moment instead of today's value.
+   */
+  setpointHistory?: ChartSample[];
   start = Date.now() - 6 * 3600 * 1000;
   end = Date.now();
   showPoints = false;
@@ -764,10 +773,23 @@ export class RoomClimateChart extends LitElement {
 
     const setpointValue =
       typeof this.setpoint === 'number' && Number.isFinite(this.setpoint) ? this.setpoint : null;
+    /*
+     * With a target history the reference is a step line: the target that was
+     * set at each moment. Without one it stays the flat line at the current
+     * target.
+     */
+    const setpointParts =
+      this.setpointHistory && this.setpointHistory.length
+        ? stepRuns(this.setpointHistory, this.start, this.end)
+        : [];
+    const setpointStepped = setpointParts.length > 0;
     // The target belongs to the domain: otherwise a setpoint above or below the
     // measured range would silently drop the reference line.
-    const tempValues =
-      setpointValue !== null ? [...temperatureValues, setpointValue] : temperatureValues;
+    const tempValues = setpointStepped
+      ? [...temperatureValues, ...setpointParts.flat().map((run) => run.v)]
+      : setpointValue !== null
+        ? [...temperatureValues, setpointValue]
+        : temperatureValues;
     const tempExtent = extent(tempValues);
     const humidityExtent = extent(humidityValues);
     const tempDomain = tempExtent
@@ -1107,23 +1129,59 @@ export class RoomClimateChart extends LitElement {
     }
 
     // Setpoint reference: how far is the room from its target?
-    const setpointY =
-      setpointValue !== null && tempY ? tempY(setpointValue) : null;
+    const firstSetpointRun = setpointParts[0]?.[0];
+    const lastSetpointPart = setpointParts[setpointParts.length - 1];
+    const lastSetpointRun = lastSetpointPart?.[lastSetpointPart.length - 1];
+    /** Target at the two ends of the window (null = a gap there). */
+    const setpointAtEdge: Record<'left' | 'right', number | null> = setpointStepped
+      ? {
+          left: firstSetpointRun && firstSetpointRun.from <= this.start ? firstSetpointRun.v : null,
+          right: lastSetpointRun && lastSetpointRun.to >= this.end ? lastSetpointRun.v : null,
+        }
+      : { left: setpointValue, right: setpointValue };
+    /** Target that applied at time `t`. */
+    const setpointAt = (t: number): number | null => {
+      if (!setpointStepped) return setpointValue;
+      for (const part of setpointParts) {
+        for (const run of part) if (t >= run.from && t <= run.to) return run.v;
+      }
+      return null;
+    };
+    const setpointYOf = (value: number | null): number | null =>
+      value !== null && tempY ? tempY(value) : null;
+    const setpointYAt = (t: number): number | null => setpointYOf(setpointAt(t));
+    // Flat reference only; the step line has its own path.
+    const setpointY = setpointStepped ? null : setpointYOf(setpointValue);
     const showSetpoint =
       this.showSetpoint &&
-      setpointY !== null &&
-      Number.isFinite(setpointY) &&
-      setpointY >= temperatureTop - 0.5 &&
-      setpointY <= temperatureBottom + 0.5;
+      tempY !== null &&
+      (setpointStepped ||
+        (setpointY !== null &&
+          Number.isFinite(setpointY) &&
+          setpointY >= temperatureTop - 0.5 &&
+          setpointY <= temperatureBottom + 0.5));
+    const setpointPath =
+      showSetpoint && setpointStepped && tempY ? stepPath(setpointParts, x, tempY) : '';
 
     // First guess for the caption: the end of the line where the measured
     // values keep the most distance from the reference.
     const firstTempValue = tempSeries.find((sample) => sample.v !== null)?.v ?? null;
     const lastTempValue = [...tempSeries].reverse().find((sample) => sample.v !== null)?.v ?? null;
-    const distance = (value: number | null) =>
-      value === null || setpointValue === null ? 0 : Math.abs(value - setpointValue);
+    const distance = (value: number | null, reference: number | null) =>
+      value === null || reference === null ? 0 : Math.abs(value - reference);
     const preferredCaptionSide: 'left' | 'right' =
-      distance(lastTempValue) >= distance(firstTempValue) ? 'right' : 'left';
+      setpointAtEdge.right === null && setpointAtEdge.left !== null
+        ? 'left'
+        : distance(lastTempValue, setpointAtEdge.right) >=
+            distance(firstTempValue, setpointAtEdge.left)
+          ? 'right'
+          : 'left';
+    const captionLineYBySide: Partial<Record<'left' | 'right', number>> = {};
+    for (const side of ['left', 'right'] as const) {
+      const lineY = setpointYOf(setpointAtEdge[side]);
+      if (lineY !== null && Number.isFinite(lineY)) captionLineYBySide[side] = lineY;
+    }
+    const hasCaptionLine = Object.keys(captionLineYBySide).length > 0;
 
     /*
      * The end dot has to sit *on* the curve, so it is taken from the drawn
@@ -1153,9 +1211,10 @@ export class RoomClimateChart extends LitElement {
     const captionText = this.labels.setpoint;
     const captionWidth = captionText.length * CAPTION_CHAR_WIDTH + 2;
     const captionPlacement =
-      showSetpoint && setpointY !== null
+      showSetpoint && hasCaptionLine
         ? placeSetpointCaption({
-            lineY: setpointY,
+            lineY: captionLineYBySide[preferredCaptionSide] ?? 0,
+            lineYBySide: captionLineYBySide,
             left: left + captionInset,
             right: edgeRight - captionInset,
             width: captionWidth,
@@ -1185,13 +1244,21 @@ export class RoomClimateChart extends LitElement {
             preferredSide: preferredCaptionSide,
           })
         : null;
-    const captionOnRight = captionPlacement ? captionPlacement.side === 'right' : true;
+    // The fallback placement may name a side without a line (a gap there).
+    const captionSide: 'left' | 'right' =
+      captionPlacement && captionLineYBySide[captionPlacement.side] !== undefined
+        ? captionPlacement.side
+        : captionLineYBySide.right !== undefined
+          ? 'right'
+          : 'left';
+    const captionOnRight = captionSide === 'right';
+    const captionLineY = showSetpoint ? captionLineYBySide[captionSide] ?? null : null;
     const captionBaseline =
-      setpointY === null
+      captionLineY === null
         ? 0
         : captionPlacement && !captionPlacement.above
-          ? setpointY + CAPTION_LINE_GAP + CAPTION_HEIGHT - 1
-          : setpointY - CAPTION_LINE_GAP - 1;
+          ? captionLineY + CAPTION_LINE_GAP + CAPTION_HEIGHT - 1
+          : captionLineY - CAPTION_LINE_GAP - 1;
 
     // The dashed reference is invisible to screen readers, so its value and unit
     // are part of the accessible name.
@@ -1307,9 +1374,10 @@ export class RoomClimateChart extends LitElement {
           const below = canBelow ? cy + 15 : bandBottom - 1;
           let labelY = isMax ? (canAbove ? above : below) : canBelow ? below : above;
           // Never print the number on the dashed reference line.
-          if (showSetpoint && setpointY !== null && Math.abs(labelY - setpointY) < 9) {
+          const lineYHere = showSetpoint ? setpointYAt(sample.t) : null;
+          if (lineYHere !== null && Math.abs(labelY - lineYHere) < 9) {
             const alternative = isMax ? below : above;
-            if (Math.abs(alternative - setpointY) >= 9) labelY = alternative;
+            if (Math.abs(alternative - lineYHere) >= 9) labelY = alternative;
           }
           return { sample, cx, cy, labelY, isMax };
         })
@@ -1357,8 +1425,7 @@ export class RoomClimateChart extends LitElement {
         // printing two numbers on top of each other.
         const captionX = captionOnRight ? edgeRight - captionInset : left + captionInset;
         const captionClash = (x: number): boolean =>
-          showSetpoint &&
-          setpointY !== null &&
+          captionLineY !== null &&
           Math.abs(entry.labelY - captionBaseline) < 9 &&
           Math.abs(x - captionX) < 40;
         if (captionClash(labelX)) {
@@ -1465,22 +1532,31 @@ export class RoomClimateChart extends LitElement {
       ${humidityAreas}
       ${tempAreas}
       ${showSetpoint
-        ? svg`<line
-            class="setpoint-line"
-            x1=${left}
-            x2=${right}
-            y1=${setpointY}
-            y2=${setpointY}
-            style="stroke:${this.accentColor};stroke-opacity:0.42"
-          ></line>
-          <text
+        ? svg`${setpointStepped
+            ? svg`<path
+                class="setpoint-line is-stepped"
+                d=${setpointPath}
+                fill="none"
+                style="stroke:${this.accentColor};stroke-opacity:0.42"
+              ></path>`
+            : svg`<line
+                class="setpoint-line"
+                x1=${left}
+                x2=${right}
+                y1=${setpointY}
+                y2=${setpointY}
+                style="stroke:${this.accentColor};stroke-opacity:0.42"
+              ></line>`}
+          ${captionLineY === null
+            ? nothing
+            : svg`<text
             class="setpoint-caption"
             x=${captionOnRight ? edgeRight - captionInset : left + captionInset}
             y=${captionBaseline}
             text-anchor=${captionOnRight ? 'end' : 'start'}
           >
             ${this.labels.setpoint}
-          </text>`
+          </text>`}`
         : nothing}
       ${
         /*

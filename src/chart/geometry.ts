@@ -980,9 +980,80 @@ export interface CaptionPlacement {
   clearance: number;
 }
 
+/** One horizontal piece of a step series: value `v` from `from` to `to`. */
+export interface StepRun {
+  from: number;
+  to: number;
+  v: number;
+}
+
+/**
+ * Cuts a step series (each value holds until the next sample) to the window
+ * `[start, end]`. Returns the contiguous parts: a `null` value (thermostat off,
+ * unavailable) ends a part, so the drawn line has a gap there. The value in
+ * force at `start` is the last sample at or before it.
+ */
+export function stepRuns(samples: ChartSample[], start: number, end: number): StepRun[][] {
+  if (!(end > start)) return [];
+  const sorted = [...samples].filter((sample) => Number.isFinite(sample.t)).sort((a, b) => a.t - b.t);
+  const parts: StepRun[][] = [];
+  let current: StepRun[] = [];
+  const close = () => {
+    if (current.length) parts.push(current);
+    current = [];
+  };
+  for (let index = 0; index < sorted.length; index += 1) {
+    const sample = sorted[index];
+    const next = sorted[index + 1];
+    const from = Math.max(sample.t, start);
+    const to = Math.min(next ? next.t : end, end);
+    if (to <= from) continue;
+    const value = sample.v;
+    if (value === null || !Number.isFinite(value)) {
+      close();
+      continue;
+    }
+    const previous = current[current.length - 1];
+    if (previous && previous.v === value && previous.to === from) {
+      previous.to = to;
+    } else {
+      if (previous && previous.to !== from) close();
+      current.push({ from, to, v: value });
+    }
+  }
+  close();
+  return parts;
+}
+
+/** SVG path of step parts: horizontal runs joined by vertical risers. */
+export function stepPath(
+  parts: StepRun[][],
+  x: (t: number) => number,
+  y: (v: number) => number
+): string {
+  const round = (value: number) => Math.round(value * 100) / 100;
+  return parts
+    .map((runs) =>
+      runs
+        .map((run, index) => {
+          const x0 = round(x(run.from));
+          const x1 = round(x(run.to));
+          const y0 = round(y(run.v));
+          return index === 0 ? `M ${x0} ${y0} H ${x1}` : `V ${y0} H ${x1}`;
+        })
+        .join(' ')
+    )
+    .join(' ');
+}
+
 export interface CaptionOptions {
   /** y of the dashed reference line. */
   lineY: number;
+  /**
+   * For a stepped target line: its height at the left and right end. A side
+   * without a value (a gap at that end) is not a candidate.
+   */
+  lineYBySide?: Partial<Record<'left' | 'right', number>>;
   /** Horizontal extent the caption may use. */
   left: number;
   right: number;
@@ -1021,9 +1092,11 @@ export function placeSetpointCaption(options: CaptionOptions): CaptionPlacement 
   ];
   let best: CaptionPlacement | null = null;
   for (const candidate of candidates) {
+    const lineY = options.lineYBySide ? options.lineYBySide[candidate.side] : options.lineY;
+    if (lineY === undefined || !Number.isFinite(lineY)) continue;
     const boxTop = candidate.above
-      ? options.lineY - CAPTION_LINE_GAP - options.height
-      : options.lineY + CAPTION_LINE_GAP;
+      ? lineY - CAPTION_LINE_GAP - options.height
+      : lineY + CAPTION_LINE_GAP;
     const boxBottom = boxTop + options.height;
     // A caption that would leave the plot is not a candidate.
     if (boxTop < options.top - 1 || boxBottom > options.bottom + 1) continue;

@@ -9,6 +9,8 @@ import {
   historyCacheKey,
   normalizeSamples,
   parseHistoryResponse,
+  fetchAttributeHistory,
+  normalizeAttributeSamples,
 } from '../src/data/history';
 import { createHass } from './helpers';
 
@@ -336,3 +338,61 @@ describe('long windows from the recorder statistics', () => {
   });
 });
 
+
+describe('target history (thermostat attribute)', () => {
+  it('keeps only the rows where the target changes and turns a missing target into a gap', () => {
+    const steps = normalizeAttributeSamples(
+      [
+        { s: 'heat', a: { temperature: 21, current_temperature: 20.1 }, lu: 1000 },
+        { s: 'heat', a: { temperature: 21, current_temperature: 20.4 }, lu: 1100 },
+        { s: 'heat', a: { temperature: 22.5 }, lu: 1200 },
+        { s: 'off', a: { temperature: null }, lu: 1300 },
+        { s: 'heat', attributes: { temperature: '19' }, last_updated: new Date(1_400_000).toISOString() },
+      ],
+      'temperature'
+    );
+    expect(steps).toEqual([
+      { t: 1_000_000, v: 21 },
+      { t: 1_200_000, v: 22.5 },
+      { t: 1_300_000, v: null },
+      { t: 1_400_000, v: 19 },
+    ]);
+  });
+
+  it('asks for full rows with attributes for that one entity', async () => {
+    const send = vi.fn(async () => ({
+      'climate.room': [
+        { s: 'heat', a: { temperature: 20 }, lu: 1000 },
+        { s: 'heat', a: { temperature: 21 }, lu: 2000 },
+      ],
+    }));
+    const hass = createHass();
+    hass.connection!.sendMessagePromise = send;
+    const steps = await fetchAttributeHistory(hass, 'climate.room', 'temperature', {
+      start: now - 3600_000,
+      end: now,
+    });
+    expect(steps.map((step) => step.v)).toEqual([20, 21]);
+    const message = (send.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(message).toMatchObject({
+      type: 'history/history_during_period',
+      entity_ids: ['climate.room'],
+      minimal_response: false,
+      no_attributes: false,
+      include_start_time_state: true,
+    });
+  });
+
+  it('shares and caches the target request', async () => {
+    const send = vi.fn(async () => ({ 'climate.room': [{ s: 'heat', a: { temperature: 20 }, lu: 1000 }] }));
+    const hass = createHass();
+    hass.connection!.sendMessagePromise = send;
+    const repository = new HistoryRepository();
+    await Promise.all([
+      repository.loadAttribute(hass, 'climate.room', 'temperature', 6, now),
+      repository.loadAttribute(hass, 'climate.room', 'temperature', 6, now),
+    ]);
+    await repository.loadAttribute(hass, 'climate.room', 'temperature', 6, now + 1000);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+});
