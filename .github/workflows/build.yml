@@ -45,13 +45,8 @@ jobs:
           grep -q "room-climate-card" dist/ha-room-climate-card.js
           printf 'Bundle size: %s\n' "$(wc -c < dist/ha-room-climate-card.js) bytes"
 
-      - name: Check committed bundle is up to date
-        run: |
-          if ! git diff --quiet -- dist/; then
-            echo "::error::dist/ is out of date – run 'npm run build' and commit the result."
-            git --no-pager diff --stat -- dist/
-            exit 1
-          fi
+      # No check that dist/ is up to date: the release workflow builds and commits
+      # the bundle together with the version bump.
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
