@@ -41,7 +41,7 @@ describe('dev playground', () => {
       shadowRoot: ShadowRoot;
     };
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(editor.shadowRoot.querySelectorAll('details').length).toBe(8);
+    expect(editor.shadowRoot.querySelectorAll('details').length).toBe(9);
 
     const nameSelector = Array.from(editor.shadowRoot.querySelectorAll('ha-selector')).find(
       (element) => (element as unknown as { label: string }).label === 'Raumname'

@@ -1047,9 +1047,12 @@ describe('room climate card', () => {
 
       chart.setSize(420, 140);
       await chart.updateComplete;
-      const firstLabel = chart.shadowRoot.querySelector('.axis-label')?.textContent?.trim();
-      // 06:00 UTC is 08:00 in Berlin – not the browser's zone.
-      expect(firstLabel).toContain('08:00');
+      const labels = Array.from(chart.shadowRoot.querySelectorAll('.axis-label')).map(
+        (label) => label.textContent?.trim()
+      );
+      // 06:00–12:00 UTC is 08:00–14:00 in Berlin: the ticks fall on full Berlin
+      // hours. In the browser's (UTC) zone 12:00 would already be "Jetzt".
+      expect(labels).toEqual(['Sa 10:00', 'Sa 12:00', 'Jetzt']);
     } finally {
       vi.useRealTimers();
     }
