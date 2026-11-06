@@ -2,6 +2,8 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import { CARD_TAG, EDITOR_TAG } from '../const';
 import {
   DEFAULT_COLORS,
+  DEFAULT_NAME_FONT_SIZE,
+  NAME_FONT_SIZE_RANGE,
   asBoolean,
   asEntityId,
   asString,
@@ -22,8 +24,8 @@ interface EditorText {
   chart: string;
   name: string;
   nameHelper: string;
-  nameEntity: string;
-  nameEntityHelper: string;
+  nameSize: string;
+  nameSizeHelper: string;
   icon: string;
   autoHeight: string;
   height: string;
@@ -152,8 +154,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     chart: 'Verlauf',
     name: 'Raumname',
     nameHelper: 'Leer lassen, um den Namen der Temperatur-Entität zu verwenden.',
-    nameEntity: 'Name aus Entität übernehmen',
-    nameEntityHelper: 'Optional: Der Anzeigename dieser Entität wird als Raumname verwendet.',
+    nameSize: 'Schriftgröße Raumname',
+    nameSizeHelper:
+      '11–32 px (Standard 15). Das Raumicon wächst mit, die Zeilenhöhe bleibt im Verhältnis.',
     icon: 'Raumicon',
     autoHeight: 'Höhe automatisch (Inhalt)',
     height: 'Kartenhöhe',
@@ -286,8 +289,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     chart: 'History',
     name: 'Room name',
     nameHelper: 'Leave empty to use the temperature entity name.',
-    nameEntity: 'Take name from entity',
-    nameEntityHelper: 'Optional: this entity’s friendly name is used as the room name.',
+    nameSize: 'Room name font size',
+    nameSizeHelper:
+      '11–32 px (default 15). The room icon grows with it and the line height keeps its ratio.',
     icon: 'Room icon',
     autoHeight: 'Automatic height (content)',
     height: 'Card height',
@@ -784,12 +788,15 @@ export class RoomClimateCardEditor extends LitElement {
     const autoHeight = !this._config.height || this._config.height === 'auto';
     return html`<div class="hint">${t.generalHelper}</div>
       ${this.renderText({ key: 'name', label: t.name, helper: t.nameHelper })}
-      ${this.renderField({
-        key: 'name_entity',
-        label: t.nameEntity,
-        selector: { entity: { multiple: false } },
-        value: this.stringValue('name_entity'),
-        helper: t.nameEntityHelper,
+      ${this.renderNumber({
+        key: 'name_font_size',
+        label: t.nameSize,
+        helper: t.nameSizeHelper,
+        min: NAME_FONT_SIZE_RANGE.min,
+        max: NAME_FONT_SIZE_RANGE.max,
+        step: 1,
+        unit: 'px',
+        fallback: DEFAULT_NAME_FONT_SIZE,
       })}
       ${this.renderField({
         key: 'icon',

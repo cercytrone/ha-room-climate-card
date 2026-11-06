@@ -11,6 +11,8 @@ import {
   configEntityIds,
   hasChart,
   hasStatusRow,
+  nameIconSize,
+  nameLineHeight,
   normalizeConfig,
   preferredCardHeight,
   resolveName,
@@ -443,6 +445,14 @@ export class RoomClimateCard extends LitElement {
       `--rcc-chart-height:${config.chart.height}px`,
       `--rcc-temp-size:${tempType.fontSize}px`,
       `--rcc-hum-size:${humType.fontSize}px`,
+      /*
+       * Title size and the icon that belongs to it: both are written here (not
+       * in the stylesheet) so the line height and the icon box stay in step with
+       * whatever the user picked in the editor.
+       */
+      `--rcc-name-size:${config.nameFontSize}px`,
+      `--rcc-name-line:${nameLineHeight(config.nameFontSize)}px`,
+      `--rcc-name-icon:${nameIconSize(config.nameFontSize)}px`,
       `--rcc-accent:${config.accentColor}`,
       `--rcc-secondary:${config.humidity.color}`,
       tempType.fontFamily ? `--rcc-temp-font:${tempType.fontFamily}` : '',
@@ -1084,23 +1094,26 @@ export class RoomClimateCard extends LitElement {
      * ~12.5–13 px of visible glyph (the paths do not fill their 24 px viewBox
      * completely), so the icon overshoots by about a pixel top and bottom.
      * 16 px also covers Material icons, which fill their viewBox more fully.
-     * It still fits the 20 px title line, so the header does not grow.
+     * The value is a token (nameIconSize()): 16 px at the default 15 px title,
+     * 26 px next to a 24 px one – the icon scales with the name instead of
+     * looking lost beside it, and never grows past the line box.
      */
     .room-icon .icon {
-      width: 16px;
-      height: 16px;
+      width: var(--rcc-name-icon, 16px);
+      height: var(--rcc-name-icon, 16px);
     }
     .room-icon ha-icon {
-      --mdc-icon-size: 16px;
+      --mdc-icon-size: var(--rcc-name-icon, 16px);
       color: var(--rcc-tertiary);
       display: inline-flex;
     }
     /* The title is a caption, not a headline: same tone as the series labels. */
     .name {
       margin: 0;
-      font-size: 15px;
+      /* Room name size from the editor; 4/3 line height keeps the proportions. */
+      font-size: var(--rcc-name-size, 15px);
       font-weight: 500;
-      line-height: 20px;
+      line-height: var(--rcc-name-line, 20px);
       letter-spacing: -0.012em;
       color: var(--rcc-muted);
       overflow: hidden;

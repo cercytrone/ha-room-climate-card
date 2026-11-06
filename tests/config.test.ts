@@ -299,14 +299,12 @@ describe('normalizeConfig', () => {
       window_entity: 'binary_sensor.w',
       motion_entity: 'binary_sensor.m',
       climate_entity: 'climate.c',
-      name_entity: 'sensor.n',
     });
     expect(configEntityIds(config).sort()).toEqual([
       'binary_sensor.m',
       'binary_sensor.w',
       'climate.c',
       'sensor.h',
-      'sensor.n',
       'sensor.t',
     ]);
   });
@@ -359,12 +357,18 @@ describe('resolveName', () => {
     expect(resolveName(config, createHass())).toBe('Küche');
   });
 
-  it('falls back to the friendly name of the name entity', () => {
+  it('ignores a name entity from an old configuration and says so', () => {
+    resetUnknownKeyWarnings();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const hass = createHass({
       states: [entity('sensor.name', { state: '1', attributes: { friendly_name: 'Wohnzimmer' } })],
     });
-    const config = normalizeConfig({ name_entity: 'sensor.name' });
-    expect(resolveName(config, hass)).toBe('Wohnzimmer');
+    const config = normalizeConfig({ name_entity: 'sensor.name' } as never);
+    // The name comes from `name` (or the temperature sensor) only.
+    expect(resolveName(config, hass)).toBe('Raumklima');
+    expect(configEntityIds(config)).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"name_entity" wird nicht mehr unterstützt'));
+    warn.mockRestore();
   });
 
   it('falls back to the temperature sensor friendly name', () => {

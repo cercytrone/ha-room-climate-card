@@ -4,6 +4,38 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.17.0] – 2026-11-06
+
+### Hinzugefügt
+
+- **`name_font_size`** – Schriftgröße des Raumnamens, im Editor unter *Allgemein* direkt unter dem
+  Namensfeld (**Schriftgröße Raumname**, 11–32 px, Standard 15). Die Zeilenhöhe wächst im
+  Verhältnis 4/3 mit (Standard 15 px Typ auf 20 px Zeile), das Raumicon auf das 16/15-fache –
+  ein größerer Titel bekommt also ein größeres Icon statt eines verlorenen 16-px-Glyphs, und die
+  Titelzeile der Karte wächst mit, statt den Namen abzuschneiden. Beide Werte sind reine Zahlen
+  in `src/config.ts` (`nameLineHeight()`, `nameIconSize()`) und landen als CSS-Variablen
+  (`--rcc-name-size`, `--rcc-name-line`, `--rcc-name-icon`) auf der Karte.
+
+### Entfernt
+
+- **`name_entity` / „Name aus Entität übernehmen“.** Der Raumname kommt nur noch aus dem
+  Textfeld `name`; ist es leer, gilt der Friendly Name des Temperatursensors. Das
+  Entitäts-Auswahlfeld im Editor ist entfallen, die Option wird nicht mehr abgefragt und nicht
+  mehr beobachtet. Eine alte Konfiguration mit `name_entity` stürzt nicht ab, sondern meldet
+  einmalig in der Konsole: `"name_entity" wird nicht mehr unterstützt. Der Raumname kommt nur
+  noch aus \`name\` (Editor: Allgemein → Raumname); ohne Eintrag gilt der Name des
+  Temperatursensors.`
+
+### Geprüft
+
+- `tests/editor.test.ts`: Feld **Schriftgröße Raumname** vorhanden (Standard 15), kein
+  Entitätsfeld mehr, Wert außerhalb des Bereichs wird angezeigt, aber nicht übernommen, leeres
+  Feld lässt den gespeicherten Wert stehen.
+- `tests/card.test.ts`: CSS-Variablen für 15 px (20 px Zeile, 16 px Icon), 24 px (32/26), 11 px
+  (12 px Icon) und 400 px → auf 32 px begrenzt; größerer Titel erhöht `getCardSize()`.
+- `tests/config.test.ts`: `name_entity` aus alten Konfigurationen wird ignoriert und einmalig mit
+  Hinweis gemeldet, `configEntityIds()` enthält es nicht mehr.
+
 ## [2.16.3] – 2026-11-03
 
 ### Behoben
