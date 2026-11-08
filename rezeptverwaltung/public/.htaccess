@@ -1,0 +1,46 @@
+# Rezeptverwaltung – Apache-Konfiguration für das öffentliche Verzeichnis (Document Root = public/)
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Optional: HTTP -> HTTPS umleiten. Bevorzugt die Weiterleitung im Hosting-Panel aktivieren.
+    # Nur einkommentieren, wenn das Panel dies nicht anbietet UND keine Umleitungsschleife entsteht
+    # (z. B. wenn ein vorgeschalteter Proxy TLS beendet, ist %{HTTPS} hier immer "off").
+    # RewriteCond %{HTTPS} !=on
+    # RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Versteckte Dateien (z. B. .env, .git) niemals ausliefern
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+
+    # Authorization-Header weiterreichen
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Abschließende Schrägstriche entfernen
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Alle übrigen Anfragen an den Front-Controller
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Keine PHP-Ausführung außer index.php
+<FilesMatch "\.(php|phtml|phar)$">
+    Require all denied
+</FilesMatch>
+<Files "index.php">
+    Require all granted
+</Files>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    <FilesMatch "\.(css|js|svg|woff2?)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>

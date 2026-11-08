@@ -1,0 +1,84 @@
+name: Rezeptverwaltung (PHP 8.3 / MySQL 8.4)
+
+# Testet die Laravel-Anwendung im Unterordner rezeptverwaltung/ gegen MySQL 8.4.
+on:
+  push:
+    paths: ['rezeptverwaltung/**', '.github/workflows/rezeptverwaltung.yml']
+  pull_request:
+    paths: ['rezeptverwaltung/**', '.github/workflows/rezeptverwaltung.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rezeptverwaltung
+    services:
+      mysql:
+        # Zielversion des Hostings ist 8.4.13; "8.4" ist die gepflegte LTS-Linie.
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root
+          MYSQL_DATABASE: rezepte_test
+          MYSQL_USER: rezepte
+          MYSQL_PASSWORD: ci-pass
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-root"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: rezepte_test
+      DB_USERNAME: rezepte
+      DB_PASSWORD: ci-pass
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: curl, dom, fileinfo, gd, mbstring, pdo_mysql, zip, zlib
+          coverage: none
+
+      - name: Node.js (nur Build-Werkzeug)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: MySQL-Version
+        run: mysql -h 127.0.0.1 -uroot -pci-root -e "SELECT VERSION();"
+
+      - name: Composer install (Lock-Datei)
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Frontend-Build und JS-Tests
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run build
+
+      - name: Code-Stil
+        run: vendor/bin/pint --test
+
+      - name: Anwendung vorbereiten
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrationen gegen MySQL 8.4 (hin und zurück)
+        run: |
+          php artisan migrate --force
+          php artisan migrate:rollback --force
+          php artisan migrate --force
+          php artisan db:seed --class=StandardDatenSeeder --force
+
+      - name: Tests
+        run: php artisan test
+
+      - name: Systemprüfung
+        run: php artisan rezepte:systempruefung || true

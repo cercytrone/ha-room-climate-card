@@ -1,0 +1,20 @@
+# NUR VERWENDEN, WENN DAS DOCUMENT ROOT NICHT AUF public/ GESETZT WERDEN KANN.
+# Diese Datei als ".htaccess" in das Anwendungsverzeichnis (eine Ebene ÜBER public/) legen.
+# Sie leitet alle Anfragen intern nach public/ um und sperrt jeden direkten Zugriff
+# auf Anwendungscode, .env, storage/, vendor/ usw.
+# Nach dem Einrichten unbedingt prüfen (siehe docs/INSTALLATION.md, Abschnitt „Prüfung“):
+#   https://rezepte.example.org/.env           -> 403/404
+#   https://rezepte.example.org/storage/logs/  -> 403/404
+#   https://rezepte.example.org/composer.json  -> 403/404
+Options -Indexes -MultiViews
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Versteckte Dateien sperren
+    RewriteRule (^|/)\. - [F,L]
+    # Alles, was nicht bereits in public/ liegt, nach public/ umschreiben
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
