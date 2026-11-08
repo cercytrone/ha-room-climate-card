@@ -1,4 +1,0 @@
-<!DOCTYPE html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Interner Fehler</title>
-<style>body{font-family:system-ui,sans-serif;background:#fafaf9;color:#1c1917;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:16px}main{max-width:32rem;background:#fff;border:1px solid #e7e5e4;border-radius:12px;padding:24px}h1{margin:0 0 8px;font-size:1.5rem}a{color:#33522e}</style></head>
-<body><main><p style="color:#78716c;margin:0">Fehler 500</p><h1>Interner Fehler</h1><p>Es ist ein unerwarteter Fehler aufgetreten. Details stehen im Protokoll (storage/logs).</p><p><a href="/">Zur Startseite</a></p></main></body></html>
