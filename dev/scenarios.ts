@@ -88,6 +88,16 @@ export const demoScenarios: DemoScenario[] = [
     },
   },
   {
+    title: 'Spieldiele · Fenster kurz offen, Kurven überlappen',
+    config: {
+      type: 'custom:room-climate-card',
+      name: 'Spieldiele',
+      temperature_entity: 'sensor.demo_play_temperature',
+      humidity_entity: 'sensor.demo_living_humidity',
+      chart_overlap: true,
+    },
+  },
+  {
     title: 'Flur · Sensor nicht verfügbar',
     config: {
       type: 'custom:room-climate-card',

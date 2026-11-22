@@ -134,6 +134,11 @@ export interface RoomClimateCardConfig extends LovelaceCardConfig {
   chart_show_tooltip?: boolean;
   /** Quiet min/max marks next to the curves. Default on. */
   chart_show_extremes?: boolean;
+  /**
+   * Temperature and humidity both use the full chart height and may cross.
+   * Default off: humidity owns the upper third, temperature the lower half.
+   */
+  chart_overlap?: boolean;
   /** Soft colour gradient under the temperature curve. Default on. */
   chart_temperature_gradient?: boolean;
   /** Soft colour gradient under the humidity curve. Default on. */
@@ -200,6 +205,8 @@ export interface ResolvedChartConfig {
   showGrid: boolean;
   showTooltip: boolean;
   showExtremes: boolean;
+  /** Both curves use the full plot height and may cross. */
+  overlap: boolean;
   /** Time labels below the plot: without them the curves get the space. */
   showAxis: boolean;
   /** `true` runs the chart to the card's outer edge instead of the text edge. */
@@ -488,6 +495,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = [
   'chart_show_setpoint',
   'chart_show_tooltip',
   'chart_show_extremes',
+  'chart_overlap',
   'chart_temperature_gradient',
   'chart_humidity_gradient',
   'chart_temperature_area_opacity',
@@ -674,6 +682,7 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
       showExtremes: asBoolean(config.chart_show_extremes) ?? true,
       showAxis: asBoolean(config.chart_show_axis) ?? true,
       fullBleed: asBoolean(config.chart_full_bleed) ?? true,
+      overlap: asBoolean(config.chart_overlap) ?? false,
       showChartSetpoint: asBoolean(config.chart_show_setpoint) ?? true,
       showTemperatureGradient: asBoolean(config.chart_temperature_gradient) ?? true,
       showHumidityGradient: asBoolean(config.chart_humidity_gradient) ?? true,

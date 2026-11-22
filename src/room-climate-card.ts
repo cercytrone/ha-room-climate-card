@@ -1239,6 +1239,7 @@ export class RoomClimateCard extends LitElement {
         .showGrid=${config.chart.showGrid}
         .showTooltip=${config.chart.showTooltip}
         .showExtremes=${config.chart.showExtremes}
+        .overlap=${config.chart.overlap}
         .temperatureUnit=${temperatureUnitOfSensor}
         .humidityUnit=${humidityUnit ?? '%'}
         .temperatureDecimals=${config.temperatureDecimals}

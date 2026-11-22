@@ -24,6 +24,8 @@ interface EntitySpec {
    * was set, `null` = no target (off). The last entry should match `extra.temperature`.
    */
   targets?: Array<{ hoursAgo: number; value: number | null }>;
+  /** Short, steep drops (window opened): depth in the sensor unit, recovery in minutes. */
+  dips?: Array<{ hoursAgo: number; depth: number; recoverMinutes: number }>;
 }
 
 const SPECS: EntitySpec[] = [
@@ -76,6 +78,43 @@ const SPECS: EntitySpec[] = [
     base: 23.2,
     amplitude: 0.5,
     periodHours: 3.5,
+  },
+  {
+    entity_id: 'sensor.demo_play_temperature',
+    state: '21.1',
+    name: 'Spieldiele Temperatur',
+    unit: '°C',
+    deviceClass: 'temperature',
+    base: 20.9,
+    amplitude: 0.25,
+    periodHours: 9,
+    dips: [{ hoursAgo: 4.2, depth: 1.9, recoverMinutes: 35 }],
+  },
+  {
+    entity_id: 'sensor.demo_bedroom_temperature',
+    state: '17.0',
+    name: 'Schlafzimmer Temperatur',
+    unit: '°C',
+    deviceClass: 'temperature',
+    base: 17.3,
+    amplitude: 0.1,
+    periodHours: 8,
+    dips: [{ hoursAgo: 3.9, depth: 6.2, recoverMinutes: 25 }],
+  },
+  {
+    entity_id: 'sensor.demo_attic2_temperature',
+    state: '20.5',
+    name: 'Dachetage Temperatur',
+    unit: '°C',
+    deviceClass: 'temperature',
+    base: 20.45,
+    amplitude: 0.03,
+    periodHours: 5,
+    dips: [
+      { hoursAgo: 3.1, depth: -0.28, recoverMinutes: 20 },
+      { hoursAgo: 2.2, depth: -0.15, recoverMinutes: 12 },
+      { hoursAgo: 1.7, depth: -0.12, recoverMinutes: 10 },
+    ],
   },
   {
     // Wide swing (≈17–28 °C) so the temperature colour bands show all four stages.
@@ -228,10 +267,14 @@ function demoHistory(spec: EntitySpec, start: number, end: number): Array<{ s: s
   let index = 0;
   for (let time = start; time <= end; time += stepMs) {
     const hours = (time - start) / 3600000;
-    const value =
+    let value =
       spec.base +
       (spec.amplitude ?? 0) * Math.sin((hours / spec.periodHours) * Math.PI * 2) +
       noise(seed, index) * 0.08;
+    for (const dip of spec.dips ?? []) {
+      const minutesSince = (time - (end - dip.hoursAgo * 3600000)) / 60000;
+      if (minutesSince >= 0) value -= dip.depth * Math.exp(-minutesSince / (dip.recoverMinutes / 3));
+    }
     index += 1;
     if (spec.gapFrom !== undefined && spec.gapTo !== undefined) {
       const hoursToEnd = (end - time) / 3600000;

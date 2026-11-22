@@ -85,6 +85,8 @@ interface EditorText {
   offColor: string;
   showTemperatureChart: string;
   showHumidityChart: string;
+  overlap: string;
+  overlapHelper: string;
   hours: string;
   chartHeight: string;
   curve: string;
@@ -242,6 +244,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     offColor: 'Icon-Farbe aus/unterbrochen (Standard: Farbe des Soll-Werts)',
     showTemperatureChart: 'Temperaturverlauf anzeigen',
     showHumidityChart: 'Luftfeuchteverlauf anzeigen',
+    overlap: 'Temperatur und Luftfeuchte überlappen',
+    overlapHelper:
+      'Beide Kurven nutzen die volle Höhe des Verlaufs und dürfen sich kreuzen – jede bekommt etwa doppelt so viel Platz. Aus: Luftfeuchte oben, Temperatur darunter, getrennt.',
     hours: 'Zeitraum',
     chartHeight: 'Chart-Höhe',
     curve: 'Kurvenverlauf',
@@ -398,6 +403,9 @@ const TEXT: Record<'de' | 'en', EditorText> = {
     offColor: 'Off/unavailable icon colour (default: the target value colour)',
     showTemperatureChart: 'Show temperature history',
     showHumidityChart: 'Show humidity history',
+    overlap: 'Overlap temperature and humidity',
+    overlapHelper:
+      'Both curves use the full chart height and may cross – each gets about twice the room. Off: humidity on top, temperature below, kept apart.',
     hours: 'Period',
     chartHeight: 'Chart height',
     curve: 'Curve',
@@ -523,6 +531,7 @@ export const SECTION_RESET_KEYS: Record<SectionId, readonly string[]> = {
   chart: [
     'show_temperature_chart',
     'show_humidity_chart',
+    'chart_overlap',
     'chart_hours',
     'chart_height',
     'chart_curve',
@@ -1407,6 +1416,13 @@ export class RoomClimateCardEditor extends LitElement {
         label: t.showHumidityChart,
         value: showHumidity,
         onChange: (value) => this.patch({ show_humidity_chart: value }),
+      })}
+      ${this.renderSwitch({
+        key: 'chart_overlap',
+        label: t.overlap,
+        value: this.rawBoolean('chart_overlap') ?? false,
+        helper: t.overlapHelper,
+        disabled: !(showTemperature && showHumidity),
       })}
       ${this.renderSwitch({
         key: 'chart_full_bleed',

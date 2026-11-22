@@ -10,6 +10,7 @@ import {
   extent,
   linearScale,
   medianInterval,
+  keepExtremes,
   movingAverage,
   nearestSample,
   padDomain,
@@ -62,6 +63,13 @@ const FALLBACK_HEIGHT = 112;
 
 /** How long a touch readout stays visible after the finger lifts. */
 const TOOLTIP_HOLD_MS = 4000;
+
+/**
+ * Samples on each side of the measured min/max over which the averaged curve
+ * fades back into the measurement – enough to avoid a one-sample needle, few
+ * enough that the smoothing level still decides the rest of the curve.
+ */
+const EXTREME_FADE_SAMPLES = 2;
 
 /** Smallest chart the min/max marks are drawn into, in CSS pixel. */
 const MIN_EXTREME_WIDTH = 150;
@@ -210,6 +218,7 @@ export class RoomClimateChart extends LitElement {
     cornerRadius: { attribute: false },
     showTooltip: { attribute: false },
     showExtremes: { attribute: false },
+    overlap: { attribute: false },
     temperatureUnit: { attribute: false },
     humidityUnit: { attribute: false },
     temperatureDecimals: { attribute: false },
@@ -529,6 +538,8 @@ export class RoomClimateChart extends LitElement {
   showTooltip = true;
   /** Quiet min/max marks of both visible series. */
   showExtremes = true;
+  /** Both series use the whole plot height and may cross (`chart_overlap`). */
+  overlap = false;
   /** Unit of the temperature series; falls back to the setpoint unit. */
   temperatureUnit?: string;
   /** Unit of the humidity series (usually `%`). */
@@ -756,9 +767,12 @@ export class RoomClimateChart extends LitElement {
     const temperatureSeriesOn = this.temperature !== undefined;
     const humiditySeriesOn = this.humidity !== undefined;
     const singleSeries = temperatureSeriesOn !== humiditySeriesOn;
+    // With `overlap` both curves span the whole plot, like a single series, and
+    // may cross – each gets about twice the height of its own band.
+    const fullHeight = singleSeries || this.overlap;
     const humidityTop = top;
-    const humidityBottom = singleSeries ? bottom : top + plotHeight * HUMIDITY_BAND_HEIGHT;
-    const temperatureTop = singleSeries ? top : top + plotHeight * TEMPERATURE_BAND_TOP;
+    const humidityBottom = fullHeight ? bottom : top + plotHeight * HUMIDITY_BAND_HEIGHT;
+    const temperatureTop = fullHeight ? top : top + plotHeight * TEMPERATURE_BAND_TOP;
     const temperatureBottom = bottom;
 
     const visibleTemperature = this.temperatureVisible ? this.temperature ?? [] : [];
@@ -905,9 +919,10 @@ export class RoomClimateChart extends LitElement {
         series.length % 2 ? series.length : series.length - 1
       );
       if (window < 3) return series;
-      return movingAverage(series, window, {
+      const smoothed = movingAverage(series, window, {
         maxDeltaMs: smoothingGuard(window, spacing),
       });
+      return keepExtremes(series, smoothed, Math.min(EXTREME_FADE_SAMPLES, Math.floor(window / 2)));
     };
     const tempSmoothed = smoothSeries(tempSeries);
     const humiditySmoothed = smoothSeries(humiditySeries);
@@ -1332,6 +1347,11 @@ export class RoomClimateChart extends LitElement {
      * Skipped on narrow or very flat charts, where labels would collide.
      */
     const extremeMarks: TemplateResult[] = [];
+    /*
+     * Boxes of the min/max numbers already placed. With overlapping curves a
+     * number of one series can land on a number of the other.
+     */
+    const placedLabels: Array<{ from: number; to: number; y: number }> = [];
     const addExtremeMarks = (
       samples: ChartSample[],
       projectY: (value: number) => number,
@@ -1449,9 +1469,51 @@ export class RoomClimateChart extends LitElement {
             style=${`fill:var(--rcc-chart-point-fill);stroke:${color};stroke-width:1.2`}
           />`
         );
-        if (!captionClash(labelX)) {
+        /*
+         * Another number already sits there (the other curve's): try the other
+         * side of the dot, then above/below. If every spot is taken, the dot
+         * stays without its number rather than printing two on top of each other.
+         */
+        const boxOf = (x: number, side: 'start' | 'end', y: number) => ({
+          from: side === 'start' ? x : x - textWidth,
+          to: side === 'start' ? x + textWidth : x,
+          y,
+        });
+        const taken = (x: number, side: 'start' | 'end', y: number): boolean => {
+          const box = boxOf(x, side, y);
+          return placedLabels.some(
+            (other) =>
+              Math.abs(other.y - box.y) < 10 && other.from < box.to + 2 && box.from < other.to + 2
+          );
+        };
+        const fitsSide = (x: number, side: 'start' | 'end'): boolean =>
+          side === 'start'
+            ? x + textWidth <= edgeRight - EXTREME_EDGE_GAP + 0.5
+            : x - textWidth >= left + EXTREME_EDGE_GAP - 0.5;
+        const otherY = entry.labelY < entry.cy ? entry.cy + 15 : entry.cy - 9;
+        const otherYFits = otherY - 9 >= bandTop - 2 && otherY <= bandBottom + 1;
+        const flippedX = anchor === 'start' ? entry.cx - 6 : entry.cx + 6;
+        const flippedAnchor: 'start' | 'end' = anchor === 'start' ? 'end' : 'start';
+        const spots: Array<{ x: number; side: 'start' | 'end'; y: number }> = [
+          { x: labelX, side: anchor, y: entry.labelY },
+          ...(fitsSide(flippedX, flippedAnchor)
+            ? [{ x: flippedX, side: flippedAnchor, y: entry.labelY }]
+            : []),
+          ...(otherYFits ? [{ x: labelX, side: anchor, y: otherY }] : []),
+          ...(otherYFits && fitsSide(flippedX, flippedAnchor)
+            ? [{ x: flippedX, side: flippedAnchor, y: otherY }]
+            : []),
+        ];
+        const spot = spots.find(
+          (candidate) =>
+            !taken(candidate.x, candidate.side, candidate.y) && !captionClash(candidate.x)
+        );
+        if (spot) {
+          labelX = spot.x;
+          anchor = spot.side;
+          placedLabels.push(boxOf(spot.x, spot.side, spot.y));
           extremeMarks.push(
-            svg`<text class="extreme-label" x=${labelX} y=${entry.labelY} text-anchor=${anchor}>${formatNumber(
+            svg`<text class="extreme-label" x=${labelX} y=${spot.y} text-anchor=${anchor}>${formatNumber(
               entry.sample.v as number,
               this.language,
               decimals

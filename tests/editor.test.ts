@@ -911,4 +911,25 @@ describe('room climate card editor', () => {
     expect(selectorByLabel(editor, 'Stärke des Flächenverlaufs (Luftfeuchte)').disabled).toBe(false);
   });
 
+  it('offers overlapping curves only while both curves are shown', async () => {
+    const editor = await mountEditor(baseConfig);
+    openAll(editor);
+    let emitted: RoomClimateCardConfig | undefined;
+    editor.addEventListener('config-changed', (event) => {
+      emitted = (event as CustomEvent<{ config: RoomClimateCardConfig }>).detail.config;
+    });
+    const overlap = selectorByLabel(editor, 'Temperatur und Luftfeuchte überlappen');
+    expect(overlap.value).toBe(false);
+    expect(overlap.disabled).toBe(false);
+    overlap.emit(true);
+    await editor.updateComplete;
+    expect(emitted?.chart_overlap).toBe(true);
+
+    openAll(editor);
+    selectorByLabel(editor, 'Luftfeuchteverlauf anzeigen').emit(false);
+    await editor.updateComplete;
+    openAll(editor);
+    expect(selectorByLabel(editor, 'Temperatur und Luftfeuchte überlappen').disabled).toBe(true);
+  });
+
 });
