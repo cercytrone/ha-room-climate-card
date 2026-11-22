@@ -4,6 +4,24 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.21.0] – 2026-11-22
+
+### Hinzugefügt
+
+- **Temperatur und Luftfeuchte überlappen (optional).** Mit `chart_overlap: true` (Editor:
+  *Verlauf* → **Temperatur und Luftfeuchte überlappen**) nutzen beide Kurven die volle Höhe des
+  Verlaufs und dürfen sich kreuzen; jede bekommt etwa doppelt so viel Platz. Standard bleibt die
+  getrennte Darstellung (Feuchte oben, Temperatur unten).
+
+### Behoben
+
+- **Min/Max-Markierungen neben der Kurve.** Die Marken zeigen echte Messwerte, die Kurve war aber
+  geglättet: Ein kurzer Einbruch oder eine Spitze wurde abgeflacht, und der Punkt schwebte unter
+  bzw. über der Linie. Rund um Minimum und Maximum geht die Glättung jetzt in den Messwert über,
+  die Kurve erreicht die Marke.
+- **Min/Max-Zahlen übereinander.** Zahlen der Temperatur- und der Feuchtekurve weichen einander
+  aus; ist kein Platz frei, bleibt der Punkt ohne Zahl statt zwei Zahlen übereinander zu drucken.
+
 ## [2.20.0] – 2026-11-06
 
 ### Geändert

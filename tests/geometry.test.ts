@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  keepExtremes,
   stepPath,
   stepRuns,
   areaPath,
@@ -972,5 +973,28 @@ describe('stepRuns / stepPath', () => {
 
   it('returns nothing for an empty window', () => {
     expect(stepRuns([{ t: 0, v: 20 }], 10, 10)).toEqual([]);
+  });
+});
+
+describe('keepExtremes', () => {
+  const series = (values: Array<number | null>) => values.map((v, t) => ({ t, v }));
+
+  it('restores the measured minimum and maximum and fades into the average', () => {
+    const raw = series([21, 21, 21, 15, 21, 21, 21, 22, 21]);
+    const averaged = series([21, 20, 19, 19, 19, 20, 21.3, 21.4, 21.3]);
+    const kept = keepExtremes(raw, averaged, 2);
+    expect(kept[3].v).toBe(15);
+    expect(kept[7].v).toBe(22);
+    // One step away: two thirds measurement, one third average.
+    expect(kept[2].v).toBeCloseTo((2 / 3) * 21 + (1 / 3) * 19, 2);
+    // Outside the fade the average is untouched.
+    expect(kept[0].v).toBe(21);
+    expect(averaged[3].v).toBe(19);
+  });
+
+  it('leaves gaps and empty series alone', () => {
+    const raw = series([null, 20, null]);
+    expect(keepExtremes(raw, raw, 2).map((sample) => sample.v)).toEqual([null, 20, null]);
+    expect(keepExtremes([], [], 2)).toEqual([]);
   });
 });

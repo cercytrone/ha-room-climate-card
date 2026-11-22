@@ -684,6 +684,47 @@ export function movingAverage(
 }
 
 /**
+ * Restores the measured minimum and maximum in an averaged series.
+ *
+ * The min/max marks name measured values, but averaging pulls a short dip or
+ * peak (a window opened for ten minutes) towards its neighbours – the mark
+ * then floated below or above the drawn curve. Around both extremes the
+ * average fades back into the measurement over `radius` samples, so the curve
+ * reaches the marked value without a one-sample needle.
+ */
+export function keepExtremes(
+  raw: ChartSample[],
+  smoothed: ChartSample[],
+  radius: number
+): ChartSample[] {
+  if (raw.length !== smoothed.length || !raw.length) return smoothed;
+  let minIndex = -1;
+  let maxIndex = -1;
+  raw.forEach((sample, index) => {
+    if (sample.v === null) return;
+    if (minIndex < 0 || sample.v < (raw[minIndex].v as number)) minIndex = index;
+    if (maxIndex < 0 || sample.v > (raw[maxIndex].v as number)) maxIndex = index;
+  });
+  if (minIndex < 0) return smoothed;
+  const result = smoothed.map((sample) => ({ ...sample }));
+  const reach = Math.max(0, Math.floor(radius));
+  for (const index of minIndex === maxIndex ? [minIndex] : [minIndex, maxIndex]) {
+    for (let offset = -reach; offset <= reach; offset += 1) {
+      const at = index + offset;
+      const measured = raw[at];
+      const average = smoothed[at];
+      if (!measured || !average || measured.v === null || average.v === null) continue;
+      const weight = 1 - Math.abs(offset) / (reach + 1);
+      result[at] = {
+        t: measured.t,
+        v: Math.round((weight * measured.v + (1 - weight) * average.v) * 100) / 100,
+      };
+    }
+  }
+  return result;
+}
+
+/**
  * How strongly the curve is averaged, selectable in the editor.
  *
  * `none` draws every measured value, `light` removes the sensor's own jitter,

@@ -1727,4 +1727,82 @@ describe('axis, caption and keyboard', () => {
       expect(chart.shadowRoot!.querySelector('line.setpoint-line')).not.toBeNull();
     });
   });
+
+  describe('min/max marks and overlapping curves', () => {
+    const h = 3600_000;
+    /** A quiet room with one short, steep dip (a window opened for ten minutes). */
+    const dip = (): ChartSample[] =>
+      Array.from({ length: 72 }, (_, index) => ({
+        t: now - (72 - index) * 5 * 60_000,
+        v: index === 30 ? 15.2 : index === 31 ? 18.4 : 21 + ((index * 7) % 5) * 0.02,
+      }));
+
+    it('lets the smoothed curve reach the marked minimum', async () => {
+      const chart = createChart({ temperature: dip(), smoothing: 'strong', curve: 'smooth' });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      const dots = [...chart.shadowRoot!.querySelectorAll('.extreme-dot')];
+      const lowest = dots.reduce((a, b) => (Number(a.getAttribute('cy')) > Number(b.getAttribute('cy')) ? a : b));
+      // Vertices only – bezier control points may sit a pixel beyond the curve.
+      const ys = verticesOf(chart.shadowRoot!.querySelector('path.series-line')!.getAttribute('d')!).map(
+        (vertex) => vertex.y
+      );
+      // The deepest drawn point is the marked one, not a few degrees above it.
+      expect(Math.max(...ys)).toBeCloseTo(Number(lowest.getAttribute('cy')), 0);
+    });
+
+    it('gives both curves the whole plot with chart_overlap', async () => {
+      const split = createChart({ temperature: samples([20, 21, 22, 21]), humidity: samples([44, 46, 45, 47]) });
+      setSize(split, 360, 112);
+      await split.updateComplete;
+      const gradient = (chart: RoomClimateChart, series: string) => {
+        const node = chart.shadowRoot!.querySelector(`[id$="-${series}-fill"]`)!;
+        return { top: Number(node.getAttribute('y1')), bottom: Number(node.getAttribute('y2')) };
+      };
+      const splitTemp = gradient(split, 'temp');
+      const splitHumidity = gradient(split, 'humidity');
+      // Default: humidity above, temperature below – the bands do not meet.
+      expect(splitHumidity.bottom).toBeLessThanOrEqual(splitTemp.top);
+
+      document.body.replaceChildren();
+      const shared = createChart({
+        temperature: samples([20, 21, 22, 21]),
+        humidity: samples([44, 46, 45, 47]),
+        overlap: true,
+      });
+      setSize(shared, 360, 112);
+      await shared.updateComplete;
+      const temp = gradient(shared, 'temp');
+      const humidity = gradient(shared, 'humidity');
+      expect(temp).toEqual(humidity);
+      expect(temp.bottom - temp.top).toBeGreaterThan((splitTemp.bottom - splitTemp.top) * 1.5);
+    });
+
+    it('never prints two min/max numbers on top of each other', async () => {
+      // Both curves peak and drop at the same moments: their numbers compete.
+      const shape = [0, 1, 2, 3, 2, 1, 0, -1, -2, -3, -2, -1, 0];
+      const chart = createChart({
+        temperature: shape.map((v, index) => ({ t: now - (shape.length - index) * h * 0.4, v: 21 + v })),
+        humidity: shape.map((v, index) => ({ t: now - (shape.length - index) * h * 0.4, v: 50 + v * 3 })),
+        overlap: true,
+      });
+      setSize(chart, 360, 130);
+      await chart.updateComplete;
+      const boxes = [...chart.shadowRoot!.querySelectorAll('.extreme-label')].map((node) => {
+        const x = Number(node.getAttribute('x'));
+        const y = Number(node.getAttribute('y'));
+        const width = 26;
+        const from = node.getAttribute('text-anchor') === 'end' ? x - width : x;
+        return { from, to: from + width, y };
+      });
+      expect(boxes.length).toBeGreaterThanOrEqual(2);
+      for (let a = 0; a < boxes.length; a += 1) {
+        for (let b = a + 1; b < boxes.length; b += 1) {
+          const overlapX = boxes[a].from < boxes[b].to && boxes[b].from < boxes[a].to;
+          const overlapY = Math.abs(boxes[a].y - boxes[b].y) < 10;
+          expect(overlapX && overlapY).toBe(false);
+        }
+      }
+    });
+  });
 });

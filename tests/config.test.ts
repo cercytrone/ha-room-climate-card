@@ -37,6 +37,9 @@ describe('normalizeConfig', () => {
     // The chart runs edge to edge unless the config says otherwise.
     expect(config.chart.fullBleed).toBe(true);
     expect(normalizeConfig({ chart_full_bleed: false }).chart.fullBleed).toBe(false);
+    // Overlapping curves are opt-in.
+    expect(normalizeConfig({}).chart.overlap).toBe(false);
+    expect(normalizeConfig({ chart_overlap: true }).chart.overlap).toBe(true);
     expect(config.chart.showGrid).toBe(false);
     expect(config.window.openStates).toEqual(DEFAULT_OPEN_STATES);
     expect(config.window.enabled).toBe(false);

@@ -276,6 +276,7 @@ Zeiger-Ziel ohne Tastatur-Pendant gibt es damit nicht.
 | --- | --- | --- | --- |
 | `show_temperature_chart` | boolean | automatisch | Temperaturkurve anzeigen. |
 | `show_humidity_chart` | boolean | automatisch | Feuchtekurve anzeigen. |
+| `chart_overlap` | boolean | `false` | Temperatur und Luftfeuchte nutzen beide die volle Höhe des Verlaufs und dürfen sich kreuzen – jede Kurve bekommt etwa doppelt so viel Platz. Aus: Feuchte im oberen Drittel, Temperatur in der unteren Hälfte, getrennt. |
 | `chart_hours` | number | `6` | Zeitraum in Stunden (1–168; Editor bietet 3/6/12/24/48/72 h und 7 Tage). Über 48 h lädt die Karte die Fünf-Minuten-Mittel der Recorder-Statistik statt jeder einzelnen Messung; Sensoren ohne Statistik (`state_class: measurement` fehlt) kommen weiter aus dem Verlauf. |
 | `chart_height` | number | `112` | Höhe des Chart-Bereichs in px (bei automatischer Kartenhöhe). |
 | `chart_curve` | `smooth` \| `linear` | `smooth` | Geglättete (überschwingungsfreie) oder direkt verbundene Linien. |
@@ -320,7 +321,7 @@ Home-Assistant-Selektoren (Entität, Zahl, Auswahl, Schalter, Farbe, Icon, Zusta
 | **Fenster** | Ein/Aus, Kontaktsensor, Zustände für „offen“ (State-Selector) |
 | **Bewegung** | Ein/Aus, Bewegungsmelder, Ruhe-Dauer |
 | **Thermostat** | Ein/Aus, Climate-Entität, Statuszeile komplett, **Tippen auf die Karte** (Thermostat-Dialog öffnen / nichts), Solltemperatur, Heizstatus (Flamme + Wort), HVAC-Modus, drei Flammenfarben (Heizen / Ruhe / aus) |
-| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, **Verlauf bündig zur Kartenkante**, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Soll-Linie im Verlauf**, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
+| **Verlauf** | Temperatur-/Feuchteverlauf Ein/Aus, **Temperatur und Luftfeuchte überlappen**, **Verlauf bündig zur Kartenkante**, Farbverlauf je Kurve, **Stärke des Flächenverlaufs** (Temperatur und Luftfeuchte getrennt), **Deckkraft der Kurven**, **Temperaturkurve nach Bereich einfärben** samt Grenzen „kalt unter / warm ab / heiß ab“ und dem Regler **Übergang zwischen den Bereichen**, Zeitraum, Chart-Höhe, Kurvenverlauf, Glättung (4 Stufen), Linienart Luftfeuchte (durchgezogen/gepunktet), Ausfälle (überbrücken/unterbrechen), maximale Ausfallzeit, Stil überbrückter Abschnitte, Gitter, **Soll-Linie im Verlauf**, **Zeitangaben unter dem Verlauf**, Datenpunkte, **Werte beim Überfahren**, **Minimum/Maximum im Chart** |
 
 Das Bild zeigt bewusst den Abschnitt **Allgemein** – dort steht neben dem Namensfeld auch die
 neue **Schriftgröße Raumname**. Das frühere Feld „Name aus Entität übernehmen“ gibt es nicht
@@ -478,6 +479,13 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
 - **Skalierung:** Beide Reihen werden unabhängig skaliert, damit unterschiedliche Wertebereiche
   lesbar bleiben – die Feuchte lebt im oberen Drittel, die Temperatur in der unteren Hälfte.
   Die beiden Kurven kreuzen sich dadurch nie.
+- **Überlappende Kurven (optional):** Mit `chart_overlap: true` (Editor: *Verlauf* →
+  **Temperatur und Luftfeuchte überlappen**) nutzen beide Reihen die ganze Höhe des Verlaufs,
+  jede mit ihrer eigenen Skala. Die Kurven dürfen sich kreuzen, dafür hat jede etwa doppelt so
+  viel Platz – kleine Schwankungen und kurze Einbrüche werden deutlich sichtbar. Der Verlauf
+  bleibt dabei an seiner Stelle unter den Messwerten, die Kartenhöhe ändert sich nicht. Die
+  Min/Max-Zahlen beider Kurven weichen einander aus (andere Seite des Punkts, dann darüber bzw.
+  darunter); ist kein Platz frei, bleibt der Punkt ohne Zahl.
 - **Ein Band allein nutzt die ganze Höhe:** Wird nur eine Reihe gezeichnet – weil die Feuchte im
   Editor bzw. per `show_humidity_chart: false` abgeschaltet ist oder weil ihr Messwert in der
   Karte angetippt wurde –, bekommt die verbleibende Kurve die ganze Plotfläche statt der halben.
@@ -532,7 +540,10 @@ Alle Farben lassen sich über die vorhandenen Farboptionen bzw. HA-Theme-Variabl
      bleibt die Anzeige vier Sekunden stehen (auf einem Wandtablet sonst unlesbar), beim
      Verlassen mit der Maus verschwindet sie sofort.
 - **Minimum/Maximum:** Die tiefste und höchste echte Messung des Zeitraums stehen als Zahl neben
-  der Kurve (ohne Einheit – Farbe und Band sagen, welche Reihe gemeint ist), in 10 px bei 80 %
+  der Kurve. Die geglättete Kurve **erreicht** diese Punkte: Rund um das Minimum und das Maximum
+  geht die Glättung über zwei Messpunkte in den echten Wert über. Vorher zog die Glättung einen
+  kurzen Einbruch (Fenster zehn Minuten offen) zu den Nachbarn hin, und die Marke schwebte unter
+  oder neben der Linie. Die Zahl steht (ohne Einheit – Farbe und Band sagen, welche Reihe gemeint ist), in 10 px bei 80 %
   Deckkraft und mit einem Rand in Kartenfarbe, damit die Linie nicht durch die Ziffern schlägt.
   Liegen beide Zahlen auf demselben Fleck, rücken sie an die Ränder ihres Bandes, statt eine zu
   verschlucken; erst wenn selbst dafür kein Platz ist (Band flacher als eine Zeile) bleibt das

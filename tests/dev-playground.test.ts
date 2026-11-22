@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { demoScenarios } from '../dev/scenarios';
 
 function buildShell(): void {
   document.body.innerHTML = `
@@ -33,7 +34,7 @@ describe('dev playground', () => {
 
   it('renders all demo cards', () => {
     const cards = document.querySelectorAll('#cards room-climate-card');
-    expect(cards.length).toBe(7);
+    expect(cards.length).toBe(demoScenarios.length);
   });
 
   it('wires the editor to the preview card', async () => {
